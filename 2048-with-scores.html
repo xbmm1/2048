@@ -1,0 +1,1125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>2048 Game with Score History</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    background: #faf8ef;
+    margin: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  h1 {
+    color: #776e65;
+  }
+
+  #score, #highScore {
+    font-size: 20px;
+    margin: 5px 0;
+    color: #776e65;
+  }
+
+  #gameBoard {
+    background: #bbada0;
+    border-radius: 10px;
+    padding: 10px;
+    width: 420px;
+    height: 420px;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    grid-gap: 10px;
+  }
+
+  .tile {
+    width: 100px;
+    height: 100px;
+    background: #cdc1b4;
+    border-radius: 6px;
+    font-weight: bold;
+    font-size: 45px;
+    line-height: 100px;
+    text-align: center;
+    color: #776e65;
+    user-select: none;
+  }
+
+  .tile-2 { background: #eee4da; color: #776e65; }
+  .tile-4 { background: #ede0c8; color: #776e65; }
+  .tile-8 { background: #f2b179; color: #f9f6f2; }
+  .tile-16 { background: #f59563; color: #f9f6f2; }
+  .tile-32 { background: #f67c5f; color: #f9f6f2; }
+  .tile-64 { background: #f65e3b; color: #f9f6f2; }
+  .tile-128 { background: #edcf72; color: #f9f6f2; font-size: 35px; }
+  .tile-256 { background: #edcc61; color: #f9f6f2; font-size: 35px; }
+  .tile-512 { background: #edc850; color: #f9f6f2; font-size: 35px; }
+  .tile-1024 { background: #edc53f; color: #f9f6f2; font-size: 25px; }
+  .tile-2048 { background: #edc22e; color: #f9f6f2; font-size: 25px; }
+
+  #message {
+    margin-top: 15px;
+    font-size: 24px;
+    color: #776e65;
+  }
+
+  button {
+    margin: 10px 10px 10px 0;
+    padding: 10px 20px;
+    font-size: 16px;
+    background: #8f7a66;
+    border: none;
+    border-radius: 5px;
+    color: white;
+    cursor: pointer;
+  }
+  button:hover {
+    background: #9f8b76;
+  }
+
+  /* Chart container */
+  #chartContainer {
+    width: 600px;
+    max-width: 90vw;
+    margin-top: 30px;
+  }
+</style>
+</head>
+<body>
+
+<h1>2048 Game</h1>
+
+<div id="score">Score: 0</div>
+<div id="highScore">High Score: 0</div>
+<div id="averageScoreDisplay" style="margin-top: 10px; font-weight: bold; color: #647bd9;">
+  Average Score: 0
+</div>
+
+
+<div id="gameBoard"></div>
+
+<div id="message"></div>
+
+<div>
+  <button id="restartBtn">Restart</button>
+  <button id="resetHighScoreBtn">Reset High Score</button>
+  <button id="undoBtn" disabled>Undo (Z)</button>
+  <button id="patternSolverBtn" 
+  style="padding: 10px 20px; font-size: 16px; cursor: pointer; border-radius: 5px; background-color: #8f7a66; color: white; border: none; margin-left: 10px;">
+  Run Pattern Solver (R)
+</button>
+<div style="display: inline-block; margin-left: 10px;">
+  <label for="solverStrategySelect" style="margin-right: 5px;">Strategy:</label>
+  <select id="solverStrategySelect" style="padding: 8px; font-size: 14px;">
+    <option value="pattern">Pattern Solver</option>
+    <option value="cornerStack">Corner Stack</option>
+    <option value="advancedCorner">Advanced Corner</option>
+  </select>
+</div>
+<button
+  style="padding: 10px 20px; font-size: 16px; cursor: pointer; border-radius: 5px; background-color: #8f7a66; color: white; border: none;"
+  onclick="window.open('2048-strategies.html', '_blank')"
+>
+  Open 2048 Explanation
+</button>
+
+  <label for="simPolicySelect">Simulator Policy:</label>
+  <select id="simPolicySelect" style="padding: 8px; margin: 0 10px; font-size: 14px;">
+    <option value="pattern">Pattern Solver</option>
+    <option value="random">Random</option>
+    <option value="cornerStack">Corner Stack</option>
+    <option value="advancedCorner">Advanced Corner (Heuristic)</option>
+  </select>
+  <button id="runSimBtn" style="padding: 10px 20px; font-size: 16px; cursor: pointer; border-radius: 5px; background-color: #8f7a66; color: white; border: none;">Run 100 Games</button>
+</div>
+
+<div id="simProgress" style="margin-top: 10px; font-size: 14px; color: #776e65;">Progress: 0/100</div>
+
+</div>
+
+<div id="chartContainer">
+  <canvas id="scoreChart" width="600" height="300"></canvas>
+</div>
+
+<div id="simResults" style="margin-top: 30px; padding: 15px; background: #f5f5f5; border-radius: 5px; white-space: pre-wrap; font-family: monospace; color: #776e65; display: none; max-width: 600px;"></div>
+
+<!-- Chart.js library -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+  // Game variables
+  const size = 4;
+  let board = [];
+  let score = 0;
+
+  // DOM elements
+  const gameBoard = document.getElementById('gameBoard');
+  const scoreDisplay = document.getElementById('score');
+  const highScoreDisplay = document.getElementById('highScore');
+  const message = document.getElementById('message');
+  const restartBtn = document.getElementById('restartBtn');
+  const resetHighScoreBtn = document.getElementById('resetHighScoreBtn');
+  const scoreChartCtx = document.getElementById('scoreChart').getContext('2d');
+
+  let solverInterval = null;
+let currentSolverStrategy = 'pattern'; // track which strategy is being used
+const MOVE_DELAY = 50; // milliseconds delay between moves
+
+function cloneBoard(board) {
+  return board.map(row => row.slice());
+}
+
+function simulateMove(originalBoard, direction) {
+  let boardClone = cloneBoard(originalBoard);
+  let scoreGained = 0;
+
+  function slideSim(row) {
+    let arr = row.filter(v => v !== 0);
+    for(let i=0; i < arr.length -1; i++) {
+      if(arr[i] === arr[i+1]) {
+        arr[i] *= 2;
+        scoreGained += arr[i];
+        arr[i+1] = 0;
+        i++;
+      }
+    }
+    arr = arr.filter(v => v !== 0);
+    while(arr.length < boardClone.length) arr.push(0);
+    return arr;
+  }
+
+  let moved = false;
+  const size = boardClone.length;
+
+  switch(direction) {
+    case 'left':
+      for(let r=0; r<size; r++) {
+        let newRow = slideSim(boardClone[r]);
+        if(newRow.toString() !== boardClone[r].toString()) {
+          moved = true;
+          boardClone[r] = newRow;
+        }
+      }
+      break;
+    case 'right':
+      for(let r=0; r<size; r++) {
+        let reversed = boardClone[r].slice().reverse();
+        let newRow = slideSim(reversed);
+        newRow.reverse();
+        if(newRow.toString() !== boardClone[r].toString()) {
+          moved = true;
+          boardClone[r] = newRow;
+        }
+      }
+      break;
+    case 'up':
+      for(let c=0; c<size; c++) {
+        let col = [];
+        for(let r=0; r<size; r++) col.push(boardClone[r][c]);
+        let newCol = slideSim(col);
+        for(let r=0; r<size; r++) {
+          if(boardClone[r][c] !== newCol[r]) {
+            moved = true;
+            boardClone[r][c] = newCol[r];
+          }
+        }
+      }
+      break;
+    case 'down':
+      for(let c=0; c<size; c++) {
+        let col = [];
+        for(let r=0; r<size; r++) col.push(boardClone[r][c]);
+        let reversed = col.slice().reverse();
+        let newCol = slideSim(reversed);
+        newCol.reverse();
+        for(let r=0; r<size; r++) {
+          if(boardClone[r][c] !== newCol[r]) {
+            moved = true;
+            boardClone[r][c] = newCol[r];
+          }
+        }
+      }
+      break;
+  }
+
+  return { board: boardClone, moved, scoreGained };
+}
+
+// ============ PURE SIMULATION HELPERS FOR 100-GAME SIMULATOR ============
+
+function createEmptyBoard() {
+  const newBoard = [];
+  for(let i=0; i<size; i++) {
+    newBoard[i] = [];
+    for(let j=0; j<size; j++) {
+      newBoard[i][j] = 0;
+    }
+  }
+  return newBoard;
+}
+
+function addRandomTileTo(board) {
+  let empty = [];
+  for(let r=0; r<size; r++) {
+    for(let c=0; c<size; c++) {
+      if(board[r][c] === 0) empty.push({r, c});
+    }
+  }
+  if(empty.length === 0) return board;
+  
+  const newBoard = cloneBoard(board);
+  const {r, c} = empty[Math.floor(Math.random() * empty.length)];
+  newBoard[r][c] = Math.random() < 0.9 ? 2 : 4;
+  return newBoard;
+}
+
+function applyMove(board, direction) {
+  return simulateMove(board, direction);
+}
+
+function isGameOverBoard(board) {
+  for(let r=0; r<size; r++) {
+    for(let c=0; c<size; c++) {
+      if(board[r][c] === 0) return false;
+      if(c < size -1 && board[r][c] === board[r][c+1]) return false;
+      if(r < size -1 && board[r][c] === board[r+1][c]) return false;
+    }
+  }
+  return true;
+}
+
+function getMaxTile(board) {
+  let max = 0;
+  for(let r=0; r<size; r++) {
+    for(let c=0; c<size; c++) {
+      if(board[r][c] > max) max = board[r][c];
+    }
+  }
+  return max;
+}
+
+// Random move policy for simulator - tries all directions, picking first that works
+function randomPolicy(board) {
+  const dirs = ['up', 'down', 'left', 'right'];
+  // Shuffle directions for randomness
+  for(let i = dirs.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [dirs[i], dirs[j]] = [dirs[j], dirs[i]];
+  }
+  for(let i=0; i<dirs.length; i++) {
+    const result = applyMove(board, dirs[i]);
+    if(result.moved) return dirs[i];
+  }
+  return null;
+}
+
+// Pattern solver policy factory for simulator (returns a policy with local state)
+function createPatternPolicy() {
+  let leftRightPhase = 0; // local state per policy instance
+  return function policy(board) {
+    let result = applyMove(board, 'up');
+    if(result.moved) return 'up';
+    
+    result = applyMove(board, 'right');
+    if(result.moved) return 'right';
+    
+    const dir = (leftRightPhase === 0) ? 'left' : 'right';
+    result = applyMove(board, dir);
+    leftRightPhase = 1 - leftRightPhase;
+    if(result.moved) return dir;
+    
+    return null;
+  };
+}
+
+// Corner stacking policy factory - keeps highest tiles in corner, maintains empty space
+function createCornerStackPolicy() {
+  return function policy(board) {
+    // Strategy: keep highest tile in bottom-right corner
+    // Moves: Down, Right (to stack in corner), then Left, Up for variety
+    
+    const directions = ['down', 'right', 'left', 'up'];
+    
+    for(let dir of directions) {
+      const result = applyMove(board, dir);
+      if(result.moved) return dir;
+    }
+    
+    return null;
+  };
+}
+
+// Advanced corner policy - evaluates moves by board state fitness
+function createAdvancedCornerPolicy() {
+  return function policy(board) {
+    // Heuristic: prioritize moves that:
+    // 1. Keep largest tile in corner
+    // 2. Maximize empty cells
+    // 3. Minimize fragmentation (group similar values)
+    
+    function countEmptyCells(b) {
+      let empty = 0;
+      for(let r=0; r<size; r++) {
+        for(let c=0; c<size; c++) {
+          if(b[r][c] === 0) empty++;
+        }
+      }
+      return empty;
+    }
+    
+    function getMaxTilePos(b) {
+      let maxVal = 0, maxR = 0, maxC = 0;
+      for(let r=0; r<size; r++) {
+        for(let c=0; c<size; c++) {
+          if(b[r][c] > maxVal) {
+            maxVal = b[r][c];
+            maxR = r;
+            maxC = c;
+          }
+        }
+      }
+      return { val: maxVal, r: maxR, c: maxC };
+    }
+    
+    function scoreBoard(b) {
+      const max = getMaxTilePos(b);
+      const empty = countEmptyCells(b);
+      
+      // Reward: empty cells (want at least 2-3 open)
+      let score = empty * 10;
+      
+      // Reward: max tile in corner (bottom-right is ideal)
+      const cornerDist = Math.abs(max.r - 3) + Math.abs(max.c - 3);
+      score += (8 - cornerDist) * 50;
+      
+      return score;
+    }
+    
+    const directions = ['down', 'right', 'left', 'up'];
+    let bestMove = null;
+    let bestScore = scoreBoard(board);
+    
+    for(let dir of directions) {
+      const result = applyMove(board, dir);
+      if(result.moved) {
+        const newScore = scoreBoard(result.board);
+        if(newScore > bestScore) {
+          bestScore = newScore;
+          bestMove = dir;
+        }
+      }
+    }
+    
+    // If no improving move found, just return any valid move
+    if(!bestMove) {
+      for(let dir of directions) {
+        const result = applyMove(board, dir);
+        if(result.moved) return dir;
+      }
+    }
+    
+    return bestMove;
+  };
+}
+
+// Single game simulation - returns {score, steps, maxTile, durationMs}
+function runSingleSimulation(policy) {
+  const startTime = performance.now();
+  let gameBoard = createEmptyBoard();
+  gameBoard = addRandomTileTo(gameBoard);
+  gameBoard = addRandomTileTo(gameBoard);
+  
+  let gameScore = 0;
+  let steps = 0;
+  
+  while(!isGameOverBoard(gameBoard) && steps < 10000) {
+    const dir = policy(gameBoard);
+    if(!dir) break;
+    
+    const result = applyMove(gameBoard, dir);
+    if(!result.moved) break;
+    
+    gameBoard = result.board;
+    gameScore += result.scoreGained;
+    gameBoard = addRandomTileTo(gameBoard);
+    steps++;
+  }
+  
+  const maxTile = getMaxTile(gameBoard);
+  const durationMs = performance.now() - startTime;
+  
+  return { score: gameScore, steps: steps, maxTile: maxTile, durationMs: durationMs };
+}
+
+// Compute statistics from array of values
+function computeStats(values) {
+  if(values.length === 0) return {};
+  
+  const sorted = [...values].sort((a,b) => a - b);
+  const count = values.length;
+  const min = sorted[0];
+  const max = sorted[count - 1];
+  const mean = values.reduce((a,b) => a+b, 0) / count;
+  const median = count % 2 === 0 
+    ? (sorted[count/2 - 1] + sorted[count/2]) / 2 
+    : sorted[Math.floor(count/2)];
+  
+  const variance = values.reduce((sum, v) => sum + Math.pow(v - mean, 2), 0) / count;
+  const stddev = Math.sqrt(variance);
+  
+  const p10 = sorted[Math.floor(count * 0.1)];
+  const p25 = sorted[Math.floor(count * 0.25)];
+  const p50 = median;
+  const p75 = sorted[Math.floor(count * 0.75)];
+  const p90 = sorted[Math.floor(count * 0.9)];
+  
+  return { count, min, max, mean, median, stddev, p10, p25, p50, p75, p90 };
+}
+
+// Async batch runner for N games with progress updates
+async function simulateNGames(count, policyName) {
+  const scores = [];
+  const maxTiles = [];
+  const durations = [];
+  
+  let policyFactory;
+  if(policyName === 'pattern') policyFactory = createPatternPolicy;
+  else if(policyName === 'cornerStack') policyFactory = createCornerStackPolicy;
+  else if(policyName === 'advancedCorner') policyFactory = createAdvancedCornerPolicy;
+  else policyFactory = () => randomPolicy;
+  
+  const totalStartTime = performance.now();
+  
+  const batchSize = 10;
+  for(let i = 0; i < count; i++) {
+    const policy = policyFactory();
+    const result = runSingleSimulation(policy);
+    scores.push(result.score);
+    maxTiles.push(result.maxTile);
+    durations.push(result.durationMs);
+    
+    // Update progress
+    document.getElementById('simProgress').textContent = `Progress: ${i+1}/${count}`;
+    
+    // Yield every batch to avoid blocking UI
+    if((i + 1) % batchSize === 0) {
+      await new Promise(r => setTimeout(r, 0));
+    }
+  }
+  
+  const totalDurationMs = performance.now() - totalStartTime;
+  const scoreStats = computeStats(scores);
+  
+  // Count max tile distribution
+  const maxTileDist = {};
+  maxTiles.forEach(tile => {
+    maxTileDist[tile] = (maxTileDist[tile] || 0) + 1;
+  });
+  
+  return {
+    scores: scores,
+    maxTiles: maxTiles,
+    durations: durations,
+    scoreStats: scoreStats,
+    maxTileDist: maxTileDist,
+    totalDurationMs: totalDurationMs
+  };
+}
+
+// Display simulation results and save to localStorage
+async function displaySimulationResults(policyName) {
+  const runSimBtn = document.getElementById('runSimBtn');
+  const simProgress = document.getElementById('simProgress');
+  const simResults = document.getElementById('simResults');
+  
+  runSimBtn.disabled = true;
+  runSimBtn.textContent = 'Running...';
+  simProgress.style.display = 'block';
+  simResults.style.display = 'none';
+  
+  try {
+    const results = await simulateNGames(100, policyName);
+    
+    const stats = results.scoreStats;
+    const maxTileDist = results.maxTileDist;
+    
+    // Format .info() output
+    let infoText = `=== Simulation Results (${policyName.toUpperCase()} Policy) ===\n`;
+    infoText += `Count: ${stats.count}\n`;
+    infoText += `Min Score: ${Math.round(stats.min)}\n`;
+    infoText += `Max Score: ${Math.round(stats.max)}\n`;
+    infoText += `Mean: ${stats.mean.toFixed(2)}\n`;
+    infoText += `Median: ${Math.round(stats.median)}\n`;
+    infoText += `Stddev: ${stats.stddev.toFixed(2)}\n`;
+    infoText += `P10: ${Math.round(stats.p10)}\n`;
+    infoText += `P25: ${Math.round(stats.p25)}\n`;
+    infoText += `P50: ${Math.round(stats.p50)}\n`;
+    infoText += `P75: ${Math.round(stats.p75)}\n`;
+    infoText += `P90: ${Math.round(stats.p90)}\n`;
+    infoText += `\nMax Tile Distribution:\n`;
+    
+    Object.keys(maxTileDist).sort((a,b) => b-a).forEach(tile => {
+      infoText += `  ${tile}: ${maxTileDist[tile]} games\n`;
+    });
+    
+    infoText += `\nTotal Duration: ${(results.totalDurationMs / 1000).toFixed(2)}s\n`;
+    infoText += `Avg Per Game: ${(results.totalDurationMs / 100).toFixed(2)}ms\n`;
+    
+    // Save to localStorage under separate key
+    const session = {
+      id: Date.now(),
+      date: new Date().toISOString(),
+      policy: policyName,
+      count: 100,
+      scores: results.scores,
+      stats: stats,
+      maxTileDist: maxTileDist,
+      totalDurationMs: results.totalDurationMs
+    };
+    
+    let simulations = JSON.parse(localStorage.getItem('simulationResults')) || [];
+    simulations.push(session);
+    localStorage.setItem('simulationResults', JSON.stringify(simulations));
+    
+    // Display results
+    simResults.textContent = infoText;
+    simResults.style.display = 'block';
+    simProgress.textContent = `Completed 100 games in ${(results.totalDurationMs / 1000).toFixed(2)}s`;
+    
+  } catch(err) {
+    console.error('Simulation error:', err);
+    simResults.textContent = 'Error running simulation: ' + err.message;
+    simResults.style.display = 'block';
+  } finally {
+    runSimBtn.disabled = false;
+    runSimBtn.textContent = 'Run 100 Games';
+  }
+}
+
+// History stack for undo functionality
+const MAX_UNDO = 15; // cap history length
+let history = [];
+
+function saveStateForUndo() {
+  // Save a deep copy of the board and relevant state
+  history.push({ board: cloneBoard(board), score: score, highScore: highScore, message: message.textContent });
+  // Enforce cap (remove oldest if over limit)
+  if (history.length > MAX_UNDO) history.shift();
+  updateUndoButton();
+}
+
+function updateUndoButton() {
+  const btn = document.getElementById('undoBtn');
+  if (!btn) return;
+  btn.disabled = history.length === 0;
+}
+
+function undo() {
+  if (history.length === 0) return;
+  const prev = history.pop();
+  board = cloneBoard(prev.board);
+  score = prev.score;
+  highScore = prev.highScore || 0;
+  message.textContent = prev.message || '';
+  // Restore displayed high score and storage
+  localStorage.setItem('highScore', highScore);
+  updateBoard();
+  updateScore();
+  updateUndoButton();
+}
+
+// State for left/right alternation when up and right are blocked
+let leftRightPhase = 0; // 0 = next move left, 1 = next move right
+
+function patternSolverLoop() {
+  if (message.textContent !== '') {
+    // Game over or stopped, stop interval and reset button text
+    clearInterval(solverInterval);
+    solverInterval = null;
+    document.getElementById('patternSolverBtn').textContent = 'Run Pattern Solver(R)';
+    return;
+  }
+
+  // Use selected strategy to determine next move
+  let dir = null;
+  
+  if(currentSolverStrategy === 'cornerStack') {
+    // Corner stack: down, right, left, up
+    const directions = ['down', 'right', 'left', 'up'];
+    for(let d of directions) {
+      let result = simulateMove(board, d);
+      if(result.moved) {
+        dir = d;
+        break;
+      }
+    }
+  } else if(currentSolverStrategy === 'advancedCorner') {
+    // Advanced corner: evaluate board fitness
+    function countEmptyCells(b) {
+      let empty = 0;
+      for(let r=0; r<size; r++) {
+        for(let c=0; c<size; c++) {
+          if(b[r][c] === 0) empty++;
+        }
+      }
+      return empty;
+    }
+    
+    function getMaxTilePos(b) {
+      let maxVal = 0, maxR = 0, maxC = 0;
+      for(let r=0; r<size; r++) {
+        for(let c=0; c<size; c++) {
+          if(b[r][c] > maxVal) {
+            maxVal = b[r][c];
+            maxR = r;
+            maxC = c;
+          }
+        }
+      }
+      return { val: maxVal, r: maxR, c: maxC };
+    }
+    
+    function scoreBoard(b) {
+      const max = getMaxTilePos(b);
+      const empty = countEmptyCells(b);
+      let score = empty * 10;
+      const cornerDist = Math.abs(max.r - 3) + Math.abs(max.c - 3);
+      score += (8 - cornerDist) * 50;
+      return score;
+    }
+    
+    const directions = ['down', 'right', 'left', 'up'];
+    let bestMove = null;
+    let bestScore = scoreBoard(board);
+    
+    for(let d of directions) {
+      let result = simulateMove(board, d);
+      if(result.moved) {
+        const newScore = scoreBoard(result.board);
+        if(newScore > bestScore) {
+          bestScore = newScore;
+          bestMove = d;
+        }
+      }
+    }
+    
+    if(!bestMove) {
+      for(let d of directions) {
+        let result = simulateMove(board, d);
+        if(result.moved) {
+          dir = d;
+          break;
+        }
+      }
+    } else {
+      dir = bestMove;
+    }
+  } else {
+    // Default pattern solver: up, right, then alternate left/right
+    let result = simulateMove(board, 'up');
+    if (result.moved) {
+      dir = 'up';
+    } else {
+      result = simulateMove(board, 'right');
+      if (result.moved) {
+        dir = 'right';
+      } else {
+        let altDir = (leftRightPhase === 0) ? 'left' : 'right';
+        result = simulateMove(board, altDir);
+        if (result.moved) {
+          dir = altDir;
+        }
+        leftRightPhase = 1 - leftRightPhase;
+      }
+    }
+  }
+  
+  if(dir) {
+    move(dir);
+  }
+}
+
+// Button event listener to start/stop the solver loop
+document.addEventListener('DOMContentLoaded', () => {
+  const patternBtn = document.getElementById('patternSolverBtn');
+  const strategySelect = document.getElementById('solverStrategySelect');
+  
+  if(strategySelect) {
+    strategySelect.addEventListener('change', (e) => {
+      currentSolverStrategy = e.target.value;
+    });
+  }
+  
+  if (patternBtn) {
+    patternBtn.addEventListener('click', () => {
+      if (solverInterval !== null) {
+        // Stop solver
+        clearInterval(solverInterval);
+        solverInterval = null;
+        patternBtn.textContent = 'Run Pattern Solver';
+        return;
+      }
+      if (message.textContent !== '') return; // game over, do nothing
+
+      // Reset left/right alternation phase
+      leftRightPhase = 0;
+      currentSolverStrategy = document.getElementById('solverStrategySelect').value;
+      patternBtn.textContent = 'Stop Pattern Solver';
+
+      // Start interval to run solver loop repeatedly with delay
+      solverInterval = setInterval(() => {
+        patternSolverLoop();
+        if (message.textContent !== '') {
+          clearInterval(solverInterval);
+          solverInterval = null;
+          patternBtn.textContent = 'Run Pattern Solver';
+        }
+      }, MOVE_DELAY);
+    });
+  }
+});
+
+
+  // Load high score from localStorage or default to 0
+  let highScore = parseInt(localStorage.getItem('highScore')) || 0;
+  highScoreDisplay.textContent = 'High Score: ' + highScore;
+
+  // Load all past scores from localStorage or empty array
+  let scores = JSON.parse(localStorage.getItem('scores')) || [];
+
+  // Chart instance holder
+  let scoreChartInstance = null;
+
+  // Initialize game board with zeros and add two tiles
+  function initBoard() {
+    board = [];
+    score = 0;
+    message.textContent = '';
+    // Clear undo history on new game
+    history = [];
+    updateUndoButton();
+    for(let i=0; i<size; i++) {
+      board[i] = [];
+      for(let j=0; j<size; j++) {
+        board[i][j] = 0;
+      }
+    }
+    addRandomTile();
+    addRandomTile();
+    updateBoard();
+    updateScore();
+  }
+
+  // Add a random tile (2 or 4) in an empty spot
+  function addRandomTile() {
+    let empty = [];
+    for(let r=0; r<size; r++) {
+      for(let c=0; c<size; c++) {
+        if(board[r][c] === 0) empty.push({r, c});
+      }
+    }
+    if(empty.length === 0) return;
+    const {r, c} = empty[Math.floor(Math.random() * empty.length)];
+    board[r][c] = Math.random() < 0.9 ? 2 : 4;
+  }
+
+  // Render the board visually
+  function updateBoard() {
+    gameBoard.innerHTML = '';
+    for(let r=0; r<size; r++) {
+      for(let c=0; c<size; c++) {
+        const val = board[r][c];
+        const tile = document.createElement('div');
+        tile.classList.add('tile');
+        if(val !== 0) {
+          tile.classList.add('tile-' + val);
+          tile.textContent = val;
+        }
+        gameBoard.appendChild(tile);
+      }
+    }
+  }
+
+  // Update the current score and high score displays
+  function updateScore() {
+    scoreDisplay.textContent = 'Score: ' + score;
+    if(score > highScore) {
+      highScore = score;
+      localStorage.setItem('highScore', highScore);
+      highScoreDisplay.textContent = 'High Score: ' + highScore;
+    }
+  }
+
+  // Slide and merge one row or column
+  function slide(row) {
+    let arr = row.filter(v => v !== 0);
+    for(let i=0; i < arr.length - 1; i++) {
+      if(arr[i] === arr[i+1]) {
+        arr[i] *= 2;
+        score += arr[i];
+        arr[i+1] = 0;
+        i++;
+      }
+    }
+    arr = arr.filter(v => v !== 0);
+    while(arr.length < size) arr.push(0);
+    return arr;
+  }
+
+  // Perform move in given direction (uses simulateMove to detect change)
+  function move(direction) {
+    if (message.textContent !== '') return;
+    const sim = simulateMove(board, direction);
+    if (!sim.moved) return;
+
+    // Save previous state for undo
+    saveStateForUndo();
+
+    // Apply simulated result
+    board = sim.board;
+    score += sim.scoreGained;
+    addRandomTile();
+    updateBoard();
+    updateScore();
+
+    if (checkGameOver()) {
+      message.textContent = 'Game Over! Press Restart to try again.';
+      saveScore(score); // Save score on game over
+    }
+  }
+
+  // Check if no moves left (game over)
+  function checkGameOver() {
+    for(let r=0; r<size; r++) {
+      for(let c=0; c<size; c++) {
+        if(board[r][c] === 0) return false;
+        if(c < size -1 && board[r][c] === board[r][c+1]) return false;
+        if(r < size -1 && board[r][c] === board[r+1][c]) return false;
+      }
+    }
+    return true;
+  }
+
+  // Save a new score to localStorage scores array
+  function saveScore(newScore) {
+    scores.push({ score: newScore, date: new Date().toISOString() });
+    localStorage.setItem('scores', JSON.stringify(scores));
+    plotScores();
+    displayAverageScore();
+  }
+
+  // Plot scores on the chart using Chart.js
+  function plotScores() {
+  const labels = scores.map((entry) => {
+    const d = new Date(entry.date);
+    return d.toLocaleDateString() + ' ' + d.toLocaleTimeString();
+  });
+  const data = scores.map(entry => entry.score);
+
+  // Calculate average score
+  const averageScore = data.length > 0 ? data.reduce((a, b) => a + b, 0) / data.length : 0;
+
+  // Create an array with the average repeated for each label (to plot a horizontal line)
+  const averageData = new Array(data.length).fill(averageScore);
+
+  if(scoreChartInstance) {
+    scoreChartInstance.destroy();
+  }
+
+  scoreChartInstance = new Chart(scoreChartCtx, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          label: 'Game Scores Over Time',
+          data: data,
+          borderColor: 'rgba(143, 122, 102, 0.8)',
+          backgroundColor: 'rgba(143, 122, 102, 0.3)',
+          fill: true,
+          tension: 0.3,
+          pointRadius: 4,
+          pointHoverRadius: 6,
+        },
+        {
+          label: 'Average Score',
+          data: averageData,
+          borderColor: 'rgba(100, 149, 237, 0.8)', // Cornflower blue
+          borderDash: [10,5], // dashed line
+          fill: false,
+          pointRadius: 0,
+          borderWidth: 2,
+	  
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      scales: {
+        x: { display: true, title: { display: true, text: 'Date & Time' } },
+        y: { display: true, title: { display: true, text: 'Score' }, beginAtZero: true }
+      }
+    }
+  });
+}
+
+
+  // Keyboard controls
+  window.addEventListener('keydown', e => {
+    if(message.textContent !== '') return;
+    switch(e.key) {
+      case 'ArrowLeft':
+        e.preventDefault();
+        move('left');
+        break;
+      case 'ArrowRight':
+        e.preventDefault();
+        move('right');
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        move('up');
+        break;
+      case 'ArrowDown':
+        e.preventDefault();
+        move('down');
+        break;
+    }
+  });
+
+  // Restart button resets the game
+  restartBtn.addEventListener('click', () => {
+    initBoard();
+  });
+
+  // Reset high score button clears localStorage and updates display
+  resetHighScoreBtn.addEventListener('click', () => {
+    localStorage.removeItem('highScore');
+    highScore = 0;
+    highScoreDisplay.textContent = 'High Score: 0';
+
+    // Optionally clear all scores and update chart
+    scores = [];
+    localStorage.removeItem('scores');
+    plotScores();
+  });
+
+  // Undo button listener
+  const undoBtn = document.getElementById('undoBtn');
+  if (undoBtn) {
+    undoBtn.addEventListener('click', () => {
+      // If solver is running, stop it to avoid conflicts
+      if (solverInterval !== null) {
+        clearInterval(solverInterval);
+        solverInterval = null;
+        document.getElementById('patternSolverBtn').textContent = 'Run Pattern Solver(R)';
+      }
+      undo();
+    });
+  }
+
+  // Simulator button event listener
+  const runSimBtn = document.getElementById('runSimBtn');
+  if (runSimBtn) {
+    runSimBtn.addEventListener('click', () => {
+      const policy = document.getElementById('simPolicySelect').value;
+      displaySimulationResults(policy);
+    });
+  }
+
+  // Keyboard shortcut: 'z' key to undo (works even if game over message shown)
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'z' || e.key === 'Z') {
+      e.preventDefault();
+      // Stop solver to avoid conflicts
+      if (solverInterval !== null) {
+        clearInterval(solverInterval);
+        solverInterval = null;
+        const pbtn = document.getElementById('patternSolverBtn');
+        if (pbtn) pbtn.textContent = 'Run Pattern Solver(R)';
+      }
+      undo();
+    }
+  });
+
+  // Keyboard shortcut: Space toggles the pattern solver (start/stop)
+  window.addEventListener('keydown', (e) => {
+    if (e.code === 'Space' || e.key === ' ') {
+      e.preventDefault();
+      const patternBtn = document.getElementById('patternSolverBtn');
+      if (!patternBtn) return;
+
+      if (solverInterval !== null) {
+        // Stop solver
+        clearInterval(solverInterval);
+        solverInterval = null;
+        patternBtn.textContent = 'Run Pattern Solver';
+        return;
+      }
+
+      // Don't start solver if game over
+      if (message.textContent !== '') return;
+
+      // Start solver (same behavior as clicking the button)
+      leftRightPhase = 0;
+      patternBtn.textContent = 'Stop Pattern Solver';
+      solverInterval = setInterval(() => {
+        patternSolverLoop();
+        if (message.textContent !== '') {
+          clearInterval(solverInterval);
+          solverInterval = null;
+          patternBtn.textContent = 'Run Pattern Solver';
+        }
+      }, MOVE_DELAY);
+    }
+  });
+
+  // Initialize the game and plot existing scores on page load
+  initBoard();
+  plotScores();
+  displayAverageScore();
+
+function displayAverageScore() {
+  if (!scores || scores.length === 0) {
+    document.getElementById('averageScoreDisplay').textContent = 'Average Score: 0';
+    return;
+  }
+  const total = scores.reduce((sum, entry) => sum + entry.score, 0);
+  const avg = total / scores.length;
+  document.getElementById('averageScoreDisplay').textContent = 'Average Score: ' + avg.toFixed(2);
+}
+
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'r' || e.key === 'R') {
+    e.preventDefault(); // prevent default browser actions (optional)
+
+    // Restart the game
+    initBoard();
+
+    // Start the solver if not already running
+    if (solverInterval === null) {
+      // Reset solver state variables as needed
+      leftRightPhase = 0;
+      document.getElementById('patternSolverBtn').textContent = 'Stop Pattern Solver';
+
+      // Start the solver interval loop
+      solverInterval = setInterval(() => {
+        patternSolverLoop();
+        if (message.textContent !== '') {
+          clearInterval(solverInterval);
+          solverInterval = null;
+          document.getElementById('patternSolverBtn').textContent = 'Run Pattern Solver(R)';
+        }
+      }, MOVE_DELAY);
+    }
+  }
+});
+
+
+</script>
+
+</body>
+</html>
