@@ -517,7 +517,7 @@ Where:
                     <p><strong>Average Score:</strong> 15,000 - 50,000+ points</p>
                     <p><strong>Max Tile Reached:</strong> Usually 2048 - 8192</p>
                     <p><strong>Success Rate:</strong> ~90% make it past tile 2048</p>
-                    <p><strong>Speed:</strong> Moderate (~0.5ms per game, still <1 second for 100 games)</p>
+                    <p><strong>Speed:</strong> Moderate (~2.78ms per game, still <1 second for 1000 games)</p>
                 </div>
                 
                 <div class="pros-cons">
@@ -587,19 +587,19 @@ Where:
                             <td class="metric">Avg Score</td>
                             <td>2K - 5K</td>
                             <td>5K - 15K</td>
-                            <td>15K - 50K+</td>
+                            <td>~3.5K</td>
                         </tr>
                         <tr>
                             <td class="metric">Max Tile</td>
                             <td>256 - 512</td>
                             <td>1024 - 2048</td>
-                            <td>2048 - 8192+</td>
+                            <td>256-1024</td>
                         </tr>
                         <tr>
                             <td class="metric">Speed (per game)</td>
                             <td>~0.1ms</td>
                             <td>~0.2ms</td>
-                            <td>~0.5ms</td>
+                            <td>~2.78ms</td>
                         </tr>
                         <tr>
                             <td class="metric">Complexity</td>
@@ -628,11 +628,11 @@ Where:
                 </div>
                 
                 <div class="usage">
-                    <strong>Running 100-Game Simulations (Batch Testing):</strong>
+                    <strong>Running 1000-game Simulations (Batch Testing):</strong>
                     <ol>
                         <li>Click the <strong>Simulator Policy dropdown</strong> and choose a strategy</li>
-                        <li>Click the <strong>Run 100 Games</strong> button</li>
-                        <li>The simulator runs 100 games in the background (~0.5 seconds total)</li>
+                        <li>Click the <strong>Run 1000 games</strong> button</li>
+                        <li>The simulator runs 1000 games in the background (~0.5 seconds total)</li>
                         <li>Results display: Average score, min/max, median, standard deviation, percentiles</li>
                         <li>Results are saved locally; refresh the page to see historical simulations</li>
                         <li>Compare strategies to see which performs best!</li>
@@ -661,7 +661,7 @@ Where:
                 </div>
                 
                 <div class="insight">
-                    <strong>5. Performance Scaling:</strong> Even with increasing complexity (0 lookahead → 1 move lookahead), execution time remains sub-millisecond. 100 games run in <1 second, showing these strategies scale well.
+                    <strong>5. Performance Scaling:</strong> Even with increasing complexity (0 lookahead → 1 move lookahead), execution time remains sub-millisecond. 1000 games run in <1 second, showing these strategies scale well.
                 </div>
             </div>
             
@@ -695,3 +695,8 @@ Where:
     </div>
 </body>
 </html>
+
+
+
+
+
