@@ -1,6 +1,6 @@
 # 2048 Game with AI Strategy Solver
 
-A fully-featured implementation of the classic 2048 puzzle game, complete with multiple AI strategies, a 100-game simulator for benchmarking, and comprehensive strategy documentation.
+A fully-featured implementation of the classic 2048 puzzle game, complete with multiple AI strategies, a 1000-game simulator for benchmarking, and comprehensive strategy documentation.
 https://xbmm1.github.io/2048/2048-with-scores.html
 
 ## Overview
@@ -48,9 +48,9 @@ The most sophisticated strategy. It evaluates all four possible moves, scores re
 - Press Z to undo moves (useful for debugging)
 - Press R to restart and auto-start solver
 
-#### 100-Game Simulator
-- Choose a strategy policy and click "Run 100 Games"
-- Runs 100 complete games in under 1 second (async batching)
+-#### 1000-Game Simulator
+- Choose a strategy policy and click "Run 1000 Games"
+- Runs 1000 complete games in the background (async batching)
 - Displays comprehensive statistics:
   - Min/max/mean/median scores
   - Standard deviation and percentiles (p10, p25, p50, p75, p90)
@@ -81,8 +81,8 @@ Click "Open 2048 Explanation" to see a detailed page explaining each strategy's 
 
 ### Running Simulations
 1. Select a policy from the "Simulator Policy" dropdown
-2. Click "Run 100 Games"
-3. The simulator runs 100 complete games and displays statistics
+2. Click "Run 1000 Games"
+3. The simulator runs 1000 complete games and displays statistics
 4. Use these results to compare strategies
 
 ### Keyboard Shortcuts
@@ -96,7 +96,7 @@ Click "Open 2048 Explanation" to see a detailed page explaining each strategy's 
 - **Reset High Score**: Clear your high score and score history
 - **Undo (Z)**: Revert the last move
 - **Run Pattern Solver (R)**: Start solver with selected strategy
-- **Run 100 Games**: Simulate 100 complete games with chosen strategy
+-- **Run 1000 Games**: Simulate 1000 complete games with chosen strategy
 - **Open 2048 Explanation**: View detailed strategy documentation
 
 ## Technical Details
@@ -131,11 +131,11 @@ README.md                   This file
 ## Performance
 
 All strategies run efficiently in the browser:
-- **Pattern Solver**: <0.2ms per game → 100 games in ~20ms
-- **Corner Stack**: <0.3ms per game → 100 games in ~30ms
-- **Advanced Corner**: <0.6ms per game → 100 games in <600ms
+- **Pattern Solver**: <0.2ms per game → 1000 games in ~200ms
+- **Corner Stack**: <0.3ms per game → 1000 games in ~300ms
+- **Advanced Corner**: <0.6ms per game → 1000 games in <600ms
 
-Total runtime for 100-game batch: typically under 1 second with full UI updates.
+Total runtime for 1000-game batch: typically under a few seconds with full UI updates.
 
 ## Design Philosophy
 
@@ -178,6 +178,6 @@ Free to use and modify for personal and educational purposes.
 
 This project started as a simple 2048 clone but evolved into a playground for exploring AI heuristics and game theory. The main insight: even simple heuristics (corner stacking) massively outperform fixed patterns, and adding shallow lookahead creates exponential performance improvements. It's a fun way to see how strategy affects gameplay outcomes.
 
-Try running 100 games with each strategy and compare the results—you'll see why the Advanced Corner strategy reaches 8192+ tiles while the Pattern Solver struggles past 512!
+Try running 1000 games with each strategy and compare the results—you'll see why the Advanced Corner strategy reaches high tiles while the Pattern Solver struggles past 512!
 
 Enjoy the game and feel free to experiment with your own strategies. 🎮
