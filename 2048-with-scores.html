@@ -541,13 +541,13 @@ async function displaySimulationResults(policyName) {
   simResults.style.display = 'none';
   
   try {
-    const results = await simulateNGames(100, policyName);
+    const results = await simulateNGames(1000, policyName);
     
     const stats = results.scoreStats;
     const maxTileDist = results.maxTileDist;
     
     // Format .info() output
-    let infoText = `=== Simulation Results (${policyName.toUpperCase()} Policy) ===\n`;
+    let infoText = `=== Simulation Results: 1000 Games (${policyName.toUpperCase()} Policy) ===\n`;
     infoText += `Count: ${stats.count}\n`;
     infoText += `Min Score: ${Math.round(stats.min)}\n`;
     infoText += `Max Score: ${Math.round(stats.max)}\n`;
@@ -566,14 +566,14 @@ async function displaySimulationResults(policyName) {
     });
     
     infoText += `\nTotal Duration: ${(results.totalDurationMs / 1000).toFixed(2)}s\n`;
-    infoText += `Avg Per Game: ${(results.totalDurationMs / 100).toFixed(2)}ms\n`;
+    infoText += `Avg Per Game: ${(results.totalDurationMs / 1000).toFixed(2)}ms\n`;
     
     // Save to localStorage under separate key
     const session = {
       id: Date.now(),
       date: new Date().toISOString(),
       policy: policyName,
-      count: 100,
+      count: 1000,
       scores: results.scores,
       stats: stats,
       maxTileDist: maxTileDist,
@@ -587,7 +587,7 @@ async function displaySimulationResults(policyName) {
     // Display results
     simResults.textContent = infoText;
     simResults.style.display = 'block';
-    simProgress.textContent = `Completed 100 games in ${(results.totalDurationMs / 1000).toFixed(2)}s`;
+    simProgress.textContent = `Completed 1000 games in ${(results.totalDurationMs / 1000).toFixed(2)}s`;
     
   } catch(err) {
     console.error('Simulation error:', err);
@@ -1123,3 +1123,4 @@ window.addEventListener('keydown', (e) => {
 
 </body>
 </html>
+
