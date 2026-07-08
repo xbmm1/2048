@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Performance Over Time: Fast vs Normal Square Root</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    button {
+      margin-right: 10px;
+      margin-bottom: 10px;
+    }
+  </style>
+</head>
+<body>
+<h1>Compare Performance Over Time: Fast Inverse Sqrt vs Normal Math.sqrt</h1>
+
+<button id="fastBtn">Run Fast Inverse Sqrt</button>
+<button id="normalBtn">Run Normal Math.sqrt</button>
+<p id="fastResult"></p>
+<p id="normalResult"></p>
+
+<canvas id="sqrtChart" width="700" height="400"></canvas>
+
+<script>
+  // Quake's fast inverse square root implementation in JS
+  function fastInvSqrt(number) {
+    const threehalfs = 1.5;
+    const x2 = number * 0.5;
+    let y = number;
+
+    const buf = new ArrayBuffer(4);
+    const f32 = new Float32Array(buf);
+    const u32 = new Uint32Array(buf);
+
+    f32[0] = y;
+    let i = u32[0];
+
+    i = 0x5f3759df - (i >> 1);
+    u32[0] = i;
+
+    y = f32[0];
+    y = y * (threehalfs - (x2 * y * y));
+
+    return y;
+  }
+
+  function fastSqrt(number) {
+    return number * fastInvSqrt(number);
+  }
+
+  const fastBtn = document.getElementById('fastBtn');
+  const normalBtn = document.getElementById('normalBtn');
+  const fastResult = document.getElementById('fastResult');
+  const normalResult = document.getElementById('normalResult');
+  const ctx = document.getElementById('sqrtChart').getContext('2d');
+  let chart;
+
+  // Store performance data for combined chart
+  let fastData = null;
+  let normalData = null;
+
+  // Run fast inverse sqrt, record cumulative calculations over time
+  function runFastInverseSqrt() {
+    fastBtn.disabled = true;
+    normalBtn.disabled = true;
+    fastResult.textContent = 'Calculating fast inverse sqrt...';
+
+    const intervalMs = 1; // record every 1 ms
+    const maxTime = 250; // total run time in ms
+
+    let counts = [];
+    let times = [];
+
+    let count = 0;
+    let i = 1;
+
+    const startTime = performance.now();
+    let nextRecordTime = startTime + intervalMs;
+
+    while (true) {
+      fastSqrt(i);
+      count++;
+      i++;
+
+      const now = performance.now();
+      if (now >= nextRecordTime) {
+        // Record cumulative count and elapsed time
+        counts.push(count);
+        times.push(now - startTime);
+
+        nextRecordTime += intervalMs;
+      }
+
+      if (now - startTime >= maxTime) {
+        break;
+      }
+    }
+
+    // Add final point if missed
+    const finalTime = performance.now() - startTime;
+    if (times.length === 0 || times[times.length - 1] < finalTime) {
+      counts.push(count);
+      times.push(finalTime);
+    }
+
+    fastData = { times, counts };
+
+    fastResult.textContent = `Fast Inverse Sqrt calculated ${count} square roots in ${maxTime} ms.`;
+
+    updateChart();
+
+    fastBtn.disabled = false;
+    normalBtn.disabled = false;
+  }
+
+  // Run normal Math.sqrt, record cumulative calculations over time
+  function runNormalSqrt() {
+    fastBtn.disabled = true;
+    normalBtn.disabled = true;
+    normalResult.textContent = 'Calculating normal Math.sqrt...';
+
+    const intervalMs = 1; // record every 1 ms
+    const maxTime = 250; // total run time in ms
+
+    let counts = [];
+    let times = [];
+
+    let count = 0;
+    let i = 1;
+
+    const startTime = performance.now();
+    let nextRecordTime = startTime + intervalMs;
+
+    while (true) {
+      Math.sqrt(i);
+      count++;
+      i++;
+
+      const now = performance.now();
+      if (now >= nextRecordTime) {
+        counts.push(count);
+        times.push(now - startTime);
+        nextRecordTime += intervalMs;
+      }
+
+      if (now - startTime >= maxTime) {
+        break;
+      }
+    }
+
+    // Add final point if missed
+    const finalTime = performance.now() - startTime;
+    if (times.length === 0 || times[times.length - 1] < finalTime) {
+      counts.push(count);
+      times.push(finalTime);
+    }
+
+    normalData = { times, counts };
+
+    normalResult.textContent = `Normal Math.sqrt calculated ${count} square roots in ${maxTime} ms.`;
+
+    updateChart();
+
+    fastBtn.disabled = false;
+    normalBtn.disabled = false;
+  }
+
+  function updateChart() {
+    if (chart) {
+      chart.destroy();
+    }
+
+    // Helper function to format numbers to fixed decimals
+    function formatNum(num) {
+      return num.toFixed(1);
+    }
+
+    if (fastData && normalData) {
+      // Find max time range for X axis
+      const maxTime = Math.max(fastData.times[fastData.times.length - 1], normalData.times[normalData.times.length - 1]);
+
+      chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: Array.from({length: Math.ceil(maxTime)+1}, (_, i) => i), // labels as ms from 0 to maxTime rounded up
+          datasets: [
+            {
+              label: 'Fast Inverse Sqrt',
+              data: buildStepData(fastData.times, fastData.counts, maxTime),
+              borderColor: 'green',
+              backgroundColor: 'rgba(0,128,0,0.1)',
+              fill: false,
+              pointRadius: 0,
+              borderWidth: 2,
+              tension: 0.1
+            },
+            {
+              label: 'Normal Math.sqrt',
+              data: buildStepData(normalData.times, normalData.counts, maxTime),
+              borderColor: 'blue',
+              backgroundColor: 'rgba(0,0,255,0.1)',
+              fill: false,
+              pointRadius: 0,
+              borderWidth: 2,
+              tension: 0.1
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          interaction: {
+            intersect: false,
+            mode: 'index',
+          },
+          plugins: {
+            legend: {
+              display: true,
+            },
+            tooltip: {
+              callbacks: {
+                label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y.toLocaleString()} calcs at ${ctx.parsed.x} ms`
+              }
+            }
+          },
+          scales: {
+            x: {
+              title: {
+                display: true,
+                text: 'Time (ms)'
+              },
+              min: 0,
+              max: maxTime,
+              ticks: {
+                stepSize: 25
+              }
+            },
+            y: {
+              title: {
+                display: true,
+                text: 'Cumulative Calculations'
+              },
+              beginAtZero: true
+            }
+          }
+        }
+      });
+    }
+    else if (fastData) {
+      chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: fastData.times.map(t => formatNum(t)),
+          datasets: [{
+            label: 'Fast Inverse Sqrt',
+            data: fastData.counts,
+            borderColor: 'green',
+            backgroundColor: 'rgba(0,128,0,0.1)',
+            fill: false,
+            pointRadius: 0,
+            borderWidth: 2,
+            tension: 0.1
+          }]
+        },
+        options: {
+          responsive: true,
+          scales: {
+            x: {
+              title: { display: true, text: 'Time (ms)' }
+            },
+            y: {
+              title: { display: true, text: 'Cumulative Calculations' },
+              beginAtZero: true
+            }
+          },
+          plugins: {
+            legend: { display: true }
+          }
+        }
+      });
+    }
+    else if (normalData) {
+      chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: normalData.times.map(t => formatNum(t)),
+          datasets: [{
+            label: 'Normal Math.sqrt',
+            data: normalData.counts,
+            borderColor: 'blue',
+            backgroundColor: 'rgba(0,0,255,0.1)',
+            fill: false,
+            pointRadius: 0,
+            borderWidth: 2,
+            tension: 0.1
+          }]
+        },
+        options: {
+          responsive: true,
+          scales: {
+            x: {
+              title: { display: true, text: 'Time (ms)' }
+            },
+            y: {
+              title: { display: true, text: 'Cumulative Calculations' },
+              beginAtZero: true
+            }
+          },
+          plugins: {
+            legend: { display: true }
+          }
+        }
+      });
+    }
+    else {
+      ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+    }
+  }
+
+  // Helper function to convert irregular time samples into data points for each ms from 0 to maxTime
+  // Using step function: value holds until next recorded time
+  function buildStepData(times, counts, maxTime) {
+    const data = [];
+    let idx = 0;
+    for(let ms = 0; ms <= maxTime; ms++) {
+      // Advance idx if next recorded time <= ms
+      while(idx + 1 < times.length && times[idx + 1] <= ms) {
+        idx++;
+      }
+      data.push(counts[idx]);
+    }
+    return data;
+  }
+
+  fastBtn.addEventListener('click', runFastInverseSqrt);
+  normalBtn.addEventListener('click', runNormalSqrt);
+</script>
+<h2>Explanations</h2>
+
+<div>
+  <button class="collapsible">1. Why does the normal Math.sqrt calculate more square roots in the same time than the fast inverse sqrt?</button>
+  <div class="content" style="display:none; padding: 0 15px; margin-bottom: 15px;">
+    <p>At first glance, this might seem surprising because the "fast inverse square root" algorithm was famous for being faster in older hardware and specific contexts (like in Quake III Arena back in the late 90s). However, in modern JavaScript engines and on modern CPUs, the situation is quite different:</p>
+    <ul>
+      <li><strong>Math.sqrt</strong> is highly optimized in modern JavaScript engines and hardware. Modern CPUs have dedicated floating-point instructions for square root that are extremely fast and well-optimized by JavaScript JIT compilers.</li>
+      <li>The "fast inverse sqrt" algorithm involves bit-level manipulation and conversions between float and integer representations (<code>ArrayBuffer</code>, <code>Float32Array</code>, <code>Uint32Array</code>), which add overhead in JavaScript. These operations are relatively expensive compared to a direct hardware sqrt instruction.</li>
+      <li>Memory operations and type coercions inside the fast inverse sqrt function slow it down, particularly because JavaScript doesn't have native pointers or direct memory access like C/C++.</li>
+      <li>The fast inverse sqrt algorithm is designed to approximate inverse square root (<code>1 / sqrt(x)</code>), and your implementation then multiplies by <code>x</code> to get <code>sqrt(x)</code>. This two-step approach adds extra operations compared to calling <code>Math.sqrt(x)</code> once.</li>
+      <li>Modern engines can vectorize or optimize <code>Math.sqrt</code> calls better than complex manual implementations in JS.</li>
+    </ul>
+    <p><strong>In summary:</strong> The fast inverse sqrt algorithm was a clever trick for its time and platform but does not outperform native hardware-accelerated <code>Math.sqrt</code> in modern JavaScript environments. That's why you see normal <code>Math.sqrt</code> calculating roughly 4 times more square roots in the same time.</p>
+  </div>
+
+ 
+
+<script>
+  // Simple collapsible toggler
+  document.querySelectorAll('.collapsible').forEach(button => {
+    button.addEventListener('click', () => {
+      const content = button.nextElementSibling;
+      if (content.style.display === "block") {
+        content.style.display = "none";
+        button.style.fontWeight = 'normal';
+      } else {
+        content.style.display = "block";
+        button.style.fontWeight = 'bold';
+      }
+    });
+  });
+</script>
+
+
+</body>
+</html>

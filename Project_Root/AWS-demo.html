@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>AWS Thumbnail Generator Demo</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    margin: 20px;
+    background: #f0f4f8;
+    color: #333;
+  }
+  h1 {
+    text-align: center;
+  }
+  .diagram {
+    display: flex;
+    justify-content: center;
+    margin: 40px 0;
+    gap: 60px;
+    flex-wrap: wrap;
+  }
+  .box {
+    background: white;
+    border: 2px solid #ccc;
+    border-radius: 8px;
+    padding: 20px;
+    width: 220px;
+    text-align: center;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    transition: border-color 0.5s, box-shadow 0.5s;
+    position: relative;
+  }
+  .box.active {
+    border-color: #0073bb;
+    box-shadow: 0 0 15px #0073bb;
+  }
+  .arrow {
+    width: 50px;
+    height: 50px;
+    margin-top: 70px;
+    position: relative;
+  }
+  .arrow svg {
+    width: 100%;
+    height: 100%;
+    fill: #888;
+    transition: fill 0.5s;
+  }
+  .arrow.active svg {
+    fill: #0073bb;
+  }
+  button {
+    background: #0073bb;
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    margin: 0 auto;
+    display: block;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background 0.3s;
+  }
+  button:hover:not(:disabled) {
+    background: #005f8a;
+  }
+  button:disabled {
+    background: #aaa;
+    cursor: default;
+  }
+  .description {
+    max-width: 600px;
+    margin: 20px auto 40px;
+    font-size: 18px;
+    line-height: 1.4;
+    background: white;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+  }
+</style>
+</head>
+<body>
+
+<h1>AWS Image Thumbnail Generator - Interactive Demo</h1>
+
+<div class="diagram" id="diagram">
+  <div class="box" id="user">User Browser<br><small>Uploads Image</small></div>
+  <div class="arrow" id="arrow1">
+    <svg viewBox="0 0 24 24"><path d="M10 17l5-5-5-5v10z"/></svg>
+  </div>
+  <div class="box" id="s3-source">S3 Bucket<br><small>Original Images</small></div>
+  <div class="arrow" id="arrow2">
+    <svg viewBox="0 0 24 24"><path d="M10 17l5-5-5-5v10z"/></svg>
+  </div>
+  <div class="box" id="lambda">AWS Lambda<br><small>Generate Thumbnail</small></div>
+  <div class="arrow" id="arrow3">
+    <svg viewBox="0 0 24 24"><path d="M10 17l5-5-5-5v10z"/></svg>
+  </div>
+  <div class="box" id="s3-dest">S3 Bucket<br><small>Thumbnails</small></div>
+</div>
+
+<div class="description" id="description">
+  Click <strong>Next Step</strong> to see how the thumbnail generator works step by step.
+</div>
+
+<button id="nextBtn">Next Step</button>
+
+<script>
+  const steps = [
+    {
+      elementIds: ['user'],
+      arrowIds: [],
+      description: 'User selects and uploads an image from their browser to the source S3 bucket that stores original images.'
+    },
+    {
+      elementIds: ['arrow1', 's3-source'],
+      arrowIds: ['arrow1'],
+      description: 'The image is uploaded to the source S3 bucket (my-image-uploads).'
+    },
+    {
+      elementIds: ['arrow2', 'lambda'],
+      arrowIds: ['arrow2'],
+      description: 'An S3 event triggers the AWS Lambda function when a new image is uploaded.'
+    },
+    {
+      elementIds: ['arrow3', 's3-dest'],
+      arrowIds: ['arrow3'],
+      description: 'The Lambda function generates a thumbnail and saves it to the destination S3 bucket (my-image-thumbnails).'
+    },
+    {
+      elementIds: ['s3-dest', 'user'],
+      arrowIds: [],
+      description: 'The user\'s browser fetches and displays the generated thumbnail from the destination S3 bucket.'
+    }
+  ];
+
+  let currentStep = 0;
+  const nextBtn = document.getElementById('nextBtn');
+  const descriptionEl = document.getElementById('description');
+
+  function clearHighlights() {
+    document.querySelectorAll('.box').forEach(box => box.classList.remove('active'));
+    document.querySelectorAll('.arrow').forEach(arrow => arrow.classList.remove('active'));
+  }
+
+  function highlightStep(step) {
+    clearHighlights();
+    step.elementIds.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.classList.add('active');
+    });
+    step.arrowIds.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.classList.add('active');
+    });
+    descriptionEl.textContent = step.description;
+  }
+
+  nextBtn.addEventListener('click', () => {
+    highlightStep(steps[currentStep]);
+    currentStep++;
+    if (currentStep >= steps.length) {
+      nextBtn.disabled = true;
+      nextBtn.textContent = 'Demo Complete';
+    }
+  });
+
+  // Initialize first step highlight
+  highlightStep(steps[0]);
+  currentStep++;
+</script>
+
+</body>
+</html>

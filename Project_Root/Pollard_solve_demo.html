@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Pollard's Rho Factoring Demo</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    margin: 2em;
+    background: #f9f9f9;
+    color: #222;
+  }
+  h1 {
+    color: #333;
+  }
+  label {
+    font-weight: bold;
+    margin-top: 1em;
+    display: block;
+  }
+  input, button {
+    padding: 0.5em;
+    font-size: 1em;
+    margin-top: 0.3em;
+    width: 100%;
+    max-width: 300px;
+    box-sizing: border-box;
+  }
+  button {
+    margin-top: 1em;
+    cursor: pointer;
+    background: #007bff;
+    border: none;
+    color: white;
+    border-radius: 4px;
+  }
+  button:disabled {
+    background: #ccc;
+    cursor: default;
+  }
+  .output {
+    margin-top: 1.5em;
+    padding: 1em;
+    background: white;
+    border-radius: 6px;
+    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    font-family: monospace;
+    white-space: pre-wrap;
+    min-height: 200px;
+  }
+</style>
+</head>
+<body>
+
+<h1>Pollard's Rho Factoring Demo for n = 10573</h1>
+
+<button id="startBtn">Start Factoring</button>
+
+<div id="output" class="output">Click "Start Factoring" to begin.</div>
+
+<script>
+const n = 10573n;
+const output = document.getElementById('output');
+const startBtn = document.getElementById('startBtn');
+
+function gcd(a, b) {
+  while (b !== 0n) {
+    const t = b;
+    b = a % b;
+    a = t;
+  }
+  return a;
+}
+
+function f(x, n) {
+  // Polynomial function f(x) = x^2 + 1 mod n
+  return (x * x + 1n) % n;
+}
+
+async function pollardsRho(n) {
+  output.textContent = `Starting Pollard's Rho factoring for n = ${n}\n\n`;
+  let x = 2n;
+  let y = 2n;
+  let d = 1n;
+  let iteration = 0;
+
+  while (d === 1n) {
+    iteration++;
+    x = f(x, n);
+    y = f(f(y, n), n);
+    d = gcd(x > y ? x - y : y - x, n);
+
+    output.textContent += `Iteration ${iteration}:\n`;
+    output.textContent += `  x = ${x}\n`;
+    output.textContent += `  y = ${y}\n`;
+    output.textContent += `  gcd(|x - y|, n) = gcd(${x > y ? x - y : y - x}, ${n}) = ${d}\n\n`;
+
+    await sleep(1200);
+
+    if (d === n) {
+      output.textContent += "Failure: Cycle detected without finding factor. Try again with different parameters.\n";
+      return null;
+    }
+  }
+
+  output.textContent += `Nontrivial factor found: ${d}\n`;
+  return d;
+}
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+startBtn.onclick = async () => {
+  startBtn.disabled = true;
+  const factor = await pollardsRho(n);
+  if (factor) {
+    output.textContent += `\nOther factor is: ${n / factor}\n`;
+  }
+  startBtn.disabled = false;
+};
+</script>
+
+</body>
+</html>

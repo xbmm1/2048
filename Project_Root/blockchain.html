@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Educational Blockchain Demo</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card: #111827;
+      --text: #e5e7eb;
+      --muted: #9ca3af;
+      --accent: #22c55e;
+      --warn: #f59e0b;
+      --danger: #ef4444;
+    }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Tahoma, sans-serif;
+      background: radial-gradient(circle at top right, #1f2937, var(--bg));
+      color: var(--text);
+      padding: 20px;
+    }
+    .wrap {
+      max-width: 980px;
+      margin: 0 auto;
+      display: grid;
+      gap: 14px;
+    }
+    .card {
+      background: rgba(17, 24, 39, 0.9);
+      border: 1px solid #374151;
+      border-radius: 12px;
+      padding: 14px;
+    }
+    h1 { margin: 0 0 8px; }
+    p { margin: 0; color: var(--muted); }
+    .row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 10px;
+    }
+    input, button {
+      border-radius: 8px;
+      border: 1px solid #4b5563;
+      background: #0b1220;
+      color: var(--text);
+      padding: 10px 12px;
+      font-size: 14px;
+    }
+    input { min-width: 160px; }
+    button {
+      cursor: pointer;
+      background: #1f2937;
+      transition: transform 0.08s ease;
+    }
+    button:hover { transform: translateY(-1px); }
+    button.mine { border-color: var(--accent); }
+    button.tamper { border-color: var(--danger); }
+    pre {
+      margin: 0;
+      max-height: 420px;
+      overflow: auto;
+      background: #030712;
+      border-radius: 10px;
+      border: 1px solid #374151;
+      padding: 12px;
+      font-size: 12px;
+      line-height: 1.35;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+    .tag {
+      display: inline-block;
+      font-size: 12px;
+      padding: 4px 8px;
+      border-radius: 999px;
+      margin-left: 6px;
+      border: 1px solid #4b5563;
+      color: var(--muted);
+    }
+    .ok { color: #86efac; border-color: #166534; }
+    .bad { color: #fca5a5; border-color: #7f1d1d; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>Blockchain Demo <span id="validTag" class="tag">Checking...</span></h1>
+      <p>Educational only. This is not secure or production-ready crypto software.</p>
+    </div>
+
+    <div class="card">
+      <div class="row">
+        <input id="from" placeholder="From (e.g. Alice)" value="Alice" />
+        <input id="to" placeholder="To (e.g. Bob)" value="Bob" />
+        <input id="amount" type="number" placeholder="Amount" value="25" />
+        <button id="addTx">Add Transaction</button>
+      </div>
+      <div class="row">
+        <input id="miner" placeholder="Miner Address" value="Miner1" />
+        <button id="mineBtn" class="mine">Mine Pending Transactions</button>
+        <button id="checkBtn">Check Chain Validity</button>
+        <button id="tamperBtn" class="tamper">Tamper With Block #1</button>
+      </div>
+      <div class="row">
+        <button id="balanceBtn">Show Balances</button>
+        <button id="resetBtn">Reset Demo</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Log</h3>
+      <pre id="log"></pre>
+    </div>
+  </div>
+
+  <script>
+    // Simple hash for teaching: deterministic but not cryptographically secure.
+    function simpleHash(str) {
+      let hash = 0;
+      for (let i = 0; i < str.length; i++) {
+        hash = ((hash << 5) - hash) + str.charCodeAt(i);
+        hash |= 0; // force 32-bit
+      }
+      return Math.abs(hash).toString(16).padStart(8, "0");
+    }
+
+    class Block {
+      constructor(index, timestamp, transactions, previousHash = "") {
+        this.index = index;
+        this.timestamp = timestamp;
+        this.transactions = transactions;
+        this.previousHash = previousHash;
+        this.nonce = 0;
+        this.hash = this.calculateHash();
+      }
+
+      calculateHash() {
+        return simpleHash(
+          this.index +
+          this.previousHash +
+          this.timestamp +
+          JSON.stringify(this.transactions) +
+          this.nonce
+        );
+      }
+
+      mineBlock(difficulty) {
+        const target = "0".repeat(difficulty);
+        while (!this.hash.startsWith(target)) {
+          this.nonce++;
+          this.hash = this.calculateHash();
+        }
+      }
+    }
+
+    class Blockchain {
+      constructor() {
+        this.chain = [this.createGenesisBlock()];
+        this.difficulty = 3;
+        this.pendingTransactions = [];
+        this.miningReward = 50;
+      }
+
+      createGenesisBlock() {
+        return new Block(0, Date.now().toString(), [{ from: "GENESIS", to: "GENESIS", amount: 0 }], "0");
+      }
+
+      getLatestBlock() {
+        return this.chain[this.chain.length - 1];
+      }
+
+      createTransaction(tx) {
+        if (!tx.from || !tx.to || tx.amount <= 0) {
+          throw new Error("Invalid transaction.");
+        }
+        this.pendingTransactions.push(tx);
+      }
+
+      minePendingTransactions(minerAddress) {
+        if (this.pendingTransactions.length === 0) {
+          return "No pending transactions to mine.";
+        }
+
+        const block = new Block(
+          this.chain.length,
+          Date.now().toString(),
+          this.pendingTransactions,
+          this.getLatestBlock().hash
+        );
+
+        block.mineBlock(this.difficulty);
+        this.chain.push(block);
+
+        this.pendingTransactions = [
+          { from: "SYSTEM", to: minerAddress, amount: this.miningReward }
+        ];
+
+        return `Mined block #${block.index} with hash ${block.hash} (nonce=${block.nonce})`;
+      }
+
+      getBalance(address) {
+        let balance = 0;
+        for (const block of this.chain) {
+          for (const tx of block.transactions) {
+            if (tx.from === address) balance -= tx.amount;
+            if (tx.to === address) balance += tx.amount;
+          }
+        }
+        return balance;
+      }
+
+      isChainValid() {
+        for (let i = 1; i < this.chain.length; i++) {
+          const current = this.chain[i];
+          const previous = this.chain[i - 1];
+
+          if (current.hash !== current.calculateHash()) return false;
+          if (current.previousHash !== previous.hash) return false;
+        }
+        return true;
+      }
+    }
+
+    let coin = new Blockchain();
+
+    const logEl = document.getElementById("log");
+    const validTag = document.getElementById("validTag");
+
+    function log(msg) {
+      logEl.textContent += msg + "\n";
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    function renderState() {
+      const valid = coin.isChainValid();
+      validTag.textContent = valid ? "Chain Valid" : "Chain Invalid";
+      validTag.className = "tag " + (valid ? "ok" : "bad");
+
+      log("\n=== CHAIN SNAPSHOT ===");
+      log(JSON.stringify(coin.chain, null, 2));
+      log("Pending: " + JSON.stringify(coin.pendingTransactions));
+      log("======================\n");
+    }
+
+    document.getElementById("addTx").addEventListener("click", () => {
+      const from = document.getElementById("from").value.trim();
+      const to = document.getElementById("to").value.trim();
+      const amount = Number(document.getElementById("amount").value);
+
+      try {
+        coin.createTransaction({ from, to, amount });
+        log(`Added tx: ${from} -> ${to} (${amount})`);
+        renderState();
+      } catch (err) {
+        log("Error: " + err.message);
+      }
+    });
+
+    document.getElementById("mineBtn").addEventListener("click", () => {
+      const miner = document.getElementById("miner").value.trim() || "Miner1";
+      const result = coin.minePendingTransactions(miner);
+      log(result);
+      renderState();
+    });
+
+    document.getElementById("checkBtn").addEventListener("click", () => {
+      log("Chain valid? " + coin.isChainValid());
+      renderState();
+    });
+
+    document.getElementById("tamperBtn").addEventListener("click", () => {
+      if (coin.chain.length < 2) {
+        log("Mine at least one block before tampering.");
+        return;
+      }
+      coin.chain[1].transactions[0].amount = 999999;
+      log("Tampered block #1 transaction amount.");
+      log("Chain valid? " + coin.isChainValid());
+      renderState();
+    });
+
+    document.getElementById("balanceBtn").addEventListener("click", () => {
+      const users = ["Alice", "Bob", "Miner1", "Miner2", "SYSTEM"];
+      for (const u of users) {
+        log(`Balance(${u}) = ${coin.getBalance(u)}`);
+      }
+    });
+
+    document.getElementById("resetBtn").addEventListener("click", () => {
+      coin = new Blockchain();
+      log("Demo reset.");
+      renderState();
+    });
+
+    log("Demo ready.");
+    log("Try this sequence:");
+    log("1) Add tx Alice -> Bob");
+    log("2) Mine pending transactions");
+    log("3) Tamper block #1 and re-check validity");
+    renderState();
+  </script>
+</body>
+</html>

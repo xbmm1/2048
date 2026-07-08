@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>4-bit Ripple Carry Adder Demo</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    margin: 20px;
+    max-width: 700px;
+  }
+  h1 {
+    text-align: center;
+  }
+  .bit-inputs {
+    display: flex;
+    justify-content: space-around;
+    margin: 15px 0;
+  }
+  .bit-group {
+    text-align: center;
+  }
+  label {
+    display: block;
+    font-weight: bold;
+  }
+  input[type="checkbox"] {
+    transform: scale(1.5);
+    margin: 5px 0;
+  }
+  .outputs {
+    margin-top: 20px;
+    text-align: center;
+    font-size: 1.5em;
+  }
+  .explanation {
+    margin-top: 30px;
+    background: #eef6ff;
+    border-left: 5px solid #2a7ae2;
+    padding: 15px;
+    font-size: 0.9em;
+  }
+  .bit-labels {
+    display: flex;
+    justify-content: space-around;
+    font-weight: bold;
+    margin-bottom: 5px;
+  }
+  .bit-labels div {
+    width: 40px;
+  }
+  .result-bits {
+    display: flex;
+    justify-content: center;
+    margin-top: 10px;
+  }
+  .result-bits div {
+    width: 40px;
+    font-weight: bold;
+    border: 1px solid #2a7ae2;
+    padding: 5px 0;
+    margin: 0 2px;
+    background: #d0e2ff;
+  }
+</style>
+</head>
+<body>
+
+<h1>4-bit Ripple Carry Adder Demo</h1>
+
+<div>
+  <label for="carryIn">Initial Carry In (Cin):</label>
+  <input type="checkbox" id="carryIn" />
+</div>
+
+<h2>Input A (4 bits)</h2>
+<div class="bit-labels" aria-label="Bit positions for input A">
+  <div>Bit 3</div><div>Bit 2</div><div>Bit 1</div><div>Bit 0</div>
+</div>
+<div class="bit-inputs" id="inputA">
+  <!-- Checkboxes will be inserted here -->
+</div>
+
+<h2>Input B (4 bits)</h2>
+<div class="bit-labels" aria-label="Bit positions for input B">
+  <div>Bit 3</div><div>Bit 2</div><div>Bit 1</div><div>Bit 0</div>
+</div>
+<div class="bit-inputs" id="inputB">
+  <!-- Checkboxes will be inserted here -->
+</div>
+
+<div class="outputs">
+  <div>Sum (4 bits):</div>
+  <div class="result-bits" id="sumOutput">
+    <!-- Sum bits displayed here -->
+  </div>
+  <div style="margin-top: 10px;">
+    Carry Out (Cout): <span id="carryOut">0</span>
+  </div>
+</div>
+
+<div class="explanation" id="explanation">
+  Toggle the bits of Input A, Input B, and the initial carry-in.<br />
+  This demo adds the two 4-bit binary numbers using 4 cascaded full adders.<br />
+  The carry-out from each adder cascades to the next higher bit adder.<br />
+</div>
+
+<script>
+  // Utility functions
+  function xor(a, b) {
+    return a !== b ? 1 : 0;
+  }
+
+  function and(a, b) {
+    return a && b ? 1 : 0;
+  }
+
+  function or(a, b) {
+    return a || b ? 1 : 0;
+  }
+
+  // Full adder for single bit
+  function fullAdderBit(A, B, Cin) {
+    const sum = xor(xor(A, B), Cin);
+    const carry = or(or(and(A, B), and(B, Cin)), and(A, Cin));
+    return { sum, carry };
+  }
+
+  // Create 4 checkboxes for each input (A and B)
+  function createBitInputs(containerId) {
+    const container = document.getElementById(containerId);
+    for(let i = 3; i >= 0; i--) {
+      const label = document.createElement('label');
+      label.style.display = 'block';
+      label.style.textAlign = 'center';
+
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.id = containerId + '_bit' + i;
+      checkbox.dataset.bit = i;
+      checkbox.setAttribute('aria-label', `${containerId} bit ${i}`);
+
+      label.appendChild(checkbox);
+      container.appendChild(label);
+    }
+  }
+
+  createBitInputs('inputA');
+  createBitInputs('inputB');
+
+  const inputsA = [...document.querySelectorAll('#inputA input[type=checkbox]')];
+  const inputsB = [...document.querySelectorAll('#inputB input[type=checkbox]')];
+  const carryInInput = document.getElementById('carryIn');
+  const sumOutputContainer = document.getElementById('sumOutput');
+  const carryOutDisplay = document.getElementById('carryOut');
+  const explanationDiv = document.getElementById('explanation');
+
+  function updateAdder() {
+    // Read inputs bits as integers
+    const A = inputsA.map(cb => cb.checked ? 1 : 0).reverse(); // bit 0 is last in array
+    const B = inputsB.map(cb => cb.checked ? 1 : 0).reverse();
+
+    let Cin = carryInInput.checked ? 1 : 0;
+
+    const sums = [];
+    let explanationText = '<strong>Step-by-step ripple carry addition:</strong><br/><br/>';
+
+    for(let i = 0; i < 4; i++) {
+      const { sum, carry } = fullAdderBit(A[i], B[i], Cin);
+      sums.push(sum);
+      explanationText += `Bit ${i}: A=${A[i]}, B=${B[i]}, Cin=${Cin} → Sum=${sum}, Cout=${carry}<br/>`;
+      Cin = carry; // Carry out cascades to next bit carry in
+    }
+
+    // Display sum bits (reverse order to show MSB left)
+    sumOutputContainer.innerHTML = sums.slice().reverse().map(bit => {
+      const div = document.createElement('div');
+      div.textContent = bit;
+      return div;
+    });
+
+    carryOutDisplay.textContent = Cin;
+    explanationDiv.innerHTML = explanationText + '<br/>Final Carry Out (Cout) = ' + Cin;
+  }
+
+  // Attach event listeners
+  [...inputsA, ...inputsB, carryInInput].forEach(input => {
+    input.addEventListener('change', updateAdder);
+  });
+
+  // Initialize display
+  updateAdder();
+</script>
+
+</body>
+</html>

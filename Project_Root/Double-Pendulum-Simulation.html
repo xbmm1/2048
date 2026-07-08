@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Interactive Double Pendulum Simulation</title>
+  <style>
+    body {
+      background-color: #222;
+      color: white;
+      font-family: Arial, sans-serif;
+      text-align: center;
+      margin: 0;
+      padding: 0;
+    }
+    canvas {
+      background-color: #111;
+      display: block;
+      margin: 20px auto;
+      border: 1px solid #555;
+    }
+    .slider-container {
+      margin: 15px auto;
+      max-width: 600px;
+      text-align: left;
+    }
+    label {
+      display: inline-block;
+      width: 180px;
+      font-weight: bold;
+    }
+    input[type="range"] {
+      width: 350px;
+      vertical-align: middle;
+    }
+    .description {
+      max-width: 700px;
+      margin: 20px auto;
+      font-size: 16px;
+      line-height: 1.5;
+      background: #333;
+      padding: 15px;
+      border-radius: 8px;
+    }
+  </style>
+</head>
+<body>
+
+<h1>Interactive Double Pendulum Simulation</h1>
+
+<div class="description">
+  <p>
+    This simulation shows a <strong>double pendulum</strong>.
+    It demonstrates <strong>chaos theory</strong>: very small changes in the starting angles of the pendulums cause drastically different motions over time.
+    You can use the sliders below to set the starting angles (in degrees) of each pendulum arm, then watch how the system evolves.
+  </p>
+  <p>
+    Notice how unpredictable and complex the motion becomes, even though the system is governed by simple physics!
+  </p>
+</div>
+
+<div class="slider-container">
+  <label for="angle1">Initial Angle 1 (degrees): <span id="angle1Value">90</span></label>
+  <input type="range" id="angle1" min="0" max="360" value="90" />
+</div>
+
+<div class="slider-container">
+  <label for="angle2">Initial Angle 2 (degrees): <span id="angle2Value">90</span></label>
+  <input type="range" id="angle2" min="0" max="360" value="90" />
+</div>
+
+<canvas id="pendulumCanvas" width="600" height="600"></canvas>
+
+<script>
+  const canvas = document.getElementById('pendulumCanvas');
+  const ctx = canvas.getContext('2d');
+  const width = canvas.width;
+  const height = canvas.height;
+
+  // Pendulum parameters
+  const g = 1; // gravity
+  const r1 = 150; // length first rod
+  const r2 = 150; // length second rod
+  const m1 = 10;  // mass first bob
+  const m2 = 10;  // mass second bob
+
+  // Origin point (pivot)
+  const originX = width / 2;
+  const originY = 200;
+
+  // Initial angles and velocities (will be set by sliders)
+  let a1 = Math.PI / 2;
+  let a2 = Math.PI / 2;
+  let a1_v = 0;
+  let a2_v = 0;
+  let a1_a = 0;
+  let a2_a = 0;
+
+  // Trail for second bob
+  const trail = [];
+  const maxTrailLength = 500;
+
+  // Update angles from sliders
+  const angle1Slider = document.getElementById('angle1');
+  const angle2Slider = document.getElementById('angle2');
+  const angle1ValueLabel = document.getElementById('angle1Value');
+  const angle2ValueLabel = document.getElementById('angle2Value');
+
+  function degreesToRadians(deg) {
+    return deg * (Math.PI / 180);
+  }
+
+  function resetPendulum() {
+    a1 = degreesToRadians(parseFloat(angle1Slider.value));
+    a2 = degreesToRadians(parseFloat(angle2Slider.value));
+    a1_v = 0;
+    a2_v = 0;
+    trail.length = 0; // clear trail
+  }
+
+  angle1Slider.addEventListener('input', () => {
+    angle1ValueLabel.textContent = angle1Slider.value;
+    resetPendulum();
+  });
+
+  angle2Slider.addEventListener('input', () => {
+    angle2ValueLabel.textContent = angle2Slider.value;
+    resetPendulum();
+  });
+
+  // Physics update
+  function update() {
+    const num1 = -g * (2 * m1 + m2) * Math.sin(a1);
+    const num2 = -m2 * g * Math.sin(a1 - 2 * a2);
+    const num3 = -2 * Math.sin(a1 - a2) * m2;
+    const num4 = a2_v * a2_v * r2 + a1_v * a1_v * r1 * Math.cos(a1 - a2);
+    const den = r1 * (2 * m1 + m2 - m2 * Math.cos(2 * a1 - 2 * a2));
+    a1_a = (num1 + num2 + num3 * num4) / den;
+
+    const num5 = 2 * Math.sin(a1 - a2);
+    const num6 = a1_v * a1_v * r1 * (m1 + m2);
+    const num7 = g * (m1 + m2) * Math.cos(a1);
+    const num8 = a2_v * a2_v * r2 * m2 * Math.cos(a1 - a2);
+    const den2 = r2 * (2 * m1 + m2 - m2 * Math.cos(2 * a1 - 2 * a2));
+    a2_a = (num5 * (num6 + num7 + num8)) / den2;
+
+    a1_v += a1_a;
+    a2_v += a2_a;
+    a1 += a1_v;
+    a2 += a2_v;
+
+    // Damping to slow down
+    a1_v *= 0.9999;
+    a2_v *= 0.9999;
+  }
+
+  // Drawing function
+  function draw() {
+    ctx.clearRect(0, 0, width, height);
+
+    const x1 = originX + r1 * Math.sin(a1);
+    const y1 = originY + r1 * Math.cos(a1);
+
+    const x2 = x1 + r2 * Math.sin(a2);
+    const y2 = y1 + r2 * Math.cos(a2);
+
+    // Draw rods
+    ctx.strokeStyle = '#888';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(originX, originY);
+    ctx.lineTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+
+    // Draw bobs
+    ctx.fillStyle = '#ff5555';
+    ctx.beginPath();
+    ctx.arc(x1, y1, m1, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#55aaff';
+    ctx.beginPath();
+    ctx.arc(x2, y2, m2, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Save trail point
+    trail.push({ x: x2, y: y2 });
+    if (trail.length > maxTrailLength) trail.shift();
+
+    // Draw trail
+    ctx.beginPath();
+    for (let i = 0; i < trail.length - 1; i++) {
+      const p = trail[i];
+      const pNext = trail[i + 1];
+      ctx.strokeStyle = `rgba(255, 255, 255, ${i / trail.length})`;
+      ctx.moveTo(p.x, p.y);
+      ctx.lineTo(pNext.x, pNext.y);
+    }
+    ctx.stroke();
+  }
+
+  function animate() {
+    update();
+    draw();
+    requestAnimationFrame(animate);
+  }
+
+  // Initialize pendulum angles from sliders on load
+  resetPendulum();
+  animate();
+</script>
+<div style="background:#222; color:#fff; font-family: Arial, sans-serif; padding: 15px; border-radius: 8px; max-width: 700px; margin: 20px auto; line-height: 1.5;">
+  <h3>What this program does each iteration (or frame):</h3>
+  <ol>
+    <li>
+      <strong>Update the physics of the pendulum (<code>update</code> function):</strong><br/>
+      The program calculates the <em>angular accelerations</em> (<code>a1_a</code> and <code>a2_a</code>) of the two pendulum arms using physics formulas derived from Newton’s laws for a double pendulum.<br/>
+      - These formulas take into account:<br/>
+      &nbsp;&nbsp;&nbsp;&nbsp;- Gravity pulling down on the masses.<br/>
+      &nbsp;&nbsp;&nbsp;&nbsp;- The current angles of the arms (<code>a1</code> and <code>a2</code>).<br/>
+      &nbsp;&nbsp;&nbsp;&nbsp;- The current angular velocities (<code>a1_v</code> and <code>a2_v</code>).<br/>
+      &nbsp;&nbsp;&nbsp;&nbsp;- The lengths of the rods and the masses.<br/>
+      Then, it <em>updates the angular velocities</em> by adding the accelerations:<br/>
+      <code>a1_v = a1_v + a1_a</code><br/>
+      <code>a2_v = a2_v + a2_a</code><br/>
+      Next, it <em>updates the angles</em> by adding the velocities:<br/>
+      <code>a1 = a1 + a1_v</code><br/>
+      <code>a2 = a2 + a2_v</code><br/>
+      A small <em>damping factor</em> (like friction) is applied by multiplying velocities by 0.999 to slowly reduce the motion over time.
+    </li>
+    <li>
+      <strong>Calculate the positions of the pendulum bobs:</strong><br/>
+      Using the updated angles, the program calculates where each pendulum bob is located on the canvas:<br/>
+      - The first bob position (<code>x1</code>, <code>y1</code>) is based on the first angle and rod length.<br/>
+      - The second bob position (<code>x2</code>, <code>y2</code>) is based on the first bob’s position plus the second angle and rod length.
+    </li>
+    <li>
+      <strong>Draw the current frame (<code>draw</code> function):</strong><br/>
+      - The canvas is cleared to prepare for the new frame.<br/>
+      - The rods are drawn as lines from the pivot point to the first bob, then from the first bob to the second bob.<br/>
+      - The bobs are drawn as filled circles at their calculated positions.<br/>
+      - The program <em>records the second bob’s position</em> into a "trail" array to keep track of where it has been.<br/>
+      - It draws the trail as a fading line behind the second bob to visually show the path it has followed, revealing the chaotic motion pattern.
+    </li>
+    <li>
+      <strong>Request next animation frame:</strong><br/>
+      The program tells the browser to run the update and draw process again on the next animation frame, creating smooth continuous motion.
+    </li>
+  </ol>
+  <p><strong>Summary in plain terms:</strong></p>
+  <p>Each frame, the program:</p>
+  <ol>
+    <li>Figures out how the pendulum arms should move next based on physics.</li>
+    <li>Updates the angles and speeds of the arms.</li>
+    <li>Calculates where the pendulum bobs are now.</li>
+    <li>Draws the rods and bobs in their new positions.</li>
+    <li>Draws a fading trail showing the path the second bob has taken.</li>
+    <li>Repeats this over and over many times per second to create animation.</li>
+  </ol>
+  <p>This loop simulates real physical motion and shows how the double pendulum swings in a chaotic and unpredictable way depending on the starting angles you choose with the sliders.</p>
+</div>
+
+</body>
+</html>

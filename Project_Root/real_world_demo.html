@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>RSA Encryption/Decryption Demo (Small Example)</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    margin: 2em;
+    background: #f9f9f9;
+    color: #222;
+  }
+  h1 {
+    color: #333;
+  }
+  label {
+    font-weight: bold;
+    margin-top: 1em;
+    display: block;
+  }
+  input, button {
+    padding: 0.5em;
+    font-size: 1em;
+    margin-top: 0.3em;
+    width: 100%;
+    max-width: 200px;
+    box-sizing: border-box;
+  }
+  button {
+    margin-top: 1em;
+    cursor: pointer;
+    background: #007bff;
+    border: none;
+    color: white;
+    border-radius: 4px;
+  }
+  button:disabled {
+    background: #ccc;
+    cursor: default;
+  }
+  .output {
+    margin-top: 1.5em;
+    padding: 1em;
+    background: white;
+    border-radius: 6px;
+    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    font-family: monospace;
+    white-space: pre-wrap;
+    min-height: 150px;
+  }
+</style>
+</head>
+<body>
+
+<h1>RSA Encryption/Decryption Demo</h1>
+
+<label for="messageInput">Enter message number (e.g. 65):</label>
+<input type="number" id="messageInput" value="65" min="0" max="3232" />
+
+<button id="encryptBtn">Encrypt Message</button>
+<button id="decryptBtn" disabled>Decrypt Message</button>
+
+<div id="output" class="output"></div>
+
+<script>
+// RSA Keys from example
+const n = 3233n;
+const e = 17n;
+const d = 2753n;
+
+const output = document.getElementById('output');
+const encryptBtn = document.getElementById('encryptBtn');
+const decryptBtn = document.getElementById('decryptBtn');
+
+let ciphertext = null;
+
+// Modular exponentiation with step logging
+async function modExpWithSteps(base, exponent, modulus) {
+  let result = 1n;
+  let b = base % modulus;
+  let e = exponent;
+  const m = modulus;
+  let steps = `Start: base = ${b}, exponent = ${e}, modulus = ${m}\n\n`;
+  const binaryExp = e.toString(2);
+  steps += `Exponent in binary: ${binaryExp}\n\n`;
+
+  for (let i = 0; i < binaryExp.length; i++) {
+    steps += `Processing bit ${i + 1} (value: ${binaryExp[i]}):\n`;
+    result = (result * result) % m;
+    steps += `  Square result: result = (result * result) mod ${m} = ${result}\n`;
+    if (binaryExp[i] === '1') {
+      result = (result * b) % m;
+      steps += `  Bit is 1 → Multiply by base: result = (result * ${b}) mod ${m} = ${result}\n`;
+    } else {
+      steps += `  Bit is 0 → No multiplication\n`;
+    }
+    steps += '\n';
+    await sleep(800);
+  }
+  steps += `Final result: ${result}\n`;
+  return { result, steps };
+}
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+encryptBtn.addEventListener('click', async () => {
+  const message = BigInt(document.getElementById('messageInput').value);
+  if (message < 0n || message >= n) {
+    output.textContent = `Please enter a number between 0 and ${n - 1n}`;
+    return;
+  }
+  output.textContent = "Encrypting message...\n\n";
+  const { result, steps } = await modExpWithSteps(message, e, n);
+  ciphertext = result;
+  output.textContent = `Plaintext message: ${message}\n\n${steps}\nCiphertext: ${ciphertext}\n`;
+  decryptBtn.disabled = false;
+});
+
+decryptBtn.addEventListener('click', async () => {
+  if (ciphertext === null) {
+    output.textContent = "Please encrypt a message first.";
+    return;
+  }
+  output.textContent = "Decrypting message...\n\n";
+  const { result, steps } = await modExpWithSteps(ciphertext, d, n);
+  output.textContent = `Ciphertext: ${ciphertext}\n\n${steps}\nDecrypted message: ${result}\n`;
+});
+
+</script>
+
+</body>
+</html>

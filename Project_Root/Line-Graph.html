@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dynamic Line Graph with Sliders</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+    }
+    #graphContainer {
+      margin-bottom: 20px;
+    }
+    label {
+      display: block;
+      margin: 10px 0 5px;
+    }
+    input[type="range"] {
+      width: 300px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Dynamic Line Graph</h1>
+
+  <div id="graphContainer">
+    <canvas id="lineGraph" width="600" height="400" style="border:1px solid #ccc;"></canvas>
+  </div>
+
+  <div>
+    <label for="slopeSlider">Slope (m): <span id="slopeValue">1</span></label>
+    <input type="range" id="slopeSlider" min="-5" max="5" step="0.1" value="1" />
+  </div>
+
+  <div>
+    <label for="interceptSlider">Intercept (b): <span id="interceptValue">0</span></label>
+    <input type="range" id="interceptSlider" min="-100" max="100" step="1" value="0" />
+  </div>
+
+  <script>
+    const canvas = document.getElementById('lineGraph');
+    const ctx = canvas.getContext('2d');
+    const width = canvas.width;
+    const height = canvas.height;
+
+    const slopeSlider = document.getElementById('slopeSlider');
+    const interceptSlider = document.getElementById('interceptSlider');
+    const slopeValue = document.getElementById('slopeValue');
+    const interceptValue = document.getElementById('interceptValue');
+
+    // Coordinate system settings
+    const padding = 50;
+    const xMin = 0;
+    const xMax = 100;
+    const yMin = -100;
+    const yMax = 100;
+
+    function mapX(x) {
+      // Map x from data coords to canvas coords
+      return padding + ((x - xMin) / (xMax - xMin)) * (width - 2 * padding);
+    }
+
+    function mapY(y) {
+      // Map y from data coords to canvas coords (inverted y-axis)
+      return height - padding - ((y - yMin) / (yMax - yMin)) * (height - 2 * padding);
+    }
+
+    function drawAxes() {
+      ctx.strokeStyle = '#000';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+
+      // X axis
+      ctx.moveTo(padding, height - padding);
+      ctx.lineTo(width - padding, height - padding);
+
+      // Y axis
+      ctx.moveTo(padding, padding);
+      ctx.lineTo(padding, height - padding);
+
+      ctx.stroke();
+
+      // Draw ticks and labels
+      ctx.fillStyle = '#000';
+      ctx.font = '12px Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+
+      // X axis ticks
+      for (let x = xMin; x <= xMax; x += 20) {
+        const cx = mapX(x);
+        ctx.beginPath();
+        ctx.moveTo(cx, height - padding);
+        ctx.lineTo(cx, height - padding + 5);
+        ctx.stroke();
+        ctx.fillText(x, cx, height - padding + 7);
+      }
+
+      // Y axis ticks
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'middle';
+      for (let y = yMin; y <= yMax; y += 50) {
+        const cy = mapY(y);
+        ctx.beginPath();
+        ctx.moveTo(padding, cy);
+        ctx.lineTo(padding - 5, cy);
+        ctx.stroke();
+        ctx.fillText(y, padding - 7, cy);
+      }
+    }
+
+    function drawLine(m, b) {
+      ctx.strokeStyle = 'blue';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+
+      // Calculate two points on the line within x range
+      const x1 = xMin;
+      const y1 = m * x1 + b;
+      const x2 = xMax;
+      const y2 = m * x2 + b;
+
+      ctx.moveTo(mapX(x1), mapY(y1));
+      ctx.lineTo(mapX(x2), mapY(y2));
+      ctx.stroke();
+    }
+
+    function clearCanvas() {
+      ctx.clearRect(0, 0, width, height);
+    }
+
+    function updateGraph() {
+      const m = parseFloat(slopeSlider.value);
+      const b = parseFloat(interceptSlider.value);
+      slopeValue.textContent = m.toFixed(1);
+      interceptValue.textContent = b.toFixed(0);
+
+      clearCanvas();
+      drawAxes();
+      drawLine(m, b);
+    }
+
+    slopeSlider.addEventListener('input', updateGraph);
+    interceptSlider.addEventListener('input', updateGraph);
+
+    // Initial draw
+    updateGraph();
+  </script>
+</body>
+</html>

@@ -1,0 +1,1004 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Double Pendulum Golf Challenge</title>
+  <style>
+    :root {
+      --sky-top: #6fb9ff;
+      --sky-bottom: #cfeeff;
+      --fairway: #4b9a43;
+      --rough: #2d6f2f;
+      --panel: #f8f3de;
+      --ink: #15381e;
+      --accent: #c96c21;
+      --accent-dark: #8f4111;
+      --line: #2f5b34;
+      --sand: #ebdfac;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: linear-gradient(180deg, #ecf6ff 0%, #d8f1e3 55%, #b8e5be 100%);
+      color: var(--ink);
+      font-family: "Trebuchet MS", "Lucida Grande", "Segoe UI", sans-serif;
+      padding: 18px;
+    }
+
+    .wrap {
+      max-width: 1720px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 270px minmax(0, 1fr);
+      gap: 18px;
+      align-items: start;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 3px solid #b5c48d;
+      border-radius: 18px;
+      box-shadow: 0 14px 24px rgba(17, 58, 30, 0.15);
+      padding: 16px;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 1.85rem;
+      line-height: 1.1;
+      letter-spacing: 0.3px;
+    }
+
+    .subtitle {
+      margin: 0 0 14px;
+      color: #355d3f;
+      font-size: 0.96rem;
+      line-height: 1.4;
+    }
+
+    .control {
+      margin: 12px 0;
+    }
+
+    .control label {
+      display: block;
+      margin-bottom: 6px;
+      font-weight: 700;
+      font-size: 0.92rem;
+    }
+
+    .control input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+    }
+
+    .buttons {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    button {
+      border: 0;
+      border-radius: 12px;
+      padding: 10px 12px;
+      cursor: pointer;
+      font-weight: 700;
+      color: #fff;
+      background: linear-gradient(180deg, var(--accent) 0%, var(--accent-dark) 100%);
+      box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.2);
+      transition: transform 0.12s ease;
+    }
+
+    button:disabled {
+      filter: grayscale(0.65);
+      cursor: not-allowed;
+      transform: none;
+      opacity: 0.7;
+    }
+
+    button:hover:not(:disabled) {
+      transform: translateY(-1px);
+    }
+
+    .stats {
+      margin-top: 16px;
+      background: #fffce8;
+      border: 2px solid #ddcf95;
+      border-radius: 12px;
+      padding: 10px;
+      font-size: 0.94rem;
+      line-height: 1.55;
+    }
+
+    .stats strong {
+      min-width: 96px;
+      display: inline-block;
+    }
+
+    .status {
+      margin-top: 10px;
+      font-weight: 800;
+      color: #224f2b;
+    }
+
+    .hint {
+      margin-top: 14px;
+      font-size: 0.88rem;
+      line-height: 1.42;
+      color: #3d613b;
+    }
+
+    .canvas-shell {
+      background: #ecf6ff;
+      border: 3px solid #9cc39f;
+      border-radius: 18px;
+      padding: 12px;
+      box-shadow: 0 14px 24px rgba(17, 58, 30, 0.15);
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: auto;
+      touch-action: none;
+      border-radius: 12px;
+      background: #a8d9ff;
+    }
+
+    @media (max-width: 900px) {
+      .wrap {
+        grid-template-columns: 1fr;
+      }
+
+      .panel {
+        order: 2;
+      }
+
+      .canvas-shell {
+        order: 1;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="panel">
+      <h1>Pendulum Golf Challenge</h1>
+      <p class="subtitle">
+        Set two starting angles, swing the double pendulum, and blast the golf ball.
+        Tiny angle changes can create big distance changes.
+      </p>
+
+      <div class="control">
+        <label>Arm 1 Angle: <span id="angle1Value">120</span> deg</label>
+      </div>
+
+      <div class="control">
+        <label>Arm 2 Angle: <span id="angle2Value">220</span> deg</label>
+      </div>
+
+      <div class="control">
+        <label for="ballOffsetX">Ball Offset Left/Right: <span id="ballOffsetXValue">0</span> px</label>
+        <input id="ballOffsetX" type="range" min="-120" max="120" value="0" />
+      </div>
+
+      <div class="control">
+        <label for="ballOffsetY">Ball Offset Up/Down: <span id="ballOffsetYValue">0</span> px</label>
+        <input id="ballOffsetY" type="range" min="-120" max="120" value="0" />
+      </div>
+
+      <div class="buttons">
+        <button id="swingBtn">Swing</button>
+        <button id="resetBtn">Reset Shot</button>
+        <button id="resetArmsBtn">Reset Arms</button>
+      </div>
+
+      <div class="stats">
+        <div><strong>Last Shot:</strong> <span id="lastShot">0.0 m</span></div>
+        <div><strong>Best Shot:</strong> <span id="bestShot">0.0 m</span></div>
+        <div><strong>Shots Taken:</strong> <span id="shotCount">0</span></div>
+        <div><strong>Impact Speed:</strong> <span id="impactSpeed">0.00</span></div>
+      </div>
+
+      <div id="status" class="status">Ready. Choose angles and press Swing.</div>
+
+      <p class="hint">
+        Drag either pendulum bob to set the arm angles, then press Swing.
+      </p>
+    </section>
+
+    <section class="canvas-shell">
+      <canvas id="gameCanvas" width="760" height="880" aria-label="Double pendulum golf game"></canvas>
+    </section>
+  </div>
+
+  <script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+
+    const angle1Value = document.getElementById("angle1Value");
+    const angle2Value = document.getElementById("angle2Value");
+    const ballOffsetXSlider = document.getElementById("ballOffsetX");
+    const ballOffsetYSlider = document.getElementById("ballOffsetY");
+    const ballOffsetXValue = document.getElementById("ballOffsetXValue");
+    const ballOffsetYValue = document.getElementById("ballOffsetYValue");
+
+    const swingBtn = document.getElementById("swingBtn");
+    const resetBtn = document.getElementById("resetBtn");
+    const resetArmsBtn = document.getElementById("resetArmsBtn");
+
+    const statusEl = document.getElementById("status");
+    const lastShotEl = document.getElementById("lastShot");
+    const bestShotEl = document.getElementById("bestShot");
+    const shotCountEl = document.getElementById("shotCount");
+    const impactSpeedEl = document.getElementById("impactSpeed");
+
+    const state = {
+      game: "ready",
+      width: canvas.width,
+      height: canvas.height,
+      groundY: 760,
+      teeX: 370,
+      ballStartX: 370,
+      ballStartY: 760,
+      ballOffsetX: 0,
+      ballOffsetY: 0,
+      distanceScale: 0.22,
+      shotCount: 0,
+      bestShot: 0,
+      lastShot: 0,
+      impactSpeed: 0,
+      showPendulum: true
+    };
+
+    const pendulum = {
+      g: 1,
+      r1: 145,
+      r2: 145,
+      m1: 13,
+      m2: 16,
+      originX: 190,
+      originY: 120,
+      a1: 0,
+      a2: 0,
+      a1_v: 0,
+      a2_v: 0,
+      a1_a: 0,
+      a2_a: 0,
+      damping: 0.9992,
+      trail: [],
+      maxTrailLength: 260,
+      bob2PrevX: 0,
+      bob2PrevY: 0,
+      bob1X: 0,
+      bob1Y: 0,
+      bob2X: 0,
+      bob2Y: 0,
+      defaultA1: degreesToRadians(120),
+      defaultA2: degreesToRadians(220),
+      aimA1: degreesToRadians(120),
+      aimA2: degreesToRadians(220)
+    };
+
+    const ball = {
+      x: state.teeX,
+      y: state.groundY - 10,
+      radius: 10,
+      mass: 1.7,
+      drag: 0.988,
+      rollFriction: 0.94,
+      vx: 0,
+      vy: 0,
+      inFlight: false,
+      wasHit: false
+    };
+
+    const impactFX = {
+      active: false,
+      x: 0,
+      y: 0,
+      life: 0
+    };
+
+    const dragState = {
+      active: false,
+      target: "",
+      pointerId: null
+    };
+
+    function degreesToRadians(degrees) {
+      return degrees * (Math.PI / 180);
+    }
+
+    function radiansToDegrees(radians) {
+      return radians * (180 / Math.PI);
+    }
+
+    function normalizeDegrees(value) {
+      const wrapped = ((value % 360) + 360) % 360;
+      return wrapped.toFixed(0);
+    }
+
+    function updateSliderLabels() {
+      angle1Value.textContent = normalizeDegrees(radiansToDegrees(pendulum.a1));
+      angle2Value.textContent = normalizeDegrees(radiansToDegrees(pendulum.a2));
+      ballOffsetXValue.textContent = ballOffsetXSlider.value;
+      ballOffsetYValue.textContent = ballOffsetYSlider.value;
+    }
+
+    function getBallStartPosition() {
+      const minX = 14;
+      const maxX = state.width - 14;
+      const minY = 14;
+      const maxY = state.groundY - ball.radius;
+      const x = Math.max(minX, Math.min(maxX, state.teeX + state.ballOffsetX));
+      const y = Math.max(minY, Math.min(maxY, state.groundY - ball.radius + state.ballOffsetY));
+      return { x, y };
+    }
+
+    function recalcLayout() {
+      const targetWidth = Math.max(760, Math.min(1500, window.innerWidth - 42));
+      const targetHeight = Math.max(620, Math.round(targetWidth * 0.72));
+      canvas.width = targetWidth;
+      canvas.height = targetHeight;
+
+      state.width = canvas.width;
+      state.height = canvas.height;
+      const armLength = Math.max(108, Math.min(170, Math.floor((state.height - 110) / 4)));
+      pendulum.r1 = armLength;
+      pendulum.r2 = armLength;
+      pendulum.originX = Math.round(state.width * 0.18);
+
+      // Keep the entire pendulum circle in frame at all angles.
+      const reach = pendulum.r1 + pendulum.r2 + pendulum.m2 + 8;
+      const minOriginX = reach;
+      const maxOriginX = state.width - reach;
+      pendulum.originX = Math.max(minOriginX, Math.min(maxOriginX, pendulum.originX));
+      pendulum.originY = reach + 18;
+
+      // Ground follows pendulum size so the bob can reach the tee area.
+      state.groundY = Math.min(state.height - 36, pendulum.originY + pendulum.r1 + pendulum.r2 + 24);
+
+      // Place tee and ball directly below the pendulum vertical centerline.
+      state.teeX = pendulum.originX;
+
+      // Keep right edge near 300m so long shots are visible on screen.
+      const runwayPixels = Math.max(260, state.width - state.teeX - 24);
+      state.distanceScale = 300 / runwayPixels;
+
+      ball.x = state.teeX;
+      ball.y = state.groundY - ball.radius;
+    }
+
+    function setStatus(message) {
+      statusEl.textContent = message;
+    }
+
+    function computePendulumCoordinates() {
+      pendulum.bob1X = pendulum.originX + pendulum.r1 * Math.sin(pendulum.a1);
+      pendulum.bob1Y = pendulum.originY + pendulum.r1 * Math.cos(pendulum.a1);
+      pendulum.bob2X = pendulum.bob1X + pendulum.r2 * Math.sin(pendulum.a2);
+      pendulum.bob2Y = pendulum.bob1Y + pendulum.r2 * Math.cos(pendulum.a2);
+    }
+
+    function resetPendulumMotion(clearTrail = true) {
+      pendulum.a1_v = 0;
+      pendulum.a2_v = 0;
+      pendulum.a1_a = 0;
+      pendulum.a2_a = 0;
+      if (clearTrail) {
+        pendulum.trail.length = 0;
+      }
+      computePendulumCoordinates();
+      pendulum.bob2PrevX = pendulum.bob2X;
+      pendulum.bob2PrevY = pendulum.bob2Y;
+      updateSliderLabels();
+    }
+
+    function resetPendulumPose() {
+      pendulum.a1 = pendulum.defaultA1;
+      pendulum.a2 = pendulum.defaultA2;
+      pendulum.aimA1 = pendulum.a1;
+      pendulum.aimA2 = pendulum.a2;
+      resetPendulumMotion(true);
+    }
+
+    function restoreAimPose() {
+      pendulum.a1 = pendulum.aimA1;
+      pendulum.a2 = pendulum.aimA2;
+      resetPendulumMotion(true);
+    }
+
+    function resetBall() {
+      const startPos = getBallStartPosition();
+      state.ballStartX = startPos.x;
+      state.ballStartY = startPos.y;
+      ball.x = state.ballStartX;
+      ball.y = state.ballStartY;
+      ball.vx = 0;
+      ball.vy = 0;
+      ball.inFlight = false;
+      ball.wasHit = false;
+    }
+
+    function resetShotState() {
+      state.game = "ready";
+      state.showPendulum = true;
+      state.impactSpeed = 0;
+      impactSpeedEl.textContent = "0.00";
+      restoreAimPose();
+      resetBall();
+      impactFX.active = false;
+      setStatus("Ready. Drag a bob to aim, then press Swing.");
+      swingBtn.disabled = false;
+    }
+
+    function beginSwing() {
+      state.game = "swinging";
+      state.showPendulum = true;
+      state.impactSpeed = 0;
+      impactSpeedEl.textContent = "0.00";
+      pendulum.aimA1 = pendulum.a1;
+      pendulum.aimA2 = pendulum.a2;
+      resetPendulumMotion(true);
+      resetBall();
+      setStatus("Swinging... waiting for impact.");
+      swingBtn.disabled = true;
+    }
+
+    function updatePendulumPhysics() {
+      const a1 = pendulum.a1;
+      const a2 = pendulum.a2;
+      const a1_v = pendulum.a1_v;
+      const a2_v = pendulum.a2_v;
+      const m1 = pendulum.m1;
+      const m2 = pendulum.m2;
+      const r1 = pendulum.r1;
+      const r2 = pendulum.r2;
+      const g = pendulum.g;
+
+      const denCommon = 2 * m1 + m2 - m2 * Math.cos(2 * a1 - 2 * a2);
+      const safeDenA1 = r1 * (Math.abs(denCommon) < 1e-6 ? 1e-6 : denCommon);
+      const safeDenA2 = r2 * (Math.abs(denCommon) < 1e-6 ? 1e-6 : denCommon);
+
+      const num1 = -g * (2 * m1 + m2) * Math.sin(a1);
+      const num2 = -m2 * g * Math.sin(a1 - 2 * a2);
+      const num3 = -2 * Math.sin(a1 - a2) * m2;
+      const num4 = a2_v * a2_v * r2 + a1_v * a1_v * r1 * Math.cos(a1 - a2);
+      pendulum.a1_a = (num1 + num2 + num3 * num4) / safeDenA1;
+
+      const num5 = 2 * Math.sin(a1 - a2);
+      const num6 = a1_v * a1_v * r1 * (m1 + m2);
+      const num7 = g * (m1 + m2) * Math.cos(a1);
+      const num8 = a2_v * a2_v * r2 * m2 * Math.cos(a1 - a2);
+      pendulum.a2_a = (num5 * (num6 + num7 + num8)) / safeDenA2;
+
+      pendulum.a1_v += pendulum.a1_a;
+      pendulum.a2_v += pendulum.a2_a;
+      pendulum.a1 += pendulum.a1_v;
+      pendulum.a2 += pendulum.a2_v;
+
+      pendulum.a1_v *= pendulum.damping;
+      pendulum.a2_v *= pendulum.damping;
+
+      computePendulumCoordinates();
+      pendulum.trail.push({ x: pendulum.bob2X, y: pendulum.bob2Y });
+      if (pendulum.trail.length > pendulum.maxTrailLength) {
+        pendulum.trail.shift();
+      }
+    }
+
+    function closestPointOnSegment(ax, ay, bx, by, px, py) {
+      const abx = bx - ax;
+      const aby = by - ay;
+      const apx = px - ax;
+      const apy = py - ay;
+      const abLenSq = abx * abx + aby * aby;
+      if (abLenSq < 1e-9) {
+        return { x: ax, y: ay };
+      }
+      const t = Math.max(0, Math.min(1, (apx * abx + apy * aby) / abLenSq));
+      return {
+        x: ax + abx * t,
+        y: ay + aby * t
+      };
+    }
+
+    function tryImpactBall() {
+      if (ball.wasHit) {
+        return;
+      }
+
+      const bobRadius = pendulum.m2;
+      const impactRadius = bobRadius + ball.radius;
+
+      const hitPoint = closestPointOnSegment(
+        pendulum.bob2PrevX,
+        pendulum.bob2PrevY,
+        pendulum.bob2X,
+        pendulum.bob2Y,
+        ball.x,
+        ball.y
+      );
+
+      const dx = hitPoint.x - ball.x;
+      const dy = hitPoint.y - ball.y;
+      const distSq = dx * dx + dy * dy;
+
+      if (distSq > impactRadius * impactRadius) {
+        return;
+      }
+
+      const bobVx = pendulum.bob2X - pendulum.bob2PrevX;
+      const bobVy = pendulum.bob2Y - pendulum.bob2PrevY;
+      const bobSpeed = Math.hypot(bobVx, bobVy);
+
+      if (bobSpeed < 0.2) {
+        return;
+      }
+
+      const nx = bobVx / bobSpeed;
+      const ny = bobVy / bobSpeed;
+      const transfer = 0.62;
+      const impulse = (bobSpeed * transfer) / ball.mass;
+
+      // Heavier effective ball response keeps distances in a playable range.
+      ball.vx = Math.max(0, nx * impulse + 0.65);
+      ball.vy = Math.min(-0.8, ny * impulse - 1.1);
+
+      // Hard speed cap to avoid runaway launches from chaotic edge cases.
+      const launchSpeed = Math.hypot(ball.vx, ball.vy);
+      const maxLaunchSpeed = 14;
+      if (launchSpeed > maxLaunchSpeed) {
+        const scale = maxLaunchSpeed / launchSpeed;
+        ball.vx *= scale;
+        ball.vy *= scale;
+      }
+      ball.wasHit = true;
+      ball.inFlight = true;
+      state.showPendulum = false;
+      pendulum.a1_v = 0;
+      pendulum.a2_v = 0;
+
+      state.impactSpeed = bobSpeed;
+      impactSpeedEl.textContent = bobSpeed.toFixed(2);
+      setStatus("Crack! The ball is in flight.");
+      state.game = "flight";
+
+      impactFX.active = true;
+      impactFX.x = ball.x;
+      impactFX.y = ball.y;
+      impactFX.life = 16;
+    }
+
+    function updateBallPhysics() {
+      if (!ball.inFlight) {
+        return;
+      }
+
+      ball.vy += 0.36;
+      ball.x += ball.vx;
+      ball.y += ball.vy;
+
+      ball.vx *= ball.drag;
+      ball.vy *= 0.996;
+
+      if (ball.y + ball.radius >= state.groundY) {
+        ball.y = state.groundY - ball.radius;
+
+        if (Math.abs(ball.vy) > 0.9) {
+          ball.vy *= -0.14;
+        } else {
+          ball.vy = 0;
+        }
+
+        ball.vx *= ball.rollFriction;
+      }
+
+      if (Math.abs(ball.vx) < 0.16 && Math.abs(ball.vy) < 0.16 && ball.y + ball.radius >= state.groundY - 0.02) {
+        ball.inFlight = false;
+        concludeShot(ball.wasHit);
+      }
+    }
+
+    function concludeShot(wasHit) {
+      const rawDistance = (ball.x - state.ballStartX) * state.distanceScale;
+      const shotDistance = wasHit ? Math.max(0, rawDistance) : 0;
+
+      state.lastShot = shotDistance;
+      state.bestShot = Math.max(state.bestShot, shotDistance);
+      state.shotCount += 1;
+
+      lastShotEl.textContent = `${shotDistance.toFixed(1)} m`;
+      bestShotEl.textContent = `${state.bestShot.toFixed(1)} m`;
+      shotCountEl.textContent = String(state.shotCount);
+
+      if (wasHit) {
+        setStatus(`Shot complete: ${shotDistance.toFixed(1)} yards. Adjust angles and swing again.`);
+      } else {
+        setStatus("Missed the ball. Tweak angles and try another swing.");
+      }
+
+      state.game = "settled";
+      swingBtn.disabled = false;
+    }
+
+    function updateSimulation() {
+      pendulum.bob2PrevX = pendulum.bob2X;
+      pendulum.bob2PrevY = pendulum.bob2Y;
+
+      if (state.game === "swinging" && state.showPendulum) {
+        updatePendulumPhysics();
+      }
+
+      if (state.game === "swinging") {
+        tryImpactBall();
+
+        const energy = Math.abs(pendulum.a1_v) + Math.abs(pendulum.a2_v);
+        if (!ball.wasHit && energy < 0.03 && pendulum.trail.length > 80) {
+          concludeShot(false);
+        }
+      }
+
+      if (state.game === "flight") {
+        updateBallPhysics();
+      }
+
+      if (impactFX.active) {
+        impactFX.life -= 1;
+        if (impactFX.life <= 0) {
+          impactFX.active = false;
+        }
+      }
+    }
+
+    function drawBackground() {
+      const sky = ctx.createLinearGradient(0, 0, 0, state.groundY);
+      sky.addColorStop(0, "#6fb9ff");
+      sky.addColorStop(1, "#d9f4ff");
+      ctx.fillStyle = sky;
+      ctx.fillRect(0, 0, state.width, state.groundY);
+
+      ctx.fillStyle = "#ffe89e";
+      ctx.beginPath();
+      ctx.arc(state.width - 88, 72, 34, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = "rgba(255, 255, 255, 0.88)";
+      drawCloud(140, 78, 54);
+      drawCloud(280, 58, 45);
+      drawCloud(state.width - 270, 96, 50);
+
+      ctx.fillStyle = "#4b9a43";
+      ctx.fillRect(0, state.groundY, state.width, state.height - state.groundY);
+
+      ctx.fillStyle = "#2d6f2f";
+      ctx.beginPath();
+      ctx.moveTo(0, state.groundY);
+      ctx.quadraticCurveTo(state.width * 0.2, state.groundY - 24, state.width * 0.45, state.groundY);
+      ctx.quadraticCurveTo(state.width * 0.72, state.groundY + 20, state.width, state.groundY - 8);
+      ctx.lineTo(state.width, state.height);
+      ctx.lineTo(0, state.height);
+      ctx.closePath();
+      ctx.fill();
+
+      drawSandPatch();
+      drawFlag();
+    }
+
+    function drawCloud(x, y, s) {
+      ctx.beginPath();
+      ctx.arc(x, y, s * 0.38, 0, Math.PI * 2);
+      ctx.arc(x + s * 0.35, y + 2, s * 0.28, 0, Math.PI * 2);
+      ctx.arc(x - s * 0.3, y + 4, s * 0.26, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    function drawSandPatch() {
+      const x = state.width * 0.78;
+      const y = state.groundY + 18;
+      ctx.fillStyle = "#ebdfac";
+      ctx.beginPath();
+      ctx.ellipse(x, y, 98, 34, -0.06, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    function drawFlag() {
+      const flagX = state.width - 90;
+      const flagBaseY = state.groundY;
+      ctx.strokeStyle = "#2a5f31";
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(flagX, flagBaseY);
+      ctx.lineTo(flagX, flagBaseY - 100);
+      ctx.stroke();
+
+      ctx.fillStyle = "#d34c23";
+      ctx.beginPath();
+      ctx.moveTo(flagX, flagBaseY - 100);
+      ctx.lineTo(flagX + 46, flagBaseY - 86);
+      ctx.lineTo(flagX, flagBaseY - 72);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.fillStyle = "rgba(0, 0, 0, 0.17)";
+      ctx.beginPath();
+      ctx.ellipse(flagX, flagBaseY + 2, 22, 6, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    function drawTee() {
+      ctx.fillStyle = "#f9f3de";
+      ctx.beginPath();
+      ctx.arc(state.ballStartX, state.groundY, 4, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = "#7c5a30";
+      ctx.fillRect(state.ballStartX - 2, state.groundY - 11, 4, 10);
+    }
+
+    function drawPendulum() {
+      ctx.strokeStyle = "#3d4b56";
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(pendulum.originX, pendulum.originY);
+      ctx.lineTo(pendulum.bob1X, pendulum.bob1Y);
+      ctx.lineTo(pendulum.bob2X, pendulum.bob2Y);
+      ctx.stroke();
+
+      ctx.fillStyle = "#5f6f7d";
+      ctx.beginPath();
+      ctx.arc(pendulum.originX, pendulum.originY, 8, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = "#c95f35";
+      ctx.beginPath();
+      ctx.arc(pendulum.bob1X, pendulum.bob1Y, pendulum.m1, 0, Math.PI * 2);
+      ctx.fill();
+
+      drawClubHead();
+
+      ctx.lineWidth = 2;
+      for (let i = 1; i < pendulum.trail.length; i++) {
+        const p0 = pendulum.trail[i - 1];
+        const p1 = pendulum.trail[i];
+        const alpha = i / pendulum.trail.length;
+        ctx.strokeStyle = `rgba(37, 72, 150, ${alpha * 0.55})`;
+        ctx.beginPath();
+        ctx.moveTo(p0.x, p0.y);
+        ctx.lineTo(p1.x, p1.y);
+        ctx.stroke();
+      }
+    }
+
+    function drawClubHead() {
+      const shaftAngle = Math.atan2(
+        pendulum.bob2Y - pendulum.bob1Y,
+        pendulum.bob2X - pendulum.bob1X
+      );
+
+      ctx.save();
+      ctx.translate(pendulum.bob2X, pendulum.bob2Y);
+      ctx.rotate(shaftAngle + Math.PI / 2);
+
+      // Crown of the club head.
+      ctx.fillStyle = "#3f4a56";
+      ctx.beginPath();
+      ctx.ellipse(0, -2, pendulum.m2 + 7, pendulum.m2 * 0.78, -0.08, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Club face and sole highlight.
+      ctx.fillStyle = "#8e9aa6";
+      ctx.beginPath();
+      ctx.roundRect(-pendulum.m2 - 2, pendulum.m2 * 0.15, pendulum.m2 * 2.1, pendulum.m2 * 0.62, 4);
+      ctx.fill();
+
+      ctx.fillStyle = "rgba(255, 255, 255, 0.35)";
+      ctx.beginPath();
+      ctx.ellipse(-3, -6, pendulum.m2 * 0.42, pendulum.m2 * 0.24, -0.3, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.restore();
+    }
+
+    function drawBall() {
+      ctx.fillStyle = "#ffffff";
+      ctx.beginPath();
+      ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.strokeStyle = "#d9d9d9";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(ball.x - 2, ball.y - 1, 3, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    function drawDistanceMarker() {
+      const zeroX = state.ballStartX;
+      const currentX = Math.max(zeroX, ball.x);
+      const markerY = Math.min(state.height - 20, state.groundY + 20);
+
+      ctx.strokeStyle = "rgba(0, 0, 0, 0.35)";
+      ctx.lineWidth = 2;
+      ctx.setLineDash([8, 7]);
+      ctx.beginPath();
+      ctx.moveTo(zeroX, markerY);
+      ctx.lineTo(currentX, markerY);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      const shownDistance = Math.max(0, (currentX - zeroX) * state.distanceScale);
+      ctx.fillStyle = "#14351f";
+      ctx.font = "700 15px Trebuchet MS";
+      ctx.fillText(`${shownDistance.toFixed(1)} m`, zeroX + 8, Math.min(state.height - 6, markerY + 20));
+    }
+
+    function drawImpactEffect() {
+      if (!impactFX.active) {
+        return;
+      }
+
+      const radius = (18 - impactFX.life) * 2;
+      const alpha = Math.max(0, impactFX.life / 16);
+      ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(impactFX.x, impactFX.y, radius, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, state.width, state.height);
+      drawBackground();
+      drawDistanceMarker();
+      drawTee();
+      if (state.showPendulum) {
+        drawPendulum();
+      }
+      drawBall();
+      drawImpactEffect();
+    }
+
+    function animate() {
+      updateSimulation();
+      draw();
+      requestAnimationFrame(animate);
+    }
+
+    ballOffsetXSlider.addEventListener("input", () => {
+      state.ballOffsetX = parseFloat(ballOffsetXSlider.value);
+      updateSliderLabels();
+      if (state.game === "ready" || state.game === "settled") {
+        resetBall();
+      }
+    });
+
+    ballOffsetYSlider.addEventListener("input", () => {
+      state.ballOffsetY = parseFloat(ballOffsetYSlider.value);
+      updateSliderLabels();
+      if (state.game === "ready" || state.game === "settled") {
+        resetBall();
+      }
+    });
+
+    swingBtn.addEventListener("click", () => {
+      if (state.game === "swinging" || state.game === "flight") {
+        return;
+      }
+      beginSwing();
+    });
+
+    resetBtn.addEventListener("click", () => {
+      resetShotState();
+    });
+
+    resetArmsBtn.addEventListener("click", () => {
+      if (state.game === "swinging" || state.game === "flight") {
+        return;
+      }
+      resetPendulumPose();
+      state.showPendulum = true;
+      resetBall();
+      setStatus("Arms reset. Drag a bob to aim, then press Swing.");
+    });
+
+    function getPointerOnCanvas(event) {
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+      return {
+        x: (event.clientX - rect.left) * scaleX,
+        y: (event.clientY - rect.top) * scaleY
+      };
+    }
+
+    function startDrag(event) {
+      if (!(state.game === "ready" || state.game === "settled") || !state.showPendulum) {
+        return;
+      }
+
+      const pointer = getPointerOnCanvas(event);
+      const d1 = Math.hypot(pointer.x - pendulum.bob1X, pointer.y - pendulum.bob1Y);
+      const d2 = Math.hypot(pointer.x - pendulum.bob2X, pointer.y - pendulum.bob2Y);
+      const radius = 30;
+
+      if (d2 <= radius) {
+        dragState.active = true;
+        dragState.target = "bob2";
+      } else if (d1 <= radius) {
+        dragState.active = true;
+        dragState.target = "bob1";
+      } else {
+        return;
+      }
+
+      dragState.pointerId = event.pointerId;
+      canvas.setPointerCapture(event.pointerId);
+      setStatus("Dragging arm. Release to lock your setup.");
+      dragMove(event);
+    }
+
+    function dragMove(event) {
+      if (!dragState.active || dragState.pointerId !== event.pointerId) {
+        return;
+      }
+
+      const pointer = getPointerOnCanvas(event);
+
+      if (dragState.target === "bob1") {
+        pendulum.a1 = Math.atan2(pointer.x - pendulum.originX, pointer.y - pendulum.originY);
+      } else if (dragState.target === "bob2") {
+        pendulum.a2 = Math.atan2(pointer.x - pendulum.bob1X, pointer.y - pendulum.bob1Y);
+      }
+
+      pendulum.aimA1 = pendulum.a1;
+      pendulum.aimA2 = pendulum.a2;
+
+      resetPendulumMotion(true);
+    }
+
+    function endDrag(event) {
+      if (!dragState.active || dragState.pointerId !== event.pointerId) {
+        return;
+      }
+
+      dragState.active = false;
+      dragState.target = "";
+      dragState.pointerId = null;
+      if (canvas.hasPointerCapture(event.pointerId)) {
+        canvas.releasePointerCapture(event.pointerId);
+      }
+      setStatus("Ready. Drag a bob to aim, then press Swing.");
+    }
+
+    canvas.addEventListener("pointerdown", startDrag);
+    canvas.addEventListener("pointermove", dragMove);
+    canvas.addEventListener("pointerup", endDrag);
+    canvas.addEventListener("pointercancel", endDrag);
+
+    window.addEventListener("resize", () => {
+      recalcLayout();
+      if (state.game !== "swinging" && state.game !== "flight") {
+        resetShotState();
+      }
+    });
+
+    recalcLayout();
+    resetPendulumPose();
+    state.ballOffsetX = parseFloat(ballOffsetXSlider.value);
+    state.ballOffsetY = parseFloat(ballOffsetYSlider.value);
+    updateSliderLabels();
+    resetShotState();
+    animate();
+  </script>
+</body>
+</html>

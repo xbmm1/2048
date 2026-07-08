@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>RSA Demo</title>
+<style>
+body { font-family: Arial, sans-serif; margin: 2em; background: #f5f5f5; }
+h1 { color: #333; }
+textarea { width: 100%; height: 80px; font-size: 1em; }
+button { padding: 10px 20px; margin-top: 10px; font-size: 1em; }
+.output { background: white; padding: 1em; margin-top: 1em; white-space: pre-wrap; word-break: break-word; }
+</style>
+</head>
+<body>
+
+<h1>Simple RSA Demo</h1>
+
+<label>Enter message to encrypt:</label><br />
+<textarea id="message" placeholder="Type your message here...">HELLO RSA!</textarea><br />
+
+<button onclick="generateKeys()">Generate Keys</button>
+<button onclick="encryptMessage()">Encrypt</button>
+<button onclick="decryptMessage()">Decrypt</button>
+
+<div>
+<h3>Public Key (n, e):</h3>
+<div id="publicKey" class="output"></div>
+
+<h3>Private Key (n, d):</h3>
+<div id="privateKey" class="output"></div>
+
+<h3>Encrypted Message:</h3>
+<div id="encrypted" class="output"></div>
+
+<h3>Decrypted Message:</h3>
+<div id="decrypted" class="output"></div>
+</div>
+
+<script>
+// Utility: Compute gcd & Extended Euclidean Algorithm
+function egcd(a, b) {
+if (b === 0) return [a, 1, 0];
+const [g, x1, y1] = egcd(b, a % b);
+return [g, y1, x1 - Math.floor(a / b) * y1];
+}
+
+// Modular inverse
+function modInverse(e, phi) {
+const [g, x] = egcd(e, phi);
+if (g !== 1) throw 'No modular inverse';
+return (x % phi + phi) % phi;
+}
+
+// Check prime (simple, small primes only)
+function isPrime(n) {
+if (n < 2) return false;
+for (let i = 2; i * i <= n; i++)
+if (n % i === 0) return false;
+return true;
+}
+
+// Generate small prime (for demo purposes only)
+function generatePrime(min = 50, max = 150) {
+let p;
+do {
+p = Math.floor(Math.random() * (max - min)) + min;
+} while (!isPrime(p));
+return p;
+}
+
+// Modular exponentiation
+function modPow(base, exponent, modulus) {
+let result = 1n;
+let b = BigInt(base);
+let e = BigInt(exponent);
+let m = BigInt(modulus);
+b = b % m;
+while (e > 0) {
+if (e % 2n === 1n) result = (result * b) % m;
+e = e / 2n;
+b = (b * b) % m;
+}
+return result;
+}
+
+// Globals for keys
+let n, e, d;
+let encryptedMessage = [];
+
+// Generate keys
+function generateKeys() {
+const p = generatePrime();
+const q = generatePrime();
+n = p * q;
+const phi = (p - 1) * (q - 1);
+e = 65537;
+// Check gcd
+function gcd(a, b) { return b === 0 ? a : gcd(b, a % b); }
+if (gcd(e, phi) !== 1) {
+e = 3;
+while (gcd(e, phi) !== 1) e += 2;
+}
+d = modInverse(e, phi);
+
+document.getElementById('publicKey').innerText = `n = ${n}, e = ${e}`;
+document.getElementById('privateKey').innerText = `n = ${n}, d = ${d}`;
+document.getElementById('encrypted').innerText = '';
+document.getElementById('decrypted').innerText = '';
+encryptedMessage = [];
+alert(`Keys generated!\np = ${p}\nq = ${q}`);
+}
+
+// Encrypt message
+function encryptMessage() {
+if (!n || !e) {
+alert('Generate keys first!');
+return;
+}
+const message = document.getElementById('message').value;
+encryptedMessage = [];
+for (let i = 0; i < message.length; i++) {
+const c = modPow(message.charCodeAt(i), e, n);
+encryptedMessage.push(c.toString());
+}
+document.getElementById('encrypted').innerText = encryptedMessage.join(' ');
+document.getElementById('decrypted').innerText = '';
+}
+
+// Decrypt message
+function decryptMessage() {
+if (!n || !d || encryptedMessage.length === 0) {
+alert('Encrypt a message first!');
+return;
+}
+let decrypted = '';
+for (let c of encryptedMessage) {
+const m = modPow(BigInt(c), d, n);
+decrypted += String.fromCharCode(Number(m));
+}
+document.getElementById('decrypted').innerText = decrypted;
+}
+</script>
+
+</body>
+</html>

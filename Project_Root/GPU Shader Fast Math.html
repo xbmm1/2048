@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>GPU Shader Fast Math: Approximate sin(x) Visualization</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    max-width: 700px;
+    margin: 30px auto;
+    padding: 0 15px;
+  }
+  h1 {
+    text-align: center;
+  }
+  input[type="number"] {
+    width: 120px;
+    font-size: 1rem;
+    padding: 5px;
+  }
+  button {
+    margin-top: 15px;
+    padding: 8px 15px;
+    font-size: 1rem;
+  }
+  .step {
+    margin: 20px 0;
+    padding: 15px;
+    background: #f0f0f0;
+    border-radius: 8px;
+  }
+  .highlight {
+    font-weight: bold;
+    color: #2a7ae2;
+  }
+  .value-box {
+    background: #fff;
+    border: 1px solid #ccc;
+    padding: 8px 12px;
+    border-radius: 5px;
+    font-family: monospace;
+    margin-top: 8px;
+    display: inline-block;
+  }
+  #stepsNav {
+    margin-top: 20px;
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+  }
+  #stepsNav button {
+    padding: 8px 16px;
+    font-size: 1rem;
+  }
+</style>
+</head>
+<body>
+
+<h1>GPU Shader Fast Math: Approximate sin(x) Visualization</h1>
+
+<label for="inputAngle">Enter an angle (degrees):</label><br />
+<input type="number" id="inputAngle" value="45" step="0.1" />
+<button id="startBtn">Start Visualization</button>
+
+<div id="visualization" style="display:none; margin-top: 30px;">
+
+  <div class="step" id="step0">
+    <div><span class="highlight">Step 1:</span> Convert angle to radians</div>
+    <div>Input angle: <span id="angleDeg" class="value-box"></span> degrees</div>
+    <div>Radians: <span id="angleRad" class="value-box"></span></div>
+  </div>
+
+  <div class="step" id="step1">
+    <div><span class="highlight">Step 2:</span> Calculate exact sin(x) using <code>Math.sin</code></div>
+    <div>Exact sin: <span id="exactSin" class="value-box"></span></div>
+  </div>
+
+  <div class="step" id="step2">
+    <div><span class="highlight">Step 3:</span> Calculate approximate sin using a fast polynomial approximation</div>
+    <p>Using the formula:<br />
+      <code>sin(x) ≈ x * (1.27323954 - 0.405284735 * |x|)</code></p>
+    <div>Absolute radians: <span id="absRad" class="value-box"></span></div>
+    <div>Term 1: 1.27323954 * x = <span id="term1" class="value-box"></span></div>
+    <div>Term 2: 0.405284735 * |x| * x = <span id="term2" class="value-box"></span></div>
+  </div>
+
+  <div class="step" id="step3">
+    <div><span class="highlight">Step 4:</span> Final approximate sin value</div>
+    <div>Approximate sin: <span id="approxSin" class="value-box"></span></div>
+  </div>
+
+  <div class="step" id="step4">
+    <div><span class="highlight">Step 5:</span> Calculate error</div>
+    <div>Error (approx - exact): <span id="errorVal" class="value-box"></span></div>
+  </div>
+
+</div>
+
+<div id="stepsNav" style="display:none;">
+  <button id="prevBtn" disabled>&laquo; Previous</button>
+  <button id="nextBtn">Next &raquo;</button>
+</div>
+
+<script>
+  const inputAngle = document.getElementById('inputAngle');
+  const startBtn = document.getElementById('startBtn');
+  const visualization = document.getElementById('visualization');
+  const stepsNav = document.getElementById('stepsNav');
+  const prevBtn = document.getElementById('prevBtn');
+  const nextBtn = document.getElementById('nextBtn');
+
+  const steps = [
+    document.getElementById('step0'),
+    document.getElementById('step1'),
+    document.getElementById('step2'),
+    document.getElementById('step3'),
+    document.getElementById('step4'),
+  ];
+
+  let currentStep = 0;
+  let data = {};
+
+  function showStep(index) {
+    steps.forEach((step, i) => {
+      step.style.display = (i === index) ? 'block' : 'none';
+    });
+    prevBtn.disabled = (index === 0);
+    nextBtn.disabled = (index === steps.length - 1);
+  }
+
+  function updateVisualization() {
+    const deg = parseFloat(inputAngle.value);
+    if (isNaN(deg)) {
+      alert('Please enter a valid number');
+      return;
+    }
+    // Convert to radians
+    const rad = deg * Math.PI / 180;
+
+    // Exact sin
+    const exact = Math.sin(rad);
+
+    // Fast approximate sin formula (a common shader approx)
+    // sin(x) ≈ x * (1.27323954 - 0.405284735 * |x|)
+    const absRad = Math.abs(rad);
+    const term1 = 1.27323954 * rad;
+    const term2 = 0.405284735 * absRad * rad;
+    const approx = term1 - term2;
+
+    data = {
+      deg,
+      rad,
+      exact,
+      absRad,
+      term1,
+      term2,
+      approx,
+      error: approx - exact
+    };
+
+    // Update DOM elements
+    document.getElementById('angleDeg').textContent = deg.toFixed(4);
+    document.getElementById('angleRad').textContent = rad.toFixed(6);
+    document.getElementById('exactSin').textContent = exact.toFixed(6);
+    document.getElementById('absRad').textContent = absRad.toFixed(6);
+    document.getElementById('term1').textContent = term1.toFixed(6);
+    document.getElementById('term2').textContent = term2.toFixed(6);
+    document.getElementById('approxSin').textContent = approx.toFixed(6);
+    document.getElementById('errorVal').textContent = data.error.toExponential(3);
+  }
+
+  startBtn.addEventListener('click', () => {
+    updateVisualization();
+    visualization.style.display = 'block';
+    stepsNav.style.display = 'flex';
+    currentStep = 0;
+    showStep(currentStep);
+  });
+
+  prevBtn.addEventListener('click', () => {
+    if (currentStep > 0) {
+      currentStep--;
+      showStep(currentStep);
+    }
+  });
+
+  nextBtn.addEventListener('click', () => {
+    if (currentStep < steps.length - 1) {
+      currentStep++;
+      showStep(currentStep);
+    }
+  });
+
+  showStep(0);
+</script>
+
+</body>
+</html>

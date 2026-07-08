@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Simple GNFS Visualization for n=10403</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    margin: 2em;
+    background: #fafafa;
+    color: #222;
+  }
+  #container {
+    max-width: 700px;
+    margin: auto;
+    background: white;
+    padding: 1.5em;
+    border-radius: 8px;
+    box-shadow: 0 0 15px rgba(0,0,0,0.1);
+  }
+  h1 {
+    color: #333;
+    margin-bottom: 1em;
+  }
+  .step {
+    margin: 1.5em 0;
+    padding: 1em;
+    border-left: 6px solid #007bff;
+    background: #e6f0ff;
+    border-radius: 5px;
+    min-height: 80px;
+  }
+  button {
+    background: #007bff;
+    border: none;
+    color: white;
+    padding: 0.7em 1.2em;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1em;
+    margin-top: 1em;
+  }
+  button:disabled {
+    background: #ccc;
+    cursor: default;
+  }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin-top: 0.8em;
+  }
+  th, td {
+    border: 1px solid #ddd;
+    padding: 0.5em;
+    text-align: center;
+  }
+  th {
+    background-color: #007bff;
+    color: white;
+  }
+  .highlight {
+    font-weight: bold;
+    color: #0056b3;
+  }
+</style>
+</head>
+<body>
+
+<div id="container">
+  <h1>Simple GNFS Visualization: Factoring n = 10403</h1>
+  <div id="stepContainer" class="step">
+    Click <strong>Next</strong> to start the visualization.
+  </div>
+  <button id="nextBtn">Next</button>
+</div>
+
+<script>
+  const steps = [
+    {
+      title: "Step 1: Polynomial Selection",
+      content: `
+        <p>Choose polynomial based on \u221A n:</p>
+        <p>n = 10403, \u221A n ≈ 102</p>
+        <p>Polynomials chosen: <span class="highlight">f(x) = x - 102</span> and <span class="highlight">g(x) = x - 102</span></p>
+      `
+    },
+    {
+      title: "Step 2: Sieving for Smooth Values",
+      content: `
+        <p>Check values of x near 102:</p>
+        <table>
+          <thead>
+            <tr><th>x</th><th>f(x) = x - 102</th><th>Factors of f(x)</th><th>g(x) = x - 102</th><th>Factors of g(x)</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>100</td><td>-2</td><td>2</td><td>-2</td><td>2</td></tr>
+            <tr><td>101</td><td>-1</td><td>1 (trivial)</td><td>-1</td><td>1 (trivial)</td></tr>
+            <tr><td>102</td><td>0</td><td>0</td><td>0</td><td>0</td></tr>
+            <tr><td>103</td><td>1</td><td>1</td><td>1</td><td>1</td></tr>
+            <tr><td>104</td><td>2</td><td>2</td><td>2</td><td>2</td></tr>
+            <tr><td>105</td><td>3</td><td>3</td><td>3</td><td>3</td></tr>
+          </tbody>
+        </table>
+        <p>We pick values where both polynomials factor over small primes (2 and 3 here).</p>
+      `
+    },
+    {
+      title: "Step 3: Build and Solve the Matrix",
+      content: `
+        <p>Record exponents mod 2 for primes 2 and 3 for each x:</p>
+        <table>
+          <thead>
+            <tr><th>x</th><th>2 exponent mod 2</th><th>3 exponent mod 2</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>100</td><td>1</td><td>0</td></tr>
+            <tr><td>101</td><td>0</td><td>0</td></tr>
+            <tr><td>102</td><td>0</td><td>0</td></tr>
+            <tr><td>103</td><td>0</td><td>0</td></tr>
+            <tr><td>104</td><td>1</td><td>0</td></tr>
+            <tr><td>105</td><td>0</td><td>1</td></tr>
+          </tbody>
+        </table>
+        <p>We solve this system mod 2 to find dependencies (linear algebra step).</p>
+      `
+    },
+    {
+      title: "Step 4: Square Root Step and Factor Extraction",
+      content: `
+        <p>Use dependencies to find congruences of squares:</p>
+        <p>x² ≡ y² mod n</p>
+        <p>Compute gcd(x - y, n) to extract factor.</p>
+        <p>For n = 10403, factors are <span class="highlight">101</span> and <span class="highlight">103</span>.</p>
+      `
+    },
+    {
+      title: "Factoring Complete",
+      content: `
+        <p>Successfully factored n = 10403 into primes:</p>
+        <p><span class="highlight">10403 = 101 × 103</span></p>
+        <p>This simplified example illustrates the main steps of GNFS on a semi-large number.</p>
+      `
+    }
+  ];
+
+  let currentStep = 0;
+  const stepContainer = document.getElementById('stepContainer');
+  const nextBtn = document.getElementById('nextBtn');
+
+  nextBtn.addEventListener('click', () => {
+    if (currentStep < steps.length) {
+      const step = steps[currentStep];
+      stepContainer.innerHTML = `<h2>${step.title}</h2>${step.content}`;
+      currentStep++;
+      if (currentStep === steps.length) {
+        nextBtn.disabled = true;
+        nextBtn.textContent = "Done";
+      }
+    }
+  });
+</script>
+
+</body>
+</html>

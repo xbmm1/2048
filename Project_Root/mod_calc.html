@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Modular Arithmetic Calculator</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    margin: 2em;
+    background: #f0f4f8;
+  }
+  h1 {
+    color: #222;
+  }
+  label {
+    display: block;
+    margin-top: 1em;
+    font-weight: bold;
+  }
+  input, select, button {
+    font-size: 1em;
+    padding: 0.4em;
+    margin-top: 0.3em;
+    width: 100%;
+    max-width: 300px;
+    box-sizing: border-box;
+  }
+  button {
+    margin-top: 1em;
+    cursor: pointer;
+    background: #007bff;
+    color: white;
+    border: none;
+    border-radius: 3px;
+  }
+  button:hover {
+    background: #0056b3;
+  }
+  .output {
+    margin-top: 1.5em;
+    padding: 1em;
+    background: white;
+    border-radius: 5px;
+    font-family: monospace;
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-width: 320px;
+  }
+  .error {
+    color: #d9534f;
+    font-weight: bold;
+  }
+</style>
+</head>
+<body>
+
+<h1>Modular Arithmetic Calculator</h1>
+
+<label for="num1">First Number (a):</label>
+<input type="number" id="num1" placeholder="Enter first number" />
+
+<label for="num2">Second Number (b):</label>
+<input type="number" id="num2" placeholder="Enter second number" />
+
+<label for="modulus">Modulus (n):</label>
+<input type="number" id="modulus" placeholder="Enter modulus (positive integer)" />
+
+<label for="operation">Operation:</label>
+<select id="operation">
+  <option value="add">Addition (a + b mod n)</option>
+  <option value="subtract">Subtraction (a - b mod n)</option>
+  <option value="multiply">Multiplication (a × b mod n)</option>
+  <option value="divide">Division (a ÷ b mod n)</option>
+  <option value="power">Exponentiation (a^b mod n)</option>
+</select>
+
+<button onclick="calculate()">Calculate</button>
+
+<div id="result" class="output"></div>
+
+<script>
+// Extended Euclidean Algorithm for modular inverse
+function egcd(a, b) {
+  if (b === 0) return [a, 1, 0];
+  let [g, x1, y1] = egcd(b, a % b);
+  let x = y1;
+  let y = x1 - Math.floor(a / b) * y1;
+  return [g, x, y];
+}
+
+function modInverse(b, n) {
+  const [g, x] = egcd(b, n);
+  if (g !== 1) return null; // inverse doesn't exist
+  return ((x % n) + n) % n;
+}
+
+function modPow(base, exponent, modulus) {
+  if (modulus === 1) return 0;
+  let result = 1;
+  base = base % modulus;
+  while (exponent > 0) {
+    if (exponent % 2 === 1) result = (result * base) % modulus;
+    exponent = Math.floor(exponent / 2);
+    base = (base * base) % modulus;
+  }
+  return result;
+}
+
+function calculate() {
+  const a = parseInt(document.getElementById('num1').value, 10);
+  const b = parseInt(document.getElementById('num2').value, 10);
+  const n = parseInt(document.getElementById('modulus').value, 10);
+  const op = document.getElementById('operation').value;
+  const resultDiv = document.getElementById('result');
+  resultDiv.classList.remove('error');
+  
+  if (isNaN(a) || isNaN(b) || isNaN(n) || n <= 0) {
+    resultDiv.textContent = 'Please enter valid numbers and a positive modulus.';
+    resultDiv.classList.add('error');
+    return;
+  }
+  
+  let result;
+  switch (op) {
+    case 'add':
+      result = ((a % n) + (b % n)) % n;
+      resultDiv.textContent = `(${a} + ${b}) mod ${n} = ${result}`;
+      break;
+    case 'subtract':
+      result = ((a % n) - (b % n) + n) % n;
+      resultDiv.textContent = `(${a} - ${b}) mod ${n} = ${result}`;
+      break;
+    case 'multiply':
+      result = ((a % n) * (b % n)) % n;
+      resultDiv.textContent = `(${a} × ${b}) mod ${n} = ${result}`;
+      break;
+    case 'divide':
+      // division mod n means multiply by modular inverse of b mod n
+      const inv = modInverse(b, n);
+      if (inv === null) {
+        resultDiv.textContent = `Division not possible: modular inverse of ${b} mod ${n} does not exist.`;
+        resultDiv.classList.add('error');
+      } else {
+        result = ((a % n) * inv) % n;
+        resultDiv.textContent = `(${a} ÷ ${b}) mod ${n} = ${result} (using modular inverse ${inv})`;
+      }
+      break;
+    case 'power':
+      if (b < 0) {
+        resultDiv.textContent = 'Negative exponents are not supported.';
+        resultDiv.classList.add('error');
+        break;
+      }
+      result = modPow(a, b, n);
+      resultDiv.textContent = `(${a}^${b}) mod ${n} = ${result}`;
+      break;
+    default:
+      resultDiv.textContent = 'Unknown operation.';
+  }
+}
+</script>
+
+</body>
+</html>

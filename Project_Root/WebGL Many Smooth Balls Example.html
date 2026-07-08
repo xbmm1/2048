@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Interactive WebGL Balls with UI</title>
+<style>
+  body, html {
+    margin: 0; padding: 0; overflow: hidden; height: 100%;
+    background: #222;
+    color: white;
+    font-family: sans-serif;
+    user-select: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  canvas {
+    display: block;
+    width: 100vw;
+    height: 80vh;
+    background: #222;
+    cursor: pointer;
+  }
+  #controls {
+    margin: 10px 0;
+  }
+  button {
+    background: #444;
+    border: none;
+    color: white;
+    font-size: 16px;
+    padding: 8px 16px;
+    margin: 0 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+  }
+  button:hover {
+    background: #666;
+  }
+  #ballCount {
+    margin-left: 16px;
+    font-weight: bold;
+    font-size: 16px;
+  }
+</style>
+</head>
+<body>
+
+<div id="controls">
+  <button id="addBallBtn">Add Ball</button>
+  <button id="removeBallBtn">Remove Ball</button>
+  <span id="ballCount">Balls: 0</span>
+</div>
+
+<canvas id="glcanvas"></canvas>
+
+<script type="x-shader/x-vertex" id="vertex-shader">
+attribute vec2 a_position;      // Quad vertex position [-1..1]
+attribute vec2 a_center;        // Ball center in pixels
+attribute float a_radius;       // Ball radius in pixels
+attribute vec3 a_color;         // Ball color RGB
+
+uniform vec2 u_resolution;
+
+varying vec2 v_localPos;        // Position relative to ball center in pixels
+varying vec3 v_color;
+varying float v_radius;
+
+void main() {
+  // Convert quad vertex pos [-1,1] to pixel offset relative to center
+  v_localPos = a_position * a_radius;
+  v_color = a_color;
+  v_radius = a_radius;
+
+  // Compute final position in pixels
+  vec2 pos = a_center + v_localPos;
+
+  // Convert to clip space [-1,1]
+  vec2 clipPos = (pos / u_resolution) * 2.0 - 1.0;
+  // Flip Y axis for WebGL coords
+  clipPos.y = -clipPos.y;
+
+  gl_Position = vec4(clipPos, 0, 1);
+}
+</script>
+
+<script type="x-shader/x-fragment" id="fragment-shader">
+precision mediump float;
+
+varying vec2 v_localPos;
+varying vec3 v_color;
+varying float v_radius;
+
+void main() {
+  float dist = length(v_localPos);
+
+  // Smooth edge: alpha fades out near radius edge
+  float edge = 1.5; // edge softness in pixels
+  float alpha = 1.0 - smoothstep(v_radius - edge, v_radius + edge, dist);
+
+  if (alpha < 0.01) discard;
+
+  gl_FragColor = vec4(v_color, alpha);
+}
+</script>
+
+<script>
+(() => {
+  const canvas = document.getElementById('glcanvas');
+  const gl = canvas.getContext('webgl');
+  if (!gl) {
+    alert('WebGL not supported');
+    return;
+  }
+
+  // Compile shader helper
+  function compileShader(type, source) {
+    const shader = gl.createShader(type);
+    gl.shaderSource(shader, source);
+    gl.compileShader(shader);
+    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+      console.error('Shader compile error:', gl.getShaderInfoLog(shader));
+      gl.deleteShader(shader);
+      return null;
+    }
+    return shader;
+  }
+
+  // Create program helper
+  function createProgram(vsSource, fsSource) {
+    const vertexShader = compileShader(gl.VERTEX_SHADER, vsSource);
+    const fragmentShader = compileShader(gl.FRAGMENT_SHADER, fsSource);
+    const program = gl.createProgram();
+    gl.attachShader(program, vertexShader);
+    gl.attachShader(program, fragmentShader);
+    gl.linkProgram(program);
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+      console.error('Program link error:', gl.getProgramInfoLog(program));
+      gl.deleteProgram(program);
+      return null;
+    }
+    return program;
+  }
+
+  // Get shader sources from script tags
+  const vertexSource = document.getElementById('vertex-shader').textContent;
+  const fragmentSource = document.getElementById('fragment-shader').textContent;
+
+  const program = createProgram(vertexSource, fragmentSource);
+  gl.useProgram(program);
+
+  // Attribute and uniform locations
+  const a_positionLoc = gl.getAttribLocation(program, 'a_position');
+  const a_centerLoc = gl.getAttribLocation(program, 'a_center');
+  const a_radiusLoc = gl.getAttribLocation(program, 'a_radius');
+  const a_colorLoc = gl.getAttribLocation(program, 'a_color');
+  const u_resolutionLoc = gl.getUniformLocation(program, 'u_resolution');
+
+  // Quad vertex data (two triangles for a square)
+  const quadVerts = new Float32Array([
+    -1, -1, 1, -1, -1, 1,
+    -1,  1, 1, -1, 1,  1
+  ]);
+
+  // Create buffer for quad vertices
+  const quadBuffer = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, quadBuffer);
+  gl.bufferData(gl.ARRAY_BUFFER, quadVerts, gl.STATIC_DRAW);
+
+  // Enable and set pointer for quad vertex attribute
+  gl.enableVertexAttribArray(a_positionLoc);
+  gl.vertexAttribPointer(a_positionLoc, 2, gl.FLOAT, false, 0, 0);
+
+  // Data arrays for balls
+  const MAX_BALLS = 200;
+  let ballCount = 50;
+
+  const centers = new Float32Array(MAX_BALLS * 2); // x,y
+  const radii = new Float32Array(MAX_BALLS);       // radius
+  const colors = new Float32Array(MAX_BALLS * 3);  // r,g,b
+
+  const centerBuffer = gl.createBuffer();
+  const radiusBuffer = gl.createBuffer();
+  const colorBuffer = gl.createBuffer();
+
+  // Enable vertex attrib arrays for ball attributes
+  gl.enableVertexAttribArray(a_centerLoc);
+  gl.enableVertexAttribArray(a_radiusLoc);
+  gl.enableVertexAttribArray(a_colorLoc);
+
+  // Instancing extension (required in WebGL1)
+  const ext = gl.getExtension('ANGLE_instanced_arrays');
+  if (!ext) {
+    alert('Your browser does not support ANGLE_instanced_arrays extension.');
+    return;
+  }
+
+  // Helper to set up instanced attributes
+  function setInstancedAttribute(buffer, loc, size, data) {
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, data, gl.DYNAMIC_DRAW);
+    gl.vertexAttribPointer(loc, size, gl.FLOAT, false, 0, 0);
+    ext.vertexAttribDivisorANGLE(loc, 1);
+  }
+
+  // Quad vertices are repeated for each instance (divisor 0)
+  ext.vertexAttribDivisorANGLE(a_positionLoc, 0);
+
+  // Ball physics data
+  class Ball {
+    constructor(x, y, radius, color) {
+      this.position = {x, y};
+      this.velocity = {x: (Math.random() - 0.5) * 200, y: (Math.random() - 0.5) * 200};
+      this.radius = radius;
+      this.color = color;
+    }
+    update(dt, width, height) {
+      this.position.x += this.velocity.x * dt;
+      this.position.y += this.velocity.y * dt;
+
+      // Bounce off walls
+      if (this.position.x - this.radius < 0) {
+        this.position.x = this.radius;
+        this.velocity.x *= -1;
+      }
+      if (this.position.x + this.radius > width) {
+        this.position.x = width - this.radius;
+        this.velocity.x *= -1;
+      }
+      if (this.position.y - this.radius < 0) {
+        this.position.y = this.radius;
+        this.velocity.y *= -1;
+      }
+      if (this.position.y + this.radius > height) {
+        this.position.y = height - this.radius;
+        this.velocity.y *= -1;
+      }
+    }
+  }
+
+  // Create initial balls
+  const balls = [];
+  function randomColor() {
+    return [Math.random() * 0.7 + 0.3, Math.random() * 0.7 + 0.3, Math.random() * 0.7 + 0.3];
+  }
+  for (let i = 0; i < ballCount; i++) {
+    balls.push(new Ball(
+      Math.random() * canvas.width,
+      Math.random() * canvas.height,
+      10 + Math.random() * 15,
+      randomColor()
+    ));
+  }
+
+  // Update GPU buffers from ball data
+  function updateBuffers() {
+    for (let i = 0; i < ballCount; i++) {
+      centers[i * 2] = balls[i].position.x;
+      centers[i * 2 + 1] = balls[i].position.y;
+      radii[i] = balls[i].radius;
+      colors[i * 3] = balls[i].color[0];
+      colors[i * 3 + 1] = balls[i].color[1];
+      colors[i * 3 + 2] = balls[i].color[2];
+    }
+    setInstancedAttribute(centerBuffer, a_centerLoc, 2, centers);
+    setInstancedAttribute(radiusBuffer, a_radiusLoc, 1, radii);
+    setInstancedAttribute(colorBuffer, a_colorLoc, 3, colors);
+  }
+
+  // Resize canvas and viewport
+  function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    gl.viewport(0, 0, canvas.width, canvas.height);
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  // Track dragging state
+  let draggedBall = null;
+  let dragOffset = {x: 0, y: 0};
+
+  // Helper: get mouse or touch position relative to canvas
+  function getPointerPos(evt) {
+    const rect = canvas.getBoundingClientRect();
+    if (evt.touches) {
+      evt = evt.touches[0];
+    }
+    return {
+      x: evt.clientX - rect.left,
+      y: evt.clientY - rect.top
+    };
+  }
+
+  // Find ball under pointer
+  function findBallAtPos(pos) {
+    for (let i = ballCount - 1; i >= 0; i--) {
+      const b = balls[i];
+      const dx = pos.x - b.position.x;
+      const dy = pos.y - b.position.y;
+      if (dx * dx + dy * dy <= b.radius * b.radius) {
+        return b;
+      }
+    }
+    return null;
+  }
+
+  // Mouse and touch events for dragging balls
+  canvas.addEventListener('mousedown', e => {
+    const pos = getPointerPos(e);
+    draggedBall = findBallAtPos(pos);
+    if (draggedBall) {
+      dragOffset.x = pos.x - draggedBall.position.x;
+      dragOffset.y = pos.y - draggedBall.position.y;
+      draggedBall.velocity.x = 0;
+      draggedBall.velocity.y = 0;
+    }
+  });
+
+  window.addEventListener('mousemove', e => {
+    if (!draggedBall) return;
+    const pos = getPointerPos(e);
+    draggedBall.position.x = pos.x - dragOffset.x;
+    draggedBall.position.y = pos.y - dragOffset.y;
+  });
+
+  window.addEventListener('mouseup', () => {
+    draggedBall = null;
+  });
+
+  canvas.addEventListener('touchstart', e => {
+    e.preventDefault();
+    const pos = getPointerPos(e);
+    draggedBall = findBallAtPos(pos);
+    if (draggedBall) {
+      dragOffset.x = pos.x - draggedBall.position.x;
+      dragOffset.y = pos.y - draggedBall.position.y;
+      draggedBall.velocity.x = 0;
+      draggedBall.velocity.y = 0;
+    }
+  }, {passive:false});
+
+  canvas.addEventListener('touchmove', e => {
+    e.preventDefault();
+    if (!draggedBall) return;
+    const pos = getPointerPos(e);
+    draggedBall.position.x = pos.x - dragOffset.x;
+    draggedBall.position.y = pos.y - dragOffset.y;
+  }, {passive:false});
+
+  canvas.addEventListener('touchend', e => {
+    e.preventDefault();
+    draggedBall = null;
+  }, {passive:false});
+
+  // Keyboard event to remove last ball on Delete key
+  window.addEventListener('keydown', e => {
+    if (e.key === 'Delete' || e.key === 'Backspace') {
+      if (ballCount > 0) {
+        balls.pop();
+        ballCount--;
+        updateBallCount();
+      }
+    }
+  });
+
+  // UI elements
+  const addBallBtn = document.getElementById('addBallBtn');
+  const removeBallBtn = document.getElementById('removeBallBtn');
+  const ballCountSpan = document.getElementById('ballCount');
+
+  function updateBallCount() {
+    ballCountSpan.textContent = `Balls: ${ballCount}`;
+  }
+  updateBallCount();
+
+  addBallBtn.addEventListener('click', () => {
+    if (ballCount < MAX_BALLS) {
+      balls.push(new Ball(
+        Math.random() * canvas.width,
+        Math.random() * canvas.height,
+        10 + Math.random() * 15,
+        randomColor()
+      ));
+      ballCount++;
+      updateBallCount();
+    }
+  });
+
+  removeBallBtn.addEventListener('click', () => {
+    if (ballCount > 0) {
+      balls.pop();
+      ballCount--;
+      updateBallCount();
+    }
+  });
+
+  let lastTime = 0;
+
+  function render(time) {
+    time *= 0.001;
+    const dt = time - lastTime;
+    lastTime = time;
+
+    // Update ball physics
+    balls.forEach(ball => {
+      if (ball !== draggedBall) {
+        ball.update(dt, canvas.width, canvas.height);
+      }
+    });
+
+    // Update GPU buffers
+    updateBuffers();
+
+    gl.clearColor(0.13, 0.13, 0.13, 1);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+
+    gl.useProgram(program);
+
+    gl.uniform2f(u_resolutionLoc, canvas.width, canvas.height);
+
+    // Draw instanced quads for balls
+    ext.drawArraysInstancedANGLE(gl.TRIANGLES, 0, 6, ballCount);
+
+    requestAnimationFrame(render);
+  }
+
+  requestAnimationFrame(render);
+})();
+</script>
+
+
+
+</body>
+</html>

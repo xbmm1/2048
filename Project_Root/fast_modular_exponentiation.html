@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Modular Exponentiation Visualizer</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    margin: 2em;
+    background: #f0f4f8;
+    color: #222;
+  }
+  h1 {
+    color: #333;
+  }
+  label {
+    font-weight: bold;
+    margin-top: 1em;
+    display: block;
+  }
+  input {
+    padding: 0.4em;
+    font-size: 1em;
+    width: 100%;
+    max-width: 200px;
+    box-sizing: border-box;
+  }
+  button {
+    margin-top: 1em;
+    padding: 0.6em 1em;
+    font-size: 1em;
+    border: none;
+    background: #007bff;
+    color: white;
+    border-radius: 5px;
+    cursor: pointer;
+  }
+  button:disabled {
+    background: #ccc;
+    cursor: default;
+  }
+  .output {
+    margin-top: 1.5em;
+    padding: 1em;
+    background: white;
+    border-radius: 6px;
+    box-shadow: 0 0 8px rgba(0,0,0,0.1);
+    font-family: monospace;
+    white-space: pre-wrap;
+    min-height: 150px;
+  }
+  .step-highlight {
+    color: #007bff;
+    font-weight: bold;
+  }
+</style>
+</head>
+<body>
+
+<h1>Modular Exponentiation Visualizer (Square-and-Multiply)</h1>
+
+<label for="base">Base (m):</label>
+<input type="number" id="base" value="72" min="1" />
+
+<label for="exponent">Exponent (e):</label>
+<input type="number" id="exponent" value="13" min="1" />
+
+<label for="modulus">Modulus (n):</label>
+<input type="number" id="modulus" value="1000" min="2" />
+
+<button id="startBtn">Start Visualization</button>
+
+<div id="output" class="output"></div>
+
+<script>
+  const startBtn = document.getElementById('startBtn');
+  const output = document.getElementById('output');
+
+  // Helper delay function
+  function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  async function modExpVisualizer(base, exponent, modulus) {
+    output.textContent = '';
+
+    let result = 1n;
+    let b = BigInt(base % modulus);
+    let e = BigInt(exponent);
+    const m = BigInt(modulus);
+
+    const binaryExp = e.toString(2);
+    output.textContent += `Exponent in binary: ${binaryExp}\n\n`;
+
+    output.textContent += `Initial result = 1\nInitial base = ${b}\n\n`;
+
+    // Process bits from left (most significant) to right (least significant)
+    for (let i = 0; i < binaryExp.length; i++) {
+      output.textContent += `Processing bit ${i + 1} (value: ${binaryExp[i]}):\n`;
+
+      // Square result
+      result = (result * result) % m;
+      output.textContent += `  Square result: result = (result * result) mod ${m} = ${result}\n`;
+
+      // If bit is 1, multiply by base
+      if (binaryExp[i] === '1') {
+        result = (result * b) % m;
+        output.textContent += `  Bit is 1 → Multiply by base: result = (result * ${b}) mod ${m} = ${result}\n`;
+      } else {
+        output.textContent += `  Bit is 0 → No multiplication\n`;
+      }
+
+      output.textContent += '\n';
+      await sleep(1500);
+    }
+
+    output.textContent += `Final result: ${result}\n`;
+  }
+
+  startBtn.addEventListener('click', () => {
+    const base = Number(document.getElementById('base').value);
+    const exponent = Number(document.getElementById('exponent').value);
+    const modulus = Number(document.getElementById('modulus').value);
+
+    if (base < 1 || exponent < 1 || modulus < 2) {
+      output.textContent = 'Please enter valid positive integers (modulus ≥ 2).';
+      return;
+    }
+    modExpVisualizer(base, exponent, modulus);
+  });
+</script>
+
+</body>
+</html>

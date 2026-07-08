@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Fast Inverse Square Root Step-by-Step Visualization</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    max-width: 700px;
+    margin: 30px auto;
+    padding: 0 15px;
+  }
+  h1 {
+    text-align: center;
+  }
+  input[type="number"] {
+    width: 120px;
+    font-size: 1rem;
+    padding: 5px;
+  }
+  button {
+    margin-top: 15px;
+    padding: 8px 15px;
+    font-size: 1rem;
+  }
+  .step {
+    margin: 20px 0;
+    padding: 15px;
+    background: #f0f0f0;
+    border-radius: 8px;
+  }
+  .highlight {
+    font-weight: bold;
+    color: #2a7ae2;
+  }
+  .value-box {
+    background: #fff;
+    border: 1px solid #ccc;
+    padding: 8px 12px;
+    border-radius: 5px;
+    font-family: monospace;
+    margin-top: 8px;
+    display: inline-block;
+  }
+  .bitfield {
+    font-family: monospace;
+    font-size: 0.9rem;
+    background: #222;
+    color: #0f0;
+    padding: 6px 10px;
+    border-radius: 5px;
+    display: inline-block;
+    margin-top: 8px;
+  }
+  .bit-labels {
+    margin-top: 5px;
+    font-size: 0.85rem;
+    color: #555;
+  }
+  #stepsNav {
+    margin-top: 20px;
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+  }
+  #stepsNav button {
+    padding: 8px 16px;
+    font-size: 1rem;
+  }
+</style>
+</head>
+<body>
+
+<h1>Fast Inverse Square Root Visualization</h1>
+
+<label for="inputNumber">Enter a positive number:</label><br />
+<input type="number" id="inputNumber" value="4" min="0.0001" step="0.0001" />
+<button id="startBtn">Start Visualization</button>
+
+<div id="visualization" style="display:none; margin-top: 30px;">
+
+  <div class="step" id="step0">
+    <div><span class="highlight">Step 1:</span> Interpret the float's bits as an integer</div>
+    <div>Input float value: <span id="inputFloat" class="value-box"></span></div>
+    <div>Bits (IEEE 754 32-bit float):<br /><span id="inputBits" class="bitfield"></span></div>
+    <div class="bit-labels">[Sign (1)] [Exponent (8)] [Mantissa (23)]</div>
+    <div>Integer representation: <span id="intRep" class="value-box"></span></div>
+  </div>
+
+  <div class="step" id="step1">
+    <div><span class="highlight">Step 2:</span> Apply the magic number subtraction</div>
+    <div>Magic number (hex): <code>0x5f3759df</code></div>
+    <div>Shift integer right by 1 (divide by 2): <span id="shiftedInt" class="value-box"></span></div>
+    <div>New integer = magic number - shifted int: <span id="newInt" class="value-box"></span></div>
+    <div>Bits after subtraction:<br /><span id="newBits" class="bitfield"></span></div>
+  </div>
+
+  <div class="step" id="step2">
+    <div><span class="highlight">Step 3:</span> Interpret the new integer bits as float (initial approximation)</div>
+    <div>Approximated float: <span id="approxFloat" class="value-box"></span></div>
+    <div>Bits (IEEE 754 32-bit float):<br /><span id="approxBits" class="bitfield"></span></div>
+  </div>
+
+  <div class="step" id="step3">
+    <div><span class="highlight">Step 4:</span> Perform one Newton-Raphson iteration to refine approximation</div>
+    <div>Formula: y = y * (1.5 - (0.5 * x * y * y))</div>
+    <div>Input value (x): <span id="nrInput" class="value-box"></span></div>
+    <div>Initial approx (y): <span id="nrY" class="value-box"></span></div>
+    <div>Refined result: <span id="nrResult" class="value-box"></span></div>
+  </div>
+
+  <div class="step" id="step4">
+    <div><span class="highlight">Step 5:</span> Final approximate inverse square root value</div>
+    <div>Approximate 1/√x: <span id="finalResult" class="value-box"></span></div>
+    <div>Compare with actual 1/√x: <span id="actualResult" class="value-box"></span></div>
+  </div>
+
+</div>
+
+<div id="stepsNav" style="display:none;">
+  <button id="prevBtn" disabled>&laquo; Previous</button>
+  <button id="nextBtn">Next &raquo;</button>
+</div>
+
+<script>
+  // Utility functions
+  function floatToBits(f) {
+    const buf = new ArrayBuffer(4);
+    const f32 = new Float32Array(buf);
+    const u32 = new Uint32Array(buf);
+    f32[0] = f;
+    return u32[0];
+  }
+
+  function bitsToFloat(bits) {
+    const buf = new ArrayBuffer(4);
+    const f32 = new Float32Array(buf);
+    const u32 = new Uint32Array(buf);
+    u32[0] = bits;
+    return f32[0];
+  }
+
+  function bitsToBinaryString(bits) {
+    return bits.toString(2).padStart(32, '0').replace(/(.{1})(.{8})(.{23})/, (m, s, e, mnt) => {
+      return s + ' ' + e + ' ' + mnt;
+    });
+  }
+
+  // The fast inverse sqrt core function steps, broken down for visualization
+  function fastInvSqrtSteps(x) {
+    // Step 1: float bits as int
+    const buf = new ArrayBuffer(4);
+    const f32 = new Float32Array(buf);
+    const u32 = new Uint32Array(buf);
+
+    f32[0] = x;
+    const i = u32[0];
+
+    // Step 2: magic number subtraction
+    const magic = 0x5f3759df;
+    const shifted = i >>> 1; // unsigned right shift
+    const newI = magic - shifted;
+
+    u32[0] = newI;
+    const y = f32[0];
+
+    // Step 4: Newton-Raphson iteration
+    const threehalfs = 1.5;
+    const x2 = x * 0.5;
+    const yNew = y * (threehalfs - (x2 * y * y));
+
+    return {
+      i, // original int bits
+      iBits: bitsToBinaryString(i),
+      shifted,
+      newI,
+      newIBits: bitsToBinaryString(newI),
+      y,
+      yBits: bitsToBinaryString(floatToBits(y)),
+      yNew
+    };
+  }
+
+  // DOM elements
+  const inputNumber = document.getElementById('inputNumber');
+  const startBtn = document.getElementById('startBtn');
+  const visualization = document.getElementById('visualization');
+  const stepsNav = document.getElementById('stepsNav');
+  const prevBtn = document.getElementById('prevBtn');
+  const nextBtn = document.getElementById('nextBtn');
+
+  // Step containers
+  const steps = [
+    document.getElementById('step0'),
+    document.getElementById('step1'),
+    document.getElementById('step2'),
+    document.getElementById('step3'),
+    document.getElementById('step4'),
+  ];
+
+  let currentStep = 0;
+  let data = null;
+
+  function showStep(index) {
+    steps.forEach((step, i) => {
+      step.style.display = (i === index) ? 'block' : 'none';
+    });
+
+    prevBtn.disabled = (index === 0);
+    nextBtn.disabled = (index === steps.length - 1);
+  }
+
+  function updateVisualization() {
+    const x = parseFloat(inputNumber.value);
+    if (isNaN(x) || x <= 0) {
+      alert('Please enter a positive number greater than 0');
+      return;
+    }
+    data = fastInvSqrtSteps(x);
+
+    // Step 0
+    document.getElementById('inputFloat').textContent = x;
+    document.getElementById('inputBits').textContent = data.iBits;
+    document.getElementById('intRep').textContent = data.i + ' (0x' + data.i.toString(16) + ')';
+
+    // Step 1
+    document.getElementById('shiftedInt').textContent = data.shifted + ' (0x' + data.shifted.toString(16) + ')';
+    document.getElementById('newInt').textContent = data.newI + ' (0x' + data.newI.toString(16) + ')';
+    document.getElementById('newBits').textContent = data.newIBits;
+
+    // Step 2
+    document.getElementById('approxFloat').textContent = data.y.toFixed(8);
+    document.getElementById('approxBits').textContent = data.yBits;
+
+    // Step 3
+    const x2 = x * 0.5;
+    const threehalfs = 1.5;
+    const y = data.y;
+    const yNew = data.yNew;
+
+    document.getElementById('nrInput').textContent = x;
+    document.getElementById('nrY').textContent = y.toFixed(8);
+    document.getElementById('nrResult').textContent = yNew.toFixed(8);
+
+    // Step 4
+    document.getElementById('finalResult').textContent = yNew.toFixed(8);
+    document.getElementById('actualResult').textContent = (1 / Math.sqrt(x)).toFixed(8);
+  }
+
+  startBtn.addEventListener('click', () => {
+    updateVisualization();
+    visualization.style.display = 'block';
+    stepsNav.style.display = 'flex';
+    currentStep = 0;
+    showStep(currentStep);
+  });
+
+  prevBtn.addEventListener('click', () => {
+    if (currentStep > 0) {
+      currentStep--;
+      showStep(currentStep);
+    }
+  });
+
+  nextBtn.addEventListener('click', () => {
+    if (currentStep < steps.length - 1) {
+      currentStep++;
+      showStep(currentStep);
+    }
+  });
+
+  // Show initial step hidden
+  showStep(0);
+</script>
+
+</body>
+</html>

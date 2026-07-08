@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Interactive ECC Demo</title>
+<style>
+  body { font-family: Arial, sans-serif; margin: 20px; }
+  h1 { text-align: center; }
+  #curve-svg { border: 1px solid #aaa; background: #f9f9f9; margin: 0 auto; display: block; }
+  .point { cursor: pointer; }
+  .selected { stroke: red; stroke-width: 3; }
+  .result { fill: orange; }
+  #controls { margin-top: 20px; text-align: center; }
+  #notes { max-width: 600px; margin: 20px auto; background: #eef; padding: 15px; border-radius: 8px; }
+  .note-step { margin-bottom: 15px; }
+  .tooltip {
+    border-bottom: 1px dotted #999;
+    cursor: help;
+    color: #006;
+  }
+</style>
+</head>
+<body>
+
+<h1>Interactive Elliptic Curve Cryptography (ECC) Demo</h1>
+
+<svg id="curve-svg" width="600" height="400" viewBox="0 0 17 12" style="background:#fff;"></svg>
+
+<div id="controls">
+  <button id="btn-add">Add Points (P + Q)</button>
+  <input type="number" id="scalar-input" value="3" min="1" max="20" style="width:60px" />
+  <button id="btn-mult">Scalar Multiply (k × P)</button>
+  <button id="btn-reset">Reset Selection</button>
+  <p><em>Click points on the curve to select them. For addition, select two points; for scalar multiplication, select one point and enter k.</em></p>
+</div>
+
+<div id="notes">
+  <h2>Step-by-Step Explanation</h2>
+  <div id="note-content">
+    <p>Click points and buttons above to see calculations and explanations here.</p>
+  </div>
+</div>
+
+<script>
+// Elliptic Curve Parameters (y² = x³ + ax + b mod p)
+const p = 17;      // prime modulus
+const a = 2;       // curve parameter a
+const b = 2;       // curve parameter b
+
+// SVG setup
+const svg = document.getElementById('curve-svg');
+
+// Coordinate system:
+// x in [0,17], y in [0,12], origin bottom-left
+// SVG y=0 is top, so we invert y for display
+function toSvgX(x) { return (x / (p - 1)) * 600; }
+function toSvgY(y) { return 400 - (y / (p - 1)) * 400; }
+
+
+// Modular inverse using Extended Euclidean Algorithm
+function modInv(k, p) {
+  if (k === 0) throw 'Division by zero';
+  k = ((k % p) + p) % p;
+  let [s, old_s] = [0,1];
+  let [t, old_t] = [1,0];
+  let [r, old_r] = [p,k];
+  while (r !== 0) {
+    let quotient = Math.floor(old_r / r);
+    [old_r, r] = [r, old_r - quotient * r];
+    [old_s, s] = [s, old_s - quotient * s];
+    [old_t, t] = [t, old_t - quotient * t];
+  }
+  if (old_s < 0) old_s += p;
+  return old_s;
+}
+
+// Point addition function
+function pointAdd(P, Q) {
+  if (P === 'O') return Q;
+  if (Q === 'O') return P;
+  let [x1, y1] = P;
+  let [x2, y2] = Q;
+
+  if (x1 === x2 && (y1 !== y2 || y1 === 0)) return 'O'; // point at infinity
+
+  let m;
+  if (x1 === x2 && y1 === y2) {
+    // point doubling
+    let numerator = (3 * x1 * x1 + a) % p;
+    let denominator = (2 * y1) % p;
+    m = (numerator * modInv(denominator, p)) % p;
+  } else {
+    // point addition
+    let numerator = (y2 - y1) % p;
+    let denominator = (x2 - x1) % p;
+    m = (numerator * modInv(denominator, p)) % p;
+  }
+  let x3 = (m * m - x1 - x2) % p;
+  let y3 = (m * (x1 - x3) - y1) % p;
+  if (x3 < 0) x3 += p;
+  if (y3 < 0) y3 += p;
+  return [x3, y3];
+}
+
+// Scalar multiplication (double and add)
+function scalarMult(k, P) {
+  let R = 'O'; // identity point
+  let addend = P;
+  while (k > 0) {
+    if (k & 1) R = pointAdd(R, addend);
+    addend = pointAdd(addend, addend);
+    k >>= 1;
+  }
+  return R;
+}
+
+// Compute all points on the curve y² = x³ + ax + b mod p
+function computeCurvePoints() {
+  let points = [];
+  for(let x=0; x<p; x++) {
+    let rhs = (x*x*x + a*x + b) % p;
+    if (rhs < 0) rhs += p;
+    // Find y such that y^2 = rhs mod p
+    for(let y=0; y<p; y++) {
+      if ((y*y) % p === rhs) {
+        points.push([x,y]);
+      }
+    }
+  }
+  return points;
+}
+
+// Draw the curve points as circles
+function drawPoints(points) {
+  svg.innerHTML = ''; // clear
+  points.forEach(([x,y]) => {
+    let cx = toSvgX(x);
+    let cy = toSvgY(y);
+    let circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+    circle.setAttribute('cx', cx);
+    circle.setAttribute('cy', cy);
+    circle.setAttribute('r', 7);
+    circle.setAttribute('fill', '#3498db');
+    circle.setAttribute('class', 'point');
+    circle.style.transition = 'fill 0.3s';
+    circle.dataset.x = x;
+    circle.dataset.y = y;
+    svg.appendChild(circle);
+  });
+}
+
+// Utility to display a point nicely
+function pointToStr(P) {
+  if (P === 'O') return "∞ (point at infinity)";
+  return `(${P[0]}, ${P[1]})`;
+}
+
+// Selection and interaction logic
+let selectedPoints = [];
+let lastResult = null;
+
+function updateNotes(html) {
+  document.getElementById('note-content').innerHTML = html;
+}
+
+function clearSelection() {
+  selectedPoints = [];
+  lastResult = null;
+  updateNotes("<p>Click points on the curve to select them. Then use the buttons above to add points or perform scalar multiplication.</p>");
+  Array.from(svg.querySelectorAll('circle')).forEach(c => {
+    c.classList.remove('selected', 'result');
+    c.setAttribute('fill', '#3498db');
+  });
+}
+
+function markSelected() {
+  Array.from(svg.querySelectorAll('circle')).forEach(c => {
+    let x = parseInt(c.dataset.x);
+    let y = parseInt(c.dataset.y);
+    if (selectedPoints.some(([sx, sy]) => sx === x && sy === y)) {
+      c.classList.add('selected');
+      c.setAttribute('fill', '#e74c3c');
+    } else {
+      c.classList.remove('selected');
+      c.setAttribute('fill', '#3498db');
+    }
+  });
+}
+
+function markResult(P) {
+  if (P === 'O') return; // no point to mark
+  Array.from(svg.querySelectorAll('circle')).forEach(c => {
+    let x = parseInt(c.dataset.x);
+    let y = parseInt(c.dataset.y);
+    if (x === P[0] && y === P[1]) {
+      c.classList.add('result');
+      c.setAttribute('fill', '#f39c12');
+    } else {
+      c.classList.remove('result');
+    }
+  });
+}
+
+// Event listener for point clicks
+svg.addEventListener('click', (e) => {
+  if (e.target.tagName === 'circle') {
+    let x = parseInt(e.target.dataset.x);
+    let y = parseInt(e.target.dataset.y);
+    if (selectedPoints.length < 2) {
+      // Avoid duplicate selection
+      if (!selectedPoints.some(([sx, sy]) => sx === x && sy === y)) {
+        selectedPoints.push([x,y]);
+      }
+    } else {
+      // Replace oldest selected point
+      selectedPoints.shift();
+      selectedPoints.push([x,y]);
+    }
+    markSelected();
+    updateNotes(`<p>Selected Points:<br>P = ${pointToStr(selectedPoints[0])}${selectedPoints[1] ? `<br>Q = ${pointToStr(selectedPoints[1])}` : ''}</p>`);
+  }
+});
+
+// Button actions
+document.getElementById('btn-add').onclick = () => {
+  if (selectedPoints.length !== 2) {
+    alert('Please select exactly two points for addition.');
+    return;
+  }
+  let P = selectedPoints[0];
+  let Q = selectedPoints[1];
+  let R = pointAdd(P, Q);
+  lastResult = R;
+  markResult(R);
+
+  // Explanation notes
+  let explanation = `
+    <div class="note-step">
+      <strong>Point Addition: R = P + Q</strong><br>
+      P = ${pointToStr(P)}<br>
+      Q = ${pointToStr(Q)}<br><br>
+  `;
+
+  if (R === 'O') {
+    explanation += `<p>The result is the <em>point at infinity</em>, the identity element.</p>`;
+  } else {
+    // Show slope calculation
+    if (P[0] === Q[0] && P[1] === Q[1]) {
+      explanation += `<p>This is a <em>point doubling</em> because P = Q.</p>`;
+      let numerator = (3 * P[0] * P[0] + a) % p;
+      let denominator = (2 * P[1]) % p;
+      explanation += `<p>Calculate slope λ = (3x₁² + a) / (2y₁) mod p</p>`;
+      explanation += `<p>λ = (${3}×${P[0]}² + ${a}) / (2×${P[1]}) mod ${p} = ${numerator} / ${denominator}</p>`;
+    } else {
+      explanation += `<p>This is a <em>point addition</em> because P ≠ Q.</p>`;
+      let numerator = (Q[1] - P[1]) % p;
+      let denominator = (Q[0] - P[0]) % p;
+      explanation += `<p>Calculate slope λ = (y₂ - y₁) / (x₂ - x₁) mod p</p>`;
+      explanation += `<p>λ = (${Q[1]} - ${P[1]}) / (${Q[0]} - ${P[0]}) mod ${p} = ${numerator} / ${denominator}</p>`;
+    }
+
+    // Calculate modular inverse
+    let denom = (P[0] === Q[0] && P[1] === Q[1]) ? (2 * P[1]) % p : (Q[0] - P[0]) % p;
+    if (denom < 0) denom += p;
+    let invDenom = modInv(denom, p);
+
+    explanation += `<p>Modular inverse of denominator = ${invDenom}</p>`;
+
+    // Calculate slope λ
+    let slope;
+    if (P[0] === Q[0] && P[1] === Q[1]) {
+      let num = (3 * P[0] * P[0] + a) % p;
+      slope = (num * invDenom) % p;
+    } else {
+      let num = (Q[1] - P[1]) % p;
+      if (num < 0) num += p;
+      slope = (num * invDenom) % p;
+    }
+    explanation += `<p>λ = ${slope}</p>`;
+
+    // Calculate R coordinates
+    explanation += `<p>Calculate x₃ = λ² - x₁ - x₂ mod p = ${slope}² - ${P[0]} - ${Q[0]} mod ${p}</p>`;
+    let x3 = (slope * slope - P[0] - Q[0]) % p;
+    if (x3 < 0) x3 += p;
+    explanation += `<p>x₃ = ${x3}</p>`;
+
+    explanation += `<p>Calculate y₃ = λ(x₁ - x₃) - y₁ mod p = ${slope}×(${P[0]} - ${x3}) - ${P[1]} mod ${p}</p>`;
+    let y3 = (slope * (P[0] - x3) - P[1]) % p;
+    if (y3 < 0) y3 += p;
+    explanation += `<p>y₃ = ${y3}</p>`;
+
+    explanation += `<p>Result: R = (${x3}, ${y3})</p>`;
+  }
+
+  explanation += '</div>';
+  updateNotes(explanation);
+};
+
+document.getElementById('btn-mult').onclick = () => {
+  if (selectedPoints.length !== 1) {
+    alert('Please select exactly one point for scalar multiplication.');
+    return;
+  }
+  let k = parseInt(document.getElementById('scalar-input').value);
+  if (isNaN(k) || k < 1) {
+    alert('Please enter a valid scalar (positive integer).');
+    return;
+  }
+  let P = selectedPoints[0];
+  let R = scalarMult(k, P);
+  lastResult = R;
+  markResult(R);
+
+  // Explanation notes
+  let explanation = `
+    <div class="note-step">
+      <strong>Scalar Multiplication: R = k × P</strong><br>
+      P = ${pointToStr(P)}<br>
+      k = ${k}<br><br>
+      Scalar multiplication means adding P to itself k times:<br>
+      R = P + P + ... + P (k times)
+    </div>
+    <div class="note-step">
+      <strong>Using double-and-add method:</strong><br>
+      This efficiently computes kP by repeated point doubling and addition based on binary representation of k.<br><br>
+  `;
+
+  explanation += 'Process:<br>';
+  let binary = k.toString(2);
+  explanation += `k in binary: <code>${binary}</code><br>`;
+
+  explanation += 'We start with R = ∞ (identity), then for each bit (left to right):<br>';
+  explanation += '- Double R<br>- If bit is 1, add P<br><br>';
+  explanation += `Final result after processing all bits is R = ${pointToStr(R)}.`;
+
+  explanation += '</div>';
+  updateNotes(explanation);
+};
+
+document.getElementById('btn-reset').onclick = () => {
+  clearSelection();
+};
+
+// Initialize
+const points = computeCurvePoints();
+drawPoints(points);
+clearSelection();
+
+</script>
+
+</body>
+</html>

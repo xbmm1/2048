@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Side Scrolling Platformer with Parallax & Upward Platforms</title>
+<style>
+  body {
+    margin: 0;
+    background: #87ceeb; /* sky blue */
+    overflow: hidden;
+  }
+  canvas {
+    display: block;
+    background: #87ceeb;
+    margin: 0 auto;
+    border: 2px solid #333;
+  }
+</style>
+</head>
+<body>
+
+<canvas id="gameCanvas" width="800" height="400"></canvas>
+
+<script>
+(() => {
+  const canvas = document.getElementById('gameCanvas');
+  const ctx = canvas.getContext('2d');
+  const playerImage = new Image();
+  
+  let playerImageLoaded = false;
+  playerImage.onload = () => {
+   playerImageLoaded = true;
+  };
+
+  playerImage.src = 'image.png';
+  const width = canvas.width;
+  const height = canvas.height;
+
+  // Player properties
+  const player = {
+    x: 50,
+    y: 0,
+    width: 30,
+    height: 50,
+    vx: 0,
+    vy: 0,
+    speed: 3,
+    jumpPower: 15,
+    onGround: false
+  };
+
+  // Gravity and friction
+  const gravity = 0.6;
+  const friction = 0.8;
+
+  // Camera offset for side scrolling
+  let cameraX = 0;
+
+  // Procedural platform generation parameters
+  const platformCount = 40;
+  const minPlatformWidth = 40;
+  const maxPlatformWidth = 150;
+  const minPlatformHeight = 20;
+  const maxPlatformHeight = 35;
+  const maxHorizontalGap = 90; // max horizontal gap between platforms
+  const maxVerticalStep = 30;    // max vertical step per platform (small step to trend upwards)
+
+  let platforms = [];
+
+  // Parallax background layers configuration
+  // Each layer has a color and a speed factor relative to camera movement
+  const parallaxLayers = [
+    { color: '#b0e0e6', speedFactor: 0.2, shapes: [] }, // Farthest - light blue clouds
+    { color: '#8db600', speedFactor: 0.5, shapes: [] }, // Middle - lighter blue hills
+    { color: '#9dd7ef', speedFactor: 0.8, shapes: [] }  // Closest - sky patches
+  ];
+
+  // Generate simple shapes for parallax layers
+  function generateParallaxShapes() {
+    parallaxLayers[0].shapes = [];
+    parallaxLayers[1].shapes = [];
+    parallaxLayers[2].shapes = [];
+
+    // Clouds (layer 0)
+    for(let i=0; i<20; i++) {
+      parallaxLayers[0].shapes.push({
+        x: i * 200 + Math.random()*100,
+        y: 50 + Math.sin(i) * 15,
+        radius: 30 + Math.random()*20
+      });
+    }
+
+    // Hills (layer 1)
+    for(let i=0; i<15; i++) {
+      parallaxLayers[1].shapes.push({
+        x: i * 300,
+        y: 300 + (i%2)*10,
+        width: 300,
+        height: 80 + (i%3)*10
+      });
+    }
+
+    // Sky patches (layer 2)
+    for(let i=0; i<25; i++) {
+      parallaxLayers[2].shapes.push({
+        x: i * 150 + Math.random()*50,
+        y: 200 + Math.cos(i) * 20,
+        radius: 50 + Math.random()*30
+      });
+    }
+  }
+
+  // Controls state
+  const keys = {
+    left: false,
+    right: false,
+    up: false,
+    space: false
+  };
+
+  // Handle keyboard
+  window.addEventListener('keydown', e => {
+    if(e.code === 'ArrowLeft' || e.code === 'KeyA') keys.left = true;
+    if(e.code === 'ArrowRight' || e.code === 'KeyD') keys.right = true;
+    if(e.code === 'ArrowUp' || e.code === 'KeyW') keys.up = true;
+    if(e.code === 'Space') keys.space = true;
+  });
+
+  window.addEventListener('keyup', e => {
+    if(e.code === 'ArrowLeft' || e.code === 'KeyA') keys.left = false;
+    if(e.code === 'ArrowRight' || e.code === 'KeyD') keys.right = false;
+    if(e.code === 'ArrowUp' || e.code === 'KeyW') keys.up = false;
+    if(e.code === 'Space') keys.space = false;
+  });
+
+  // Collision detection between player and platform
+  function checkCollision(px, py, pw, ph, rx, ry, rw, rh) {
+    return px < rx + rw && px + pw > rx && py < ry + rh && py + ph > ry;
+  }
+
+  // Generate procedural platforms trending upwards
+  function generatePlatforms() {
+  platforms = [];
+
+  // Ground platform spanning wide at bottom
+  platforms.push({ x: -1000, y: 350, width: 9000, height: 90 });
+
+  let lastX = 50;
+  let lastY = 300;
+  let lastWidth = 0; // Keep track of previous platform's width
+
+  for(let i = 0; i < platformCount; i++) {
+    const pWidth = Math.floor(Math.random() * (maxPlatformWidth - minPlatformWidth + 1)) + minPlatformWidth;
+    const pHeight = Math.floor(Math.random() * (maxPlatformHeight - minPlatformHeight + 1)) + minPlatformHeight;
+
+    // Horizontal gap between platforms
+    const gap = Math.floor(Math.random() * maxHorizontalGap) + 40;
+
+    // Calculate x so platforms do NOT touch
+    const x = lastX + lastWidth + gap;
+
+    // Upward trend: next platform is somewhat higher than previous by a small random step
+    let y = lastY - (Math.random() * maxVerticalStep);
+    if (y < 90) y = 90;
+    if (y > 350) y = 350;
+
+    platforms.push({ x: x, y: y, width: pWidth, height: pHeight });
+
+    lastX = x;
+    lastY = y;
+    lastWidth = pWidth;
+  }
+}
+
+
+  // Draw parallax background layers
+  function drawParallax() {
+    for(let layer of parallaxLayers) {
+      ctx.fillStyle = layer.color;
+      for(let shape of layer.shapes) {
+        const drawX = shape.x - cameraX * layer.speedFactor;
+        if (shape.radius) {
+          // Circle shape (clouds or sky patches)
+          if(drawX + shape.radius < 0 || drawX - shape.radius > width) continue;
+          ctx.beginPath();
+          ctx.ellipse(drawX, shape.y, shape.radius, shape.radius*0.6, 0, 0, Math.PI * 2);
+          ctx.fill();
+        } else {
+          // Rectangular hills
+          if(drawX + shape.width < 0 || drawX > width) continue;
+          ctx.fillRect(drawX, shape.y, shape.width, shape.height);
+        }
+      }
+    }
+  }
+
+  // Game loop
+  function update() {
+    // Horizontal movement
+    if(keys.left) {
+      player.vx = -player.speed;
+    } else if(keys.right) {
+      player.vx = player.speed;
+    } else {
+      player.vx *= friction;
+      if(Math.abs(player.vx) < 0.1) player.vx = 0;
+    }
+
+    // Jumping
+    if((keys.up || keys.space) && player.onGround) {
+      player.vy = -player.jumpPower;
+      player.onGround = false;
+    }
+
+    // Apply gravity
+    player.vy += gravity;
+
+    // Apply velocity
+    player.x += player.vx;
+    player.y += player.vy;
+
+    // Collision detection & response
+    player.onGround = false;
+    for(let plat of platforms) {
+      if(checkCollision(player.x, player.y, player.width, player.height, plat.x, plat.y, plat.width, plat.height)) {
+        // Collision from top
+        if(player.vy > 0 && player.y + player.height - player.vy <= plat.y) {
+          player.y = plat.y - player.height;
+          player.vy = 0;
+          player.onGround = true;
+        }
+        // Collision from bottom
+        else if(player.vy < 0 && player.y >= plat.y + plat.height - player.vy) {
+          player.y = plat.y + plat.height;
+          player.vy = 0;
+        }
+        // Collision from left
+        else if(player.vx > 0 && player.x + player.width - player.vx <= plat.x) {
+          player.x = plat.x - player.width;
+          player.vx = 0;
+        }
+        // Collision from right
+        else if(player.vx < 0 && player.x >= plat.x + plat.width - player.vx) {
+          player.x = plat.x + plat.width;
+          player.vx = 0;
+        }
+      }
+    }
+
+    // Prevent falling below bottom
+    if(player.y + player.height > height) {
+      player.y = height - player.height;
+      player.vy = 0;
+      player.onGround = true;
+    }
+
+    // Update camera to follow player horizontally with some offset
+    const camTargetX = player.x - width / 3;
+    cameraX += (camTargetX - cameraX) * 0.1; // smooth camera
+
+    draw();
+    requestAnimationFrame(update);
+  }
+
+  // Draw everything
+  function draw() {
+    // Clear background with sky blue (base)
+    ctx.fillStyle = '#87ceeb';
+    ctx.fillRect(0, 0, width, height);
+
+    // Draw parallax background layers
+    drawParallax();
+
+    // Draw ground and platforms relative to camera
+    ctx.fillStyle = '#654321'; // brown platforms
+    for(let plat of platforms) {
+      const drawX = plat.x - cameraX;
+      if(drawX + plat.width < 0 || drawX > width) continue; // skip offscreen
+      ctx.fillRect(drawX, plat.y, plat.width, plat.height);
+    }
+
+    // Draw player
+    const playerDrawX = player.x - cameraX;
+    if (playerImageLoaded) {
+  ctx.drawImage(playerImage, playerDrawX, player.y, player.width, player.height);
+} else {
+  ctx.fillStyle = '#ff0000';
+  ctx.fillRect(playerDrawX, player.y, player.width, player.height);
+}
+
+
+
+    // Optional: Draw ground line for clarity
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(0, 350);
+    ctx.lineTo(width, 350);
+    ctx.stroke();
+  }
+
+  // Initialize
+  generateParallaxShapes();
+  generatePlatforms();
+  player.x = 50;
+  player.y = 0;
+  player.vx = 0;
+  player.vy = 0;
+  player.onGround = false;
+  cameraX = 0;
+
+  // Start game loop
+  update();
+})();
+</script>
+
+</body>
+</html>

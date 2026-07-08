@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Interactive Guide: Building a 2D Physics Engine</title>
+<style>
+  /* Basic page styling */
+  body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    line-height: 1.5;
+    margin: 0;
+    padding: 20px;
+    background-color: #f9fafb;
+    color: #222;
+    max-width: 900px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  h1, h2, h3 {
+    color: #2c3e50;
+  }
+  h1 {
+    text-align: center;
+    margin-bottom: 1em;
+  }
+  h2 {
+    border-bottom: 3px solid #3498db;
+    padding-bottom: 0.3em;
+    cursor: pointer;
+    user-select: none;
+  }
+  h2:hover {
+    color: #2980b9;
+  }
+  p, li {
+    font-size: 1rem;
+  }
+  ul, ol {
+    margin-left: 1.5em;
+  }
+  blockquote {
+    border-left: 4px solid #3498db;
+    padding-left: 15px;
+    color: #555;
+    font-style: italic;
+    background: #ecf0f1;
+    margin: 1em 0;
+  }
+  pre {
+    background: #272822;
+    color: #f8f8f2;
+    padding: 12px;
+    border-radius: 6px;
+    overflow-x: auto;
+    font-size: 0.9rem;
+    margin-top: 0.5em;
+  }
+  code {
+    font-family: Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace;
+  }
+  textarea.code-editor {
+    width: 100%;
+    height: 150px;
+    font-family: Consolas, Monaco, monospace;
+    font-size: 0.9rem;
+    background: #272822;
+    color: #f8f8f2;
+    border: none;
+    border-radius: 6px;
+    padding: 10px;
+    resize: vertical;
+  }
+  button.run-btn {
+    margin-top: 5px;
+    padding: 6px 12px;
+    font-size: 1rem;
+    background-color: #3498db;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  button.run-btn:hover {
+    background-color: #2980b9;
+  }
+  .code-container {
+    margin-bottom: 2em;
+  }
+  .output-frame {
+    width: 100%;
+    height: 220px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    margin-top: 8px;
+  }
+  .collapsible-content {
+    display: none;
+    margin-top: 10px;
+    margin-bottom: 20px;
+  }
+  .collapsible-content.active {
+    display: block;
+  }
+  /* Live demo controls */
+  #demo-controls {
+    margin: 20px 0;
+    text-align: center;
+  }
+  #demo-controls label {
+    font-weight: bold;
+    margin-right: 10px;
+  }
+  #demo-controls input[type=range] {
+    width: 300px;
+    vertical-align: middle;
+  }
+  #demo-canvas {
+    border: 1px solid #555;
+    display: block;
+    margin: 0 auto 20px;
+    background: #222;
+    border-radius: 6px;
+  }
+</style>
+</head>
+<body>
+
+<h1>Interactive Guide to Building a 2D Physics Engine</h1>
+
+<section>
+  <h2>1. Understand the Problem and Physics Basics</h2>
+  <div class="collapsible-content">
+    <p><strong>Goal:</strong> Simulate realistic 2D motion of objects under forces like gravity, including collisions with boundaries and bouncing behavior.</p>
+    <p><strong>Key Physical Concepts:</strong></p>
+    <ul>
+      <li><strong>Position:</strong> Location of an object in 2D space (x, y).</li>
+      <li><strong>Velocity:</strong> Rate of change of position (speed and direction).</li>
+      <li><strong>Acceleration:</strong> Rate of change of velocity.</li>
+      <li><strong>Force:</strong> Causes acceleration (e.g., gravity).</li>
+      <li><strong>Mass:</strong> Amount of matter, affects acceleration from force.</li>
+      <li><strong>Collision:</strong> When objects or boundaries intersect.</li>
+      <li><strong>Restitution:</strong> Bounciness or energy retention in collisions.</li>
+    </ul>
+  </div>
+</section>
+
+<section>
+  <h2>2. Setup Your Development Environment</h2>
+  <div class="collapsible-content">
+    <p>Use a modern web browser supporting HTML5 Canvas and JavaScript. Create an HTML file with a <code>&lt;canvas&gt;</code> element for rendering. Use JavaScript to control simulation and drawing.</p>
+  </div>
+</section>
+
+<section>
+  <h2>3. Create Basic Data Structures</h2>
+  <div class="collapsible-content">
+    <h3>Vector2 Class Example</h3>
+    <p>Implement a 2D vector class representing positions, velocities, forces, etc., with methods for addition, subtraction, scaling, and cloning.</p>
+    <div class="code-container">
+      <textarea class="code-editor" data-run-id="vec2" spellcheck="false">// Vector2 class for 2D vector math
+class Vector2 {
+  constructor(x = 0, y = 0) {
+    this.x = x;
+    this.y = y;
+  }
+  add(v) {
+    this.x += v.x;
+    this.y += v.y;
+    return this;
+  }
+  subtract(v) {
+    this.x -= v.x;
+    this.y -= v.y;
+    return this;
+  }
+  multiplyScalar(s) {
+    this.x *= s;
+    this.y *= s;
+    return this;
+  }
+  clone() {
+    return new Vector2(this.x, this.y);
+  }
+}
+
+// Example usage:
+const v1 = new Vector2(3, 4);
+const v2 = new Vector2(1, 2);
+v1.add(v2);
+console.log('v1 after add:', v1);</textarea>
+      <br />
+      <button class="run-btn" data-run-id="vec2">Run Vector2 Code</button>
+      <pre id="output-vec2" style="background:#222; color:#0f0; padding:10px; border-radius:6px; height:80px; overflow:auto;"></pre>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>4. Define the Physical Object Class</h2>
+  <div class="collapsible-content">
+    <h3>PhysicsObject Class Example</h3>
+    <p>This class represents a ball with position, velocity, acceleration, radius, and mass.</p>
+    <div class="code-container">
+      <textarea class="code-editor" data-run-id="physobj" spellcheck="false">// PhysicsObject class representing a ball
+class PhysicsObject {
+  constructor(position, velocity, acceleration, radius, mass) {
+    this.position = position.clone();
+    this.velocity = velocity.clone();
+    this.acceleration = acceleration.clone();
+    this.radius = radius;
+    this.mass = mass;
+  }
+  applyForce(force) {
+    let f = force.clone().multiplyScalar(1 / this.mass);
+    this.acceleration.add(f);
+  }
+  update(deltaTime) {
+    this.velocity.add(this.acceleration.clone().multiplyScalar(deltaTime));
+    this.position.add(this.velocity.clone().multiplyScalar(deltaTime));
+    this.acceleration.multiplyScalar(0);
+  }
+  draw(ctx) {
+    ctx.beginPath();
+    ctx.arc(this.position.x, this.position.y, this.radius, 0, Math.PI * 2);
+    ctx.fillStyle = 'cyan';
+    ctx.fill();
+    ctx.strokeStyle = 'white';
+    ctx.stroke();
+  }
+}</textarea>
+      <br />
+      <button class="run-btn" data-run-id="physobj">Run PhysicsObject Code</button>
+      <pre id="output-physobj" style="background:#222; color:#0f0; padding:10px; border-radius:6px; height:80px; overflow:auto;"></pre>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>5. Implement Motion Integration</h2>
+  <div class="collapsible-content">
+    <p>Use Euler integration to update position and velocity:</p>
+    <pre><code>velocity += acceleration * deltaTime
+position += velocity * deltaTime
+acceleration = 0 (reset)</code></pre>
+  </div>
+</section>
+
+<section>
+  <h2>6. Apply Forces</h2>
+  <div class="collapsible-content">
+    <p>Apply gravity force each frame:</p>
+    <pre><code>gravity = new Vector2(0, 980) // pixels/s² downward
+object.applyForce(gravity * object.mass)</code></pre>
+  </div>
+</section>
+
+<section>
+  <h2>7. Handle Collision Detection and Response</h2>
+  <div class="collapsible-content">
+    <p>Check collision with boundaries and respond by reversing velocity with energy loss:</p>
+    <pre><code>if (object.position.y + radius > canvas.height) {
+  object.position.y = canvas.height - radius;
+  object.velocity.y *= -restitution;
+}</code></pre>
+  </div>
+</section>
+
+<section>
+  <h2>8. Implement Rendering</h2>
+  <div class="collapsible-content">
+    <p>Clear canvas each frame and draw objects at updated positions.</p>
+  </div>
+</section>
+
+<section>
+  <h2>9. Implement User Interaction</h2>
+  <div class="collapsible-content">
+    <p>Allow dragging objects with mouse or touch events.</p>
+  </div>
+</section>
+
+<section>
+  <h2>10. Create the Animation Loop</h2>
+  <div class="collapsible-content">
+    <p>Use <code>requestAnimationFrame</code> for smooth continuous updates:</p>
+    <pre><code>function update(time) {
+  let deltaTime = (time - lastTime) / 1000;
+  lastTime = time;
+
+  // Apply physics and draw objects here
+
+  requestAnimationFrame(update);
+}
+requestAnimationFrame(update);</code></pre>
+  </div>
+</section>
+
+<h2>Live Physics Engine Demo</h2>
+<div id="demo-controls">
+  <label for="tiltAngle">Gravity Tilt Angle (degrees):</label>
+  <input type="range" id="tiltAngle" min="-45" max="45" value="0" step="1" />
+  <span id="tiltValue">0°</span>
+  <br /><br />
+  <label for="bounciness">Bounciness (Restitution):</label>
+  <input type="range" id="bounciness" min="0" max="1" step="0.01" value="0.7" />
+  <span id="bounceValue">0.70</span>
+  <br /><br />
+  <button id="resetBalls">Reset Balls</button>
+  <button id="addBall">Add Ball</button>
+  <button id="removeBall">Remove Ball</button>
+  <p id="ballCount" style="font-weight:bold; margin-top:10px;">Balls: 5</p>
+</div>
+<canvas id="demo-canvas" width="600" height="400"></canvas>
+
+<script>
+  // Collapsible sections toggle
+  document.querySelectorAll('h2').forEach(h2 => {
+    h2.addEventListener('click', () => {
+      const content = h2.nextElementSibling;
+      if (!content) return;
+      content.classList.toggle('active');
+    });
+  });
+
+  // Code runners for snippets
+  document.querySelectorAll('button.run-btn').forEach(button => {
+    button.addEventListener('click', () => {
+      const id = button.getAttribute('data-run-id');
+      const textarea = document.querySelector(`textarea[data-run-id="${id}"]`);
+      const output = document.getElementById('output-' + id);
+      if (!textarea || !output) return;
+
+      try {
+        const code = textarea.value;
+        // Redirect console.log to output area
+        let logs = [];
+        const fakeConsole = {
+          log: (...args) => {
+            logs.push(args.map(a => (typeof a === 'object' ? JSON.stringify(a) : a)).join(' '));
+          }
+        };
+        const func = new Function('console', code);
+        func(fakeConsole);
+        output.textContent = logs.length ? logs.join('\n') : 'Code executed without output.';
+      } catch (e) {
+        output.textContent = 'Error: ' + e.message;
+      }
+    });
+  });
+
+  // Live physics engine demo
+  (() => {
+    // Vector2 class
+    class Vector2 {
+      constructor(x=0, y=0) { this.x = x; this.y = y; }
+      add(v) { this.x += v.x; this.y += v.y; return this; }
+      clone() { return new Vector2(this.x, this.y); }
+      multiplyScalar(s) { this.x *= s; this.y *= s; return this; }
+    }
+
+    // PhysicsObject class
+    class PhysicsObject {
+      constructor(position, velocity, acceleration, radius, mass) {
+        this.position = position.clone();
+        this.velocity = velocity.clone();
+        this.acceleration = acceleration.clone();
+        this.radius = radius;
+        this.mass = mass;
+      }
+      applyForce(force) {
+        let f = force.clone().multiplyScalar(1 / this.mass);
+        this.acceleration.add(f);
+      }
+      update(deltaTime) {
+        this.velocity.add(this.acceleration.clone().multiplyScalar(deltaTime));
+        this.position.add(this.velocity.clone().multiplyScalar(deltaTime));
+        this.acceleration.multiplyScalar(0);
+      }
+      draw(ctx) {
+        ctx.beginPath();
+        ctx.arc(this.position.x, this.position.y, this.radius, 0, Math.PI*2);
+        ctx.fillStyle = 'cyan';
+        ctx.fill();
+        ctx.strokeStyle = 'white';
+        ctx.stroke();
+      }
+      resetPosition(width, height) {
+        this.position.x = Math.random() * (width - 2*this.radius) + this.radius;
+        this.position.y = Math.random() * (height/2);
+        this.velocity.x = (Math.random() - 0.5)*200;
+        this.velocity.y = (Math.random() - 0.5)*200;
+        this.acceleration.x = 0;
+        this.acceleration.y = 0;
+      }
+    }
+
+    // Setup
+    const canvas = document.getElementById('demo-canvas');
+    const ctx = canvas.getContext('2d');
+    const tiltSlider = document.getElementById('tiltAngle');
+    const tiltValue = document.getElementById('tiltValue');
+    const bounceSlider = document.getElementById('bounciness');
+    const bounceValue = document.getElementById('bounceValue');
+    const resetBtn = document.getElementById('resetBalls');
+    const addBtn = document.getElementById('addBall');
+    const removeBtn = document.getElementById('removeBall');
+    const ballCountDisplay = document.getElementById('ballCount');
+
+    const gravityMagnitude = 980;
+    let gravity = new Vector2(0, gravityMagnitude);
+    let restitution = parseFloat(bounceSlider.value);
+
+    let balls = [];
+
+    function degToRad(deg) {
+      return deg * Math.PI / 180;
+    }
+
+    function createRandomBall() {
+      const radius = 20;
+      const mass = radius;
+      const pos = new Vector2(
+        Math.random() * (canvas.width - 2*radius) + radius,
+        Math.random() * (canvas.height/2)
+      );
+      const vel = new Vector2(
+        (Math.random() - 0.5)*200,
+        (Math.random() - 0.5)*200
+      );
+      return new PhysicsObject(pos, vel, new Vector2(0,0), radius, mass);
+    }
+
+    // Initialize balls
+    for(let i=0; i<5; i++) balls.push(createRandomBall());
+
+    function updateBallCount() {
+      ballCountDisplay.textContent = `Balls: ${balls.length}`;
+    }
+    updateBallCount();
+
+    // Interaction variables
+    let draggedBall = null;
+    let dragOffset = new Vector2();
+
+    function getMousePos(evt) {
+      const rect = canvas.getBoundingClientRect();
+      return new Vector2(evt.clientX - rect.left, evt.clientY - rect.top);
+    }
+
+    function isMouseOnBall(mousePos, ball) {
+      const dx = mousePos.x - ball.position.x;
+      const dy = mousePos.y - ball.position.y;
+      return dx*dx + dy*dy <= ball.radius*ball.radius;
+    }
+
+    // Mouse events
+    canvas.addEventListener('mousedown', e => {
+      const pos = getMousePos(e);
+      for(let i=balls.length-1; i>=0; i--) {
+        if(isMouseOnBall(pos, balls[i])) {
+          draggedBall = balls[i];
+          dragOffset.x = pos.x - draggedBall.position.x;
+          dragOffset.y = pos.y - draggedBall.position.y;
+          draggedBall.velocity.x = 0;
+          draggedBall.velocity.y = 0;
+          break;
+        }
+      }
+    });
+    canvas.addEventListener('mousemove', e => {
+      if(draggedBall) {
+        const pos = getMousePos(e);
+        draggedBall.position.x = pos.x - dragOffset.x;
+        draggedBall.position.y = pos.y - dragOffset.y;
+        draggedBall.acceleration.multiplyScalar(0);
+      }
+    });
+    canvas.addEventListener('mouseup', e => {
+      draggedBall = null;
+    });
+    canvas.addEventListener('mouseleave', e => {
+      draggedBall = null;
+    });
+
+    // Touch events for drag support
+    canvas.addEventListener('touchstart', e => {
+      if(e.touches.length !== 1) return;
+      const touch = e.touches[0];
+      const pos = getMousePos(touch);
+      for(let i=balls.length-1; i>=0; i--) {
+        if(isMouseOnBall(pos, balls[i])) {
+          draggedBall = balls[i];
+          dragOffset.x = pos.x - draggedBall.position.x;
+          dragOffset.y = pos.y - draggedBall.position.y;
+          draggedBall.velocity.x = 0;
+          draggedBall.velocity.y = 0;
+          break;
+        }
+      }
+      e.preventDefault();
+    }, {passive:false});
+    canvas.addEventListener('touchmove', e => {
+      if(!draggedBall || e.touches.length !== 1) return;
+      const touch = e.touches[0];
+      const pos = getMousePos(touch);
+      draggedBall.position.x = pos.x - dragOffset.x;
+      draggedBall.position.y = pos.y - dragOffset.y;
+      draggedBall.acceleration.multiplyScalar(0);
+      e.preventDefault();
+    }, {passive:false});
+    canvas.addEventListener('touchend', e => {
+      draggedBall = null;
+      e.preventDefault();
+    }, {passive:false});
+
+    // Control handlers
+    tiltSlider.addEventListener('input', () => {
+      const angle = parseInt(tiltSlider.value);
+      tiltValue.textContent = angle + '°';
+      const rad = degToRad(angle);
+      gravity.x = gravityMagnitude * Math.sin(rad);
+      gravity.y = gravityMagnitude * Math.cos(rad);
+    });
+
+    bounceSlider.addEventListener('input', () => {
+      restitution = parseFloat(bounceSlider.value);
+      bounceValue.textContent = restitution.toFixed(2);
+    });
+
+    resetBtn.addEventListener('click', () => {
+      balls.forEach(ball => ball.resetPosition(canvas.width, canvas.height));
+    });
+
+    addBtn.addEventListener('click', () => {
+      if(balls.length < 50) {
+        balls.push(createRandomBall());
+        updateBallCount();
+      }
+    });
+
+    removeBtn.addEventListener('click', () => {
+      if(balls.length > 0) {
+        balls.pop();
+        updateBallCount();
+      }
+    });
+
+    // Animation loop
+    let lastTime = null;
+    function animate(time=0) {
+      if(!lastTime) lastTime = time;
+      const deltaTime = (time - lastTime) / 1000;
+      lastTime = time;
+
+      ctx.clearRect(0,0,canvas.width, canvas.height);
+
+      balls.forEach(ball => {
+        if(ball !== draggedBall) {
+          ball.applyForce(gravity.clone().multiplyScalar(ball.mass));
+          ball.update(deltaTime);
+
+          // Collisions with walls
+          if(ball.position.y + ball.radius > canvas.height) {
+            ball.position.y = canvas.height - ball.radius;
+            ball.velocity.y *= -restitution;
+          }
+          if(ball.position.y - ball.radius < 0) {
+            ball.position.y = ball.radius;
+            ball.velocity.y *= -restitution;
+          }
+          if(ball.position.x + ball.radius > canvas.width) {
+            ball.position.x = canvas.width - ball.radius;
+            ball.velocity.x *= -restitution;
+          }
+          if(ball.position.x - ball.radius < 0) {
+            ball.position.x = ball.radius;
+            ball.velocity.x *= -restitution;
+          }
+        }
+        ball.draw(ctx);
+      });
+
+      requestAnimationFrame(animate);
+    }
+
+    // Initialize gravity vector for initial tilt value
+    (function init() {
+      const angle = parseInt(tiltSlider.value);
+      const rad = degToRad(angle);
+      gravity.x = gravityMagnitude * Math.sin(rad);
+      gravity.y = gravityMagnitude * Math.cos(rad);
+    })();
+
+    // Start animation
+    requestAnimationFrame(animate);
+  })();
+</script>
+
+</body>
+</html>

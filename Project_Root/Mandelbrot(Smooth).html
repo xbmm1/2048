@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Mandelbrot Set with Mouse Zoom & Pan (Smooth)</title>
+  <style>
+    body {
+      text-align: center;
+      font-family: Arial, sans-serif;
+      background: #111;
+      color: white;
+    }
+    canvas {
+      border: 1px solid #555;
+      cursor: grab;
+      display: block;
+      margin: 20px auto;
+      background: black;
+    }
+    .controls {
+      max-width: 600px;
+      margin: 0 auto 20px;
+      text-align: left;
+    }
+  </style>
+</head>
+<body>
+
+<h1>Mandelbrot Set Visualization</h1>
+
+<canvas id="mandelbrotCanvas" width="600" height="600"></canvas>
+
+<div class="controls">
+  <label for="iterationRange">Max Iterations: <span id="iterationValue">100</span></label><br/>
+  <input type="range" id="iterationRange" min="10" max="1000" value="100" step="10" />
+</div>
+
+<script>
+  const canvas = document.getElementById('mandelbrotCanvas');
+  const ctx = canvas.getContext('2d');
+  const baseWidth = canvas.width;
+  const baseHeight = canvas.height;
+
+  // Original complex plane boundaries
+  const originalBounds = {
+    xmin: -2.5,
+    xmax: 1,
+    ymin: -1.5,
+    ymax: 1.5
+  };
+
+  // Current view parameters
+  let zoom = 1;
+  let offsetX = 0; // horizontal offset in complex plane units
+  let offsetY = 0; // vertical offset in complex plane units
+  let maxIterations = 100;
+
+  // Variables for panning
+  let isDragging = false;
+  let dragStart = { x: 0, y: 0 };
+  let dragStartOffset = { x: 0, y: 0 };
+
+  // UI elements
+  const iterationRange = document.getElementById('iterationRange');
+  const iterationValue = document.getElementById('iterationValue');
+
+  iterationRange.addEventListener('input', () => {
+    maxIterations = parseInt(iterationRange.value, 10);
+    iterationValue.textContent = maxIterations;
+    scheduleDraw();
+  });
+
+  // Map pixel to complex plane coordinate (using current zoom & offset)
+  function pixelToComplex(x, y) {
+    // Calculate width and height of current view in complex plane
+    const viewWidth = (originalBounds.xmax - originalBounds.xmin) / zoom;
+    const viewHeight = (originalBounds.ymax - originalBounds.ymin) / zoom;
+
+    const real = originalBounds.xmin + offsetX + (x / baseWidth) * viewWidth;
+    const imag = originalBounds.ymin + offsetY + (y / baseHeight) * viewHeight;
+
+    return { real, imag };
+  }
+
+  // Mandelbrot iterations function
+  function mandelbrotIterations(cReal, cImag, maxIter) {
+    let zReal = 0, zImag = 0;
+    let n = 0;
+
+    while (n < maxIter) {
+      const zRealSquared = zReal * zReal;
+      const zImagSquared = zImag * zImag;
+
+      if (zRealSquared + zImagSquared > 4) break;
+
+      const tempZReal = zRealSquared - zImagSquared + cReal;
+      zImag = 2 * zReal * zImag + cImag;
+      zReal = tempZReal;
+
+      n++;
+    }
+    return n;
+  }
+
+  // Color mapping
+  function getColor(iter, maxIter) {
+    if (iter === maxIter) {
+      return [0, 0, 0];
+    }
+    const t = iter / maxIter;
+    const r = Math.floor(9 * (1 - t) * t * t * t * 255);
+    const g = Math.floor(15 * (1 - t) * (1 - t) * t * t * 255);
+    const b = Math.floor(8.5 * (1 - t) * (1 - t) * (1 - t) * t * 255);
+    return [r, g, b];
+  }
+
+  // Flag for throttling draw calls
+  let needsRedraw = false;
+
+  function drawMandelbrot() {
+    needsRedraw = false;
+
+    // Dynamic resolution scaling based on zoom:
+    // The higher the zoom, the lower the scale, but clamp minimum scale to 0.1 (10% resolution)
+    // Adjust this scaling function to your preference.
+    const scale = Math.max(0.5, 1 / Math.log10(zoom + 10));
+
+    const w = Math.floor(baseWidth * scale);
+    const h = Math.floor(baseHeight * scale);
+
+    const imageData = ctx.createImageData(w, h);
+    const data = imageData.data;
+
+    const viewWidth = (originalBounds.xmax - originalBounds.xmin) / zoom;
+    const viewHeight = (originalBounds.ymax - originalBounds.ymin) / zoom;
+
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const cReal = originalBounds.xmin + offsetX + (x / w) * viewWidth;
+        const cImag = originalBounds.ymin + offsetY + (y / h) * viewHeight;
+
+        const iter = mandelbrotIterations(cReal, cImag, maxIterations);
+        const [r, g, b] = getColor(iter, maxIterations);
+
+        const idx = (y * w + x) * 4;
+        data[idx] = r;
+        data[idx + 1] = g;
+        data[idx + 2] = b;
+        data[idx + 3] = 255;
+      }
+    }
+
+    // Draw scaled image on main canvas
+    // Using an offscreen canvas to hold the image data
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = w;
+    tempCanvas.height = h;
+    const tempCtx = tempCanvas.getContext('2d');
+    tempCtx.putImageData(imageData, 0, 0);
+
+    // Clear main canvas and draw scaled image
+    ctx.clearRect(0, 0, baseWidth, baseHeight);
+    ctx.drawImage(tempCanvas, 0, 0, baseWidth, baseHeight);
+  }
+
+  function scheduleDraw() {
+    if (!needsRedraw) {
+      needsRedraw = true;
+      requestAnimationFrame(drawMandelbrot);
+    }
+  }
+
+  // Mouse wheel zoom handler
+  canvas.addEventListener('wheel', (e) => {
+    e.preventDefault();
+
+    // Get mouse position relative to canvas
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+
+    // Convert mouse position to complex plane coords before zoom
+    const { real: mouseReBefore, imag: mouseImBefore } = pixelToComplex(mouseX, mouseY);
+
+    // Zoom factor change (scroll up zooms in, down zooms out)
+    const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
+    zoom *= zoomFactor;
+    zoom = Math.min(Math.max(zoom, 1), 1e10); // limit zoom between 1 and 10^10
+
+    // After zoom, compute complex coords under mouse again
+    const { real: mouseReAfter, imag: mouseImAfter } = pixelToComplex(mouseX, mouseY);
+
+    // Adjust offsets so the point under the mouse stays fixed
+    offsetX += (mouseReBefore - mouseReAfter);
+    offsetY += (mouseImBefore - mouseImAfter);
+
+    scheduleDraw();
+  });
+
+  // Mouse drag for panning
+  canvas.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    isDragging = true;
+    dragStart.x = e.clientX;
+    dragStart.y = e.clientY;
+    dragStartOffset.x = offsetX;
+    dragStartOffset.y = offsetY;
+    canvas.style.cursor = 'grabbing';
+  });
+
+  window.addEventListener('mouseup', (e) => {
+    if (isDragging) {
+      isDragging = false;
+      canvas.style.cursor = 'grab';
+    }
+  });
+
+  window.addEventListener('mousemove', (e) => {
+    if (!isDragging) return;
+
+    const dx = e.clientX - dragStart.x;
+    const dy = e.clientY - dragStart.y;
+
+    // Convert pixel movement to complex plane movement
+    const viewWidth = (originalBounds.xmax - originalBounds.xmin) / zoom;
+    const viewHeight = (originalBounds.ymax - originalBounds.ymin) / zoom;
+
+    offsetX = dragStartOffset.x - dx / baseWidth * viewWidth;
+    offsetY = dragStartOffset.y - dy / baseHeight * viewHeight;
+
+    scheduleDraw();
+  });
+
+  // Initial draw
+  scheduleDraw();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Interactive A* Educational Demo</title>
+<style>
+  body { font-family: Arial, sans-serif; margin: 16px; }
+  .layout { display: flex; gap: 16px; align-items: flex-start; }
+  #left { width: 420px; }
+  canvas { border: 1px solid #333; image-rendering: pixelated; display:block; }
+  button, select, input[type="range"] { margin: 6px 6px 6px 0; padding: 6px; }
+  .controls { margin-top: 8px; }
+  .panel { border: 1px solid #ddd; padding: 8px; background: #fafafa; }
+  .pseudocode { font-family: monospace; font-size: 13px; white-space: pre; }
+  .pseudocode .line { padding: 3px; }
+  .highlight { background: #fffbcc; border-left: 3px solid #f7c948; }
+  .stats { font-size: 13px; line-height: 1.4; }
+  .small { font-size: 13px; color: #333; }
+  label { margin-right: 10px; }
+  .muted { color: #666; font-size: 13px; }
+</style>
+</head>
+<body>
+
+<h1>Interactive A* Educational Demo</h1>
+
+<div class="layout">
+  <div id="left">
+    <canvas id="mazeCanvas" width="420" height="420"></canvas>
+
+    <div class="controls panel">
+      <button id="generateBtn">Generate Maze (Wilson)</button>
+      <button id="solveAnimBtn">Play</button>
+      <button id="solvePauseBtn" disabled>Pause</button>
+      <button id="stepBtn">Step</button>
+      <button id="solveInstantBtn">Solve Instant</button>
+      <label class="small">Speed:
+        <input id="speedRange" type="range" min="1" max="200" value="40">
+      </label>
+      <label class="small">Heuristic:
+        <select id="heuristicSelect">
+          <option value="manhattan">Manhattan</option>
+          <option value="euclidean">Euclidean</option>
+          <option value="chebyshev">Chebyshev</option>
+        </select>
+      </label>
+      <br />
+      <label><input type="radio" name="place" value="none" checked> Normal</label>
+      <label><input type="radio" name="place" value="start"> Place Start</label>
+      <label><input type="radio" name="place" value="goal"> Place Goal</label>
+      <label style="margin-left:8px;"><input id="showTentative" type="checkbox" checked> Show tentative path</label>
+    </div>
+
+    <div class="panel stats" id="statsPanel">
+      <strong>Statistics</strong>
+      <div id="statsContent">
+        Iterations: 0<br />
+        Nodes Expanded: 0<br />
+        Max Open Set Size: 0<br />
+        Elapsed: 0 ms
+      </div>
+    </div>
+  </div>
+
+  <div id="right" style="flex:1;">
+    <div class="panel">
+      <strong>Pseudocode (A*)</strong>
+      <div class="pseudocode" id="pseudocode">
+        <!-- lines filled by JS -->
+      </div>
+      <div class="muted small">Highlighted line corresponds to the step currently executing.</div>
+    </div>
+
+    <div class="panel" style="margin-top:12px;">
+      <strong>Notes & Teaching Points</strong>
+      <ul class="small">
+        <li>Open set = frontier (nodes to be considered). Closed set = visited/expanded.</li>
+        <li>The heuristic influences exploration; choose Manhattan for 4‑way grids.</li>
+        <li>The tentative path shows how parents create the current best path from start to the currently expanded node.</li>
+        <li>Performance: Using a binary heap for the open set makes A* much faster than sorting every iteration.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  // Canvas + maze settings
+  const canvas = document.getElementById('mazeCanvas');
+  const ctx = canvas.getContext('2d');
+  // Choose a moderate size so it's visible and educational
+  const gridW = 40;
+  const gridH = 40;
+  const cellSize = canvas.width / gridW;
+
+  // UI elements
+  const generateBtn = document.getElementById('generateBtn');
+  const solveAnimBtn = document.getElementById('solveAnimBtn');
+  const solvePauseBtn = document.getElementById('solvePauseBtn');
+  const stepBtn = document.getElementById('stepBtn');
+  const solveInstantBtn = document.getElementById('solveInstantBtn');
+  const speedRange = document.getElementById('speedRange');
+  const heuristicSelect = document.getElementById('heuristicSelect');
+  const statsContent = document.getElementById('statsContent');
+  const pseudocodeEl = document.getElementById('pseudocode');
+  const showTentative = document.getElementById('showTentative');
+
+  // bit flags for walls
+  const WALL_TOP = 1, WALL_RIGHT = 2, WALL_BOTTOM = 4, WALL_LEFT = 8, ALL_WALLS = 15;
+
+  let maze = [];
+  let start = {x:0,y:0};
+  let goal = {x: gridW-1, y: gridH-1};
+
+  function initMaze() {
+    maze = [];
+    for (let y=0;y<gridH;y++){
+      const row = [];
+      for (let x=0;x<gridW;x++) row.push(ALL_WALLS);
+      maze.push(row);
+    }
+  }
+
+  function drawMaze({path=[], openSet=[], closedSet=new Set(), current=null, highlightParents=false} = {}) {
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+
+    // Draw closed set background lightly
+    if (closedSet && closedSet.size) {
+      ctx.fillStyle = 'rgba(0,0,0,0.06)';
+      closedSet.forEach(k => {
+        const [x,y] = k.split(',').map(Number);
+        ctx.fillRect(x*cellSize, y*cellSize, cellSize, cellSize);
+      });
+    }
+    // Draw open set
+    if (openSet && openSet.length) {
+      ctx.fillStyle = 'rgba(255,215,0,0.28)';
+      openSet.forEach(n => ctx.fillRect(n.x*cellSize, n.y*cellSize, cellSize, cellSize));
+    }
+    // Current
+    if (current) {
+      ctx.fillStyle = 'rgba(30,144,255,0.35)';
+      ctx.fillRect(current.x*cellSize, current.y*cellSize, cellSize, cellSize);
+    }
+
+    // Draw walls
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 2;
+    for (let y=0;y<gridH;y++){
+      for (let x=0;x<gridW;x++){
+        const cell = maze[y][x];
+        const px = x*cellSize, py = y*cellSize;
+        if (cell & WALL_TOP) { ctx.beginPath(); ctx.moveTo(px,py); ctx.lineTo(px+cellSize,py); ctx.stroke(); }
+        if (cell & WALL_RIGHT) { ctx.beginPath(); ctx.moveTo(px+cellSize,py); ctx.lineTo(px+cellSize,py+cellSize); ctx.stroke(); }
+        if (cell & WALL_BOTTOM) { ctx.beginPath(); ctx.moveTo(px+cellSize,py+cellSize); ctx.lineTo(px,py+cellSize); ctx.stroke(); }
+        if (cell & WALL_LEFT) { ctx.beginPath(); ctx.moveTo(px,py+cellSize); ctx.lineTo(px,py); ctx.stroke(); }
+      }
+    }
+
+    // Draw start/goal
+    ctx.fillStyle = 'green';
+    ctx.fillRect(start.x*cellSize+2, start.y*cellSize+2, cellSize-4, cellSize-4);
+    ctx.fillStyle = 'red';
+    ctx.fillRect(goal.x*cellSize+2, goal.y*cellSize+2, cellSize-4, cellSize-4);
+
+    // Optionally show tentative path (current back to start)
+    if (showTentative.checked && highlightParents && current) {
+      ctx.strokeStyle = 'rgba(30,144,255,0.7)';
+      ctx.lineWidth = Math.max(2, cellSize / 6);
+      ctx.beginPath();
+      let c = current;
+      ctx.moveTo(c.x*cellSize + cellSize/2, c.y*cellSize + cellSize/2);
+      while (c && c.parent) {
+        c = c.parent;
+        ctx.lineTo(c.x*cellSize + cellSize/2, c.y*cellSize + cellSize/2);
+      }
+      ctx.stroke();
+    }
+
+    // Draw final path if provided
+    if (path && path.length) {
+      ctx.strokeStyle = 'blue';
+      ctx.lineWidth = Math.max(3, cellSize/3);
+      ctx.beginPath();
+      ctx.moveTo(path[0].x*cellSize + cellSize/2, path[0].y*cellSize + cellSize/2);
+      for (let i=1;i<path.length;i++) {
+        ctx.lineTo(path[i].x*cellSize + cellSize/2, path[i].y*cellSize + cellSize/2);
+      }
+      ctx.stroke();
+    }
+  }
+
+  // Wilson's algorithm (same as before)
+  function generateMazeWilson() {
+    const inMaze = new Set();
+    const key = (x,y) => `${x},${y}`;
+    const sx = Math.floor(Math.random()*gridW), sy = Math.floor(Math.random()*gridH);
+    inMaze.add(key(sx,sy));
+    const directions = [
+      {dx:0,dy:-1,wall:WALL_TOP,op:WALL_BOTTOM},
+      {dx:1,dy:0,wall:WALL_RIGHT,op:WALL_LEFT},
+      {dx:0,dy:1,wall:WALL_BOTTOM,op:WALL_TOP},
+      {dx:-1,dy:0,wall:WALL_LEFT,op:WALL_RIGHT},
+    ];
+    while (inMaze.size < gridW * gridH) {
+      let wx, wy;
+      do { wx = Math.floor(Math.random()*gridW); wy = Math.floor(Math.random()*gridH);} while(inMaze.has(key(wx,wy)));
+      let path = [{x:wx,y:wy}];
+      let pathSet = new Set([key(wx,wy)]);
+      while(!inMaze.has(key(wx,wy))) {
+        const neigh = directions.filter(d => {
+          const nx = wx + d.dx, ny = wy + d.dy;
+          return nx >=0 && nx < gridW && ny >=0 && ny < gridH;
+        });
+        const next = neigh[Math.floor(Math.random()*neigh.length)];
+        wx += next.dx; wy += next.dy;
+        const k = key(wx,wy);
+        if (pathSet.has(k)) {
+          const idx = path.findIndex(c => c.x===wx && c.y===wy);
+          path = path.slice(0, idx+1);
+          pathSet = new Set(path.map(c => key(c.x,c.y)));
+        } else {
+          path.push({x:wx,y:wy});
+          pathSet.add(k);
+        }
+      }
+      for (let i=0;i<path.length-1;i++) {
+        const c1 = path[i], c2 = path[i+1];
+        const dx = c2.x - c1.x, dy = c2.y - c1.y;
+        const dir = directions.find(d => d.dx===dx && d.dy===dy);
+        if (dir) {
+          maze[c1.y][c1.x] &= ~dir.wall;
+          maze[c2.y][c2.x] &= ~dir.op;
+        }
+        inMaze.add(`${c1.x},${c1.y}`);
+      }
+      inMaze.add(`${path[path.length-1].x},${path[path.length-1].y}`);
+    }
+  }
+
+  // Pseudocode lines (array)
+  const pseudoLines = [
+    "openSet = {start}",
+    "cameFrom = {}",
+    "g[start] = 0",
+    "f[start] = heuristic(start, goal)",
+    "while openSet not empty:",
+    "  current = node in openSet with lowest f",
+    "  if current == goal: reconstruct path and return",
+    "  remove current from openSet; add current to closedSet",
+    "  for each neighbor of current:",
+    "    if neighbor in closedSet: continue",
+    "    tentativeG = g[current] + dist(current,neighbor)",
+    "    if neighbor not in openSet or tentativeG < g[neighbor]:",
+    "      cameFrom[neighbor] = current",
+    "      g[neighbor] = tentativeG",
+    "      f[neighbor] = g[neighbor] + heuristic(neighbor, goal)",
+    "      if neighbor not in openSet: add neighbor to openSet"
+  ];
+
+  function renderPseudocode(highlightIndex) {
+    pseudocodeEl.innerHTML = '';
+    pseudoLines.forEach((line,i) => {
+      const div = document.createElement('div');
+      div.className = 'line' + (i===highlightIndex ? ' highlight' : '');
+      div.textContent = (i+1).toString().padStart(2,' ') + "  " + line;
+      pseudocodeEl.appendChild(div);
+    });
+  }
+
+  // Heuristic functions
+  function heuristicFor(name) {
+    switch(name) {
+      case 'euclidean':
+        return (a,b) => Math.hypot(a.x-b.x, a.y-b.y);
+      case 'chebyshev':
+        return (a,b) => Math.max(Math.abs(a.x-b.x), Math.abs(a.y-b.y));
+      default:
+        return (a,b) => Math.abs(a.x-b.x) + Math.abs(a.y-b.y); // manhattan
+    }
+  }
+
+  // A* generator: yields many small states for visualization
+  function* astarGenerator(startNode, goalNode, heuristicName) {
+    const heuristic = heuristicFor(heuristicName);
+    const nodeKey = (x,y) => `${x},${y}`;
+
+    // Node objects stored in open set contain x,y,g,h,f,parent
+    const openSet = [];
+    const closedSet = new Set();
+    function pushOpen(n) { openSet.push(n); }
+    function findOpen(x,y) { return openSet.find(n => n.x===x && n.y===y); }
+
+    const start = { x:startNode.x, y:startNode.y, g:0, h: heuristic(startNode, goalNode) };
+    start.f = start.g + start.h;
+    pushOpen(start);
+
+    // stats
+    let iterations = 0;
+    let nodesExpanded = 0;
+    let maxOpen = 1;
+
+    // pseudocode indices mapping to yields
+    // We'll yield sometimes with pseudocode index to highlight
+    renderPseudocode(-1);
+
+    // initial yield
+    yield { type:'init', openSet: openSet.map(n=>({x:n.x,y:n.y})), closedSet: new Set(), current:null, stats:{iterations,nodesExpanded,maxOpen} , pseudocode:0 };
+
+    while (openSet.length > 0) {
+      iterations++;
+      // pick node with lowest f
+      openSet.sort((a,b) => a.f - b.f);
+      const current = openSet.shift();
+      // highlight selecting current (line 6)
+      yield { type:'select', current, openSet: openSet.map(n=>({x:n.x,y:n.y})), closedSet: new Set(closedSet), stats:{iterations,nodesExpanded,maxOpen}, pseudocode:5 };
+
+      // goal check (line 7)
+      if (current.x === goalNode.x && current.y === goalNode.y) {
+        // reconstruct path
+        const path = [];
+        let c = current;
+        while (c) { path.push({x:c.x,y:c.y}); c = c.parent; }
+        path.reverse();
+        yield { type:'done', path, current, openSet: openSet.map(n=>({x:n.x,y:n.y})), closedSet: new Set(closedSet), stats:{iterations,nodesExpanded,maxOpen}, pseudocode:6 };
+        return;
+      }
+
+      // move current to closed
+      closedSet.add(nodeKey(current.x,current.y));
+      nodesExpanded++;
+      yield { type:'expanded', current, openSet: openSet.map(n=>({x:n.x,y:n.y})), closedSet: new Set(closedSet), stats:{iterations,nodesExpanded,maxOpen}, pseudocode:7 };
+
+      // neighbors (line 9 onwards)
+      const dirs = [
+        {dx:0,dy:-1,wall:WALL_TOP},
+        {dx:1,dy:0,wall:WALL_RIGHT},
+        {dx:0,dy:1,wall:WALL_BOTTOM},
+        {dx:-1,dy:0,wall:WALL_LEFT},
+      ];
+
+      for (const d of dirs) {
+        const nx = current.x + d.dx, ny = current.y + d.dy;
+        if (nx < 0 || nx >= gridW || ny < 0 || ny >= gridH) continue;
+        if (maze[current.y][current.x] & d.wall) continue; // wall blocks movement
+
+        const key = nodeKey(nx,ny);
+        // skip if in closedSet
+        if (closedSet.has(key)) {
+          // yield neighbor skipped
+          yield { type:'neighborSkipped', current, neighbor:{x:nx,y:ny}, openSet: openSet.map(n=>({x:n.x,y:n.y})), closedSet: new Set(closedSet), stats:{iterations,nodesExpanded,maxOpen}, pseudocode:8 };
+          continue;
+        }
+
+        const tentativeG = current.g + 1;
+
+        let neighbor = findOpen(nx,ny);
+        if (!neighbor) {
+          neighbor = { x:nx, y:ny, g: Infinity, h:0, f:Infinity, parent:null };
+          openSet.push(neighbor);
+        }
+
+        // if tentative better then record (line 11-14)
+        if (tentativeG < neighbor.g) {
+          neighbor.parent = current;
+          neighbor.g = tentativeG;
+          neighbor.h = heuristic(neighbor, goalNode);
+          neighbor.f = neighbor.g + neighbor.h;
+
+          yield { type:'neighborUpdated', current, neighbor, openSet: openSet.map(n=>({x:n.x,y:n.y})), closedSet: new Set(closedSet), stats:{iterations,nodesExpanded,maxOpen}, pseudocode:11 };
+        } else {
+          yield { type:'neighborNoUpdate', current, neighbor:{x:nx,y:ny}, openSet: openSet.map(n=>({x:n.x,y:n.y})), closedSet: new Set(closedSet), stats:{iterations,nodesExpanded,maxOpen}, pseudocode:11 };
+        }
+        maxOpen = Math.max(maxOpen, openSet.length);
+      }
+
+      // after exploring neighbors for this current, update stats
+      yield { type:'endIteration', current, openSet: openSet.map(n=>({x:n.x,y:n.y})), closedSet: new Set(closedSet), stats:{iterations,nodesExpanded,maxOpen}, pseudocode:4 };
+    }
+
+    // no path
+    yield { type:'noPath', current:null, openSet:[], closedSet:new Set(), stats:{iterations,nodesExpanded,maxOpen}, pseudocode:4 };
+  }
+
+  // Helper to run the generator with UI controls
+  let gen = null;
+  let playInterval = null;
+  let startTime = 0;
+
+  function resetControls() {
+    solveAnimBtn.textContent = 'Play';
+    solveAnimBtn.disabled = false;
+    solvePauseBtn.disabled = true;
+    stepBtn.disabled = false;
+    solveInstantBtn.disabled = false;
+  }
+
+  function updateStatsDisplay(s) {
+    const elapsed = Math.max(0, performance.now() - startTime);
+    statsContent.innerHTML = `Iterations: ${s.iterations}<br/>Nodes Expanded: ${s.nodesExpanded}<br/>Max Open Set Size: ${s.maxOpen}<br/>Elapsed: ${Math.round(elapsed)} ms`;
+  }
+
+  // Main play/step logic
+  function startGenerator(startCoord, goalCoord) {
+    const heuristicName = heuristicSelect.value;
+    gen = astarGenerator(startCoord, goalCoord, heuristicName);
+    startTime = performance.now();
+    // prime
+    const first = gen.next();
+    if (!first.done) {
+      handleYield(first.value);
+    }
+  }
+
+  function handleYield(y) {
+    // y contains current snapshot
+    if (!y) return;
+    const st = y;
+    // update pseudocode highlight
+    if (typeof st.pseudocode === 'number') renderPseudocode(st.pseudocode);
+    // update stats if present
+    if (st.stats) updateStatsDisplay(st.stats);
+    // draw
+    if (st.type === 'done') {
+      drawMaze({ path: st.path, openSet: st.openSet, closedSet: st.closedSet, current: st.current, highlightParents:true });
+      renderPseudocode(6);
+      updateStatsDisplay(st.stats);
+      // stop playing
+      stopPlaying();
+    } else if (st.type === 'noPath') {
+      drawMaze({ openSet: st.openSet, closedSet: st.closedSet, current: st.current });
+      stopPlaying();
+      alert('No path found.');
+    } else {
+      // draw tentative current+open+closed and optionally tentative parent chain
+      drawMaze({ openSet: st.openSet, closedSet: st.closedSet, current: st.current, highlightParents:true });
+    }
+  }
+
+  function stepOnce() {
+    if (!gen) {
+      startGenerator(start, goal);
+      // simulate stepping after init
+      return;
+    }
+    const res = gen.next();
+    handleYield(res.value);
+  }
+
+  function play() {
+    if (!gen) startGenerator(start, goal);
+    solveAnimBtn.disabled = true;
+    solvePauseBtn.disabled = false;
+    stepBtn.disabled = true;
+    solveInstantBtn.disabled = true;
+
+    const speed = Number(speedRange.value); // 1..200 (ms roughly)
+    // Use interval to step automatically
+    playInterval = setInterval(() => {
+      const res = gen.next();
+      handleYield(res.value);
+      if (res.done) stopPlaying();
+    }, Math.max(1, speed));
+  }
+
+  function stopPlaying() {
+    if (playInterval) { clearInterval(playInterval); playInterval=null; }
+    solveAnimBtn.disabled = false;
+    solvePauseBtn.disabled = true;
+    stepBtn.disabled = false;
+    solveInstantBtn.disabled = false;
+    renderPseudocode(-1);
+  }
+
+  // Instant solver (no UI steps, returns path)
+  function astarInstant(startNode, goalNode, heuristicName) {
+    const heuristic = heuristicFor(heuristicName);
+    const nodeKey = (x,y) => `${x},${y}`;
+    const openSet = [];
+    const closedSet = new Set();
+    const startN = {x:startNode.x, y:startNode.y, g:0, h:heuristic(startNode, goalNode)};
+    startN.f = startN.g + startN.h;
+    openSet.push(startN);
+    const dirs = [
+      {dx:0,dy:-1,wall:WALL_TOP},
+      {dx:1,dy:0,wall:WALL_RIGHT},
+      {dx:0,dy:1,wall:WALL_BOTTOM},
+      {dx:-1,dy:0,wall:WALL_LEFT},
+    ];
+    while (openSet.length>0) {
+      openSet.sort((a,b)=>a.f-b.f);
+      const current = openSet.shift();
+      if (current.x === goalNode.x && current.y === goalNode.y) {
+        const path = []; let c=current;
+        while (c) { path.push({x:c.x,y:c.y}); c=c.parent; }
+        return path.reverse();
+      }
+      closedSet.add(nodeKey(current.x,current.y));
+      for (const d of dirs) {
+        const nx = current.x + d.dx, ny = current.y + d.dy;
+        if (nx < 0 || nx >= gridW || ny < 0 || ny >= gridH) continue;
+        if (maze[current.y][current.x] & d.wall) continue;
+        const k = nodeKey(nx,ny);
+        if (closedSet.has(k)) continue;
+        const tentativeG = current.g + 1;
+        let neighbor = openSet.find(n => n.x===nx && n.y===ny);
+        if (!neighbor) { neighbor = {x:nx,y:ny,g:Infinity,h:0,f:Infinity,parent:null}; openSet.push(neighbor); }
+        if (tentativeG < neighbor.g) {
+          neighbor.parent = current;
+          neighbor.g = tentativeG;
+          neighbor.h = heuristic(neighbor, goalNode);
+          neighbor.f = neighbor.g + neighbor.h;
+        }
+      }
+    }
+    return [];
+  }
+
+  // UI wiring
+  generateBtn.onclick = () => {
+    stopPlaying(); gen = null; // stop any running
+    initMaze(); generateMazeWilson(); drawMaze();
+  };
+
+  solveAnimBtn.onclick = () => {
+    // Start play
+    play();
+  };
+  solvePauseBtn.onclick = () => {
+    // Pause
+    if (playInterval) { clearInterval(playInterval); playInterval=null; }
+    solveAnimBtn.disabled = false; solvePauseBtn.disabled = true; stepBtn.disabled = false; solveInstantBtn.disabled = false;
+  };
+  stepBtn.onclick = () => {
+    if (!gen) startGenerator(start, goal);
+    const res = gen.next();
+    handleYield(res.value);
+  };
+  solveInstantBtn.onclick = () => {
+    stopPlaying(); gen = null;
+    const path = astarInstant(start, goal, heuristicSelect.value);
+    drawMaze({path});
+    if (!path.length) alert('No path found.');
+  };
+
+  // canvas interaction for placing start/goal
+  const placeRadios = document.getElementsByName('place');
+  let placeMode = 'none';
+  placeRadios.forEach(r => r.addEventListener('change', () => placeMode = document.querySelector('input[name="place"]:checked').value));
+
+  canvas.addEventListener('click', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const cx = e.clientX - rect.left, cy = e.clientY - rect.top;
+    const x = Math.floor(cx / cellSize), y = Math.floor(cy / cellSize);
+    if (placeMode === 'start') { start = {x,y}; drawMaze(); gen = null; stopPlaying(); }
+    else if (placeMode === 'goal') { goal = {x,y}; drawMaze(); gen = null; stopPlaying(); }
+    else {
+      // nothing
+    }
+  });
+
+  // init
+  function initialSetup() {
+    initMaze();
+    generateMazeWilson();
+    drawMaze();
+    renderPseudocode(-1);
+  }
+
+  initialSetup();
+})();
+</script>
+</body>
+</html>

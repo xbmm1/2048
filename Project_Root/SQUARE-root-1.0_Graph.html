@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Fast Inverse Sqrt Approximation Chart</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+<h1>Quake's fast inverse square root for 1/4 second</h1>
+  <button id="startBtn">Start</button>
+  <p id="result"></p>
+  <canvas id="sqrtChart" width="600" height="400"></canvas>
+
+  <script>
+    // Quake's fast inverse square root implementation in JS
+    function fastInvSqrt(number) {
+      const threehalfs = 1.5;
+      const x2 = number * 0.5;
+      let y = number;
+
+      const buf = new ArrayBuffer(4);
+      const f32 = new Float32Array(buf);
+      const u32 = new Uint32Array(buf);
+
+      f32[0] = y;
+      let i = u32[0];
+
+      i = 0x5f3759df - (i >> 1);
+      u32[0] = i;
+
+      y = f32[0];
+      y = y * (threehalfs - (x2 * y * y));
+
+      return y;
+    }
+
+    function fastSqrt(number) {
+      return number * fastInvSqrt(number);
+    }
+
+    const startBtn = document.getElementById('startBtn');
+    const resultText = document.getElementById('result');
+    const ctx = document.getElementById('sqrtChart').getContext('2d');
+    let chart;
+
+    startBtn.addEventListener('click', () => {
+      startBtn.disabled = true;
+      resultText.textContent = 'Calculating...';
+
+      const values = [];
+      const labels = [];
+      let i = 1; // start from 1 to avoid sqrt(0)
+
+      const startTime = performance.now();
+
+      while (performance.now() - startTime < 250) {
+        const approxSqrt = fastSqrt(i);
+        values.push(approxSqrt);
+        labels.push(i.toString()); // Convert label to string here
+        i++;
+      }
+
+      console.log('Labels:', labels);
+      console.log('Values:', values);
+
+      resultText.textContent = `Calculated ${values.length} square roots in a quarter second using Quake's fast inverse sqrt.`;
+
+      if (chart) {
+        chart.destroy();
+      }
+
+      chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'Approximate Square Root',
+            data: values,
+            borderColor: 'green',
+            backgroundColor: 'rgba(0,128,0,0.1)',
+            fill: true,
+            pointRadius: 0,
+            borderWidth: 2,
+            tension: 0.2
+          }]
+        },
+        options: {
+          responsive: true,
+          scales: {
+            x: {
+              title: {
+                display: true,
+                text: 'Number'
+              }
+            },
+            y: {
+              title: {
+                display: true,
+                text: 'Square Root Approximation'
+              }
+            }
+          },
+          plugins: {
+            legend: {
+              display: true
+            }
+          }
+        }
+      });
+
+      startBtn.disabled = false;
+    });
+  </script>
+
+</body>
+</html>

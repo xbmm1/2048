@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>RSA Demo with Highlighted Steps</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    margin: 2em;
+    background: #f0f4f8;
+    color: #222;
+    max-width: 900px;
+  }
+  h1 {
+    color: #003366;
+    margin-bottom: 0.5em;
+  }
+  label {
+    font-weight: bold;
+    margin-top: 1em;
+    display: block;
+  }
+  input[type="text"] {
+    padding: 0.5em;
+    font-size: 1em;
+    width: 100%;
+    max-width: 400px;
+    box-sizing: border-box;
+  }
+  button {
+    background: #007bff;
+    border: none;
+    color: white;
+    padding: 0.6em 1em;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 1em;
+    margin: 0.5em 0;
+    transition: background-color 0.3s ease;
+  }
+  button:disabled {
+    background: #ccc;
+    cursor: default;
+  }
+  .output {
+    background: white;
+    border-radius: 6px;
+    padding: 1em;
+    margin-top: 1em;
+    box-shadow: 0 0 8px rgba(0,0,0,0.1);
+    font-family: monospace;
+    white-space: pre-wrap;
+    min-height: 180px;
+    max-height: 300px;
+    overflow-y: auto;
+  }
+  .section {
+    border-left: 5px solid #007bff;
+    padding-left: 1em;
+    margin-top: 1.5em;
+  }
+  .step {
+    margin-bottom: 0.8em;
+    display: flex;
+    align-items: center;
+  }
+  .icon {
+    font-weight: bold;
+    font-size: 1.2em;
+    width: 1.2em;
+    text-align: center;
+    margin-right: 0.5em;
+    user-select: none;
+  }
+  .multiply {
+    color: #2c7a2c; /* Green */
+  }
+  .skip {
+    color: #b36b00; /* Orange */
+  }
+  .highlight {
+    color: #007bff;
+    font-weight: bold;
+  }
+</style>
+</head>
+<body>
+
+<h1>RSA Demo with Highlighted Modular Exponentiation Steps</h1>
+
+<label for="messageInput">Enter your message (characters must have ASCII codes less than modulus):</label>
+<input type="text" id="messageInput" value="HELLO" maxlength="100" />
+
+<button id="generateKeysBtn">Generate RSA Keys</button>
+<button id="encryptBtn" disabled>Encrypt Message (Step-by-Step for 1st Char)</button>
+<button id="decryptBtn" disabled>Decrypt Message (Step-by-Step for 1st Char)</button>
+
+<div id="keysOutput" class="output section"></div>
+<div id="asciiOutput" class="output section"></div>
+<div id="modExpStepsOutput" class="output section"></div>
+<div id="encryptedOutput" class="output section"></div>
+<div id="modExpDecryptStepsOutput" class="output section"></div>
+<div id="decryptedOutput" class="output section"></div>
+
+<script>
+// Utility functions
+function egcd(a, b) {
+  if (b === 0) return [a, 1, 0];
+  const [g, x1, y1] = egcd(b, a % b);
+  return [g, y1, x1 - Math.floor(a / b) * y1];
+}
+
+function modInverse(e, phi) {
+  const [g, x] = egcd(e, phi);
+  if (g !== 1) throw 'No modular inverse';
+  return (x % phi + phi) % phi;
+}
+
+function isPrime(n) {
+  if (n < 2) return false;
+  for (let i = 2; i * i <= n; i++)
+    if (n % i === 0) return false;
+  return true;
+}
+
+function generatePrime(min = 500, max = 1000) {
+  let p;
+  do {
+    p = Math.floor(Math.random() * (max - min)) + min;
+  } while (!isPrime(p));
+  return p;
+}
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// Globals and UI references
+let n, e, d;
+let encryptedMessage = [];
+let message = "";
+
+const generateKeysBtn = document.getElementById('generateKeysBtn');
+const encryptBtn = document.getElementById('encryptBtn');
+const decryptBtn = document.getElementById('decryptBtn');
+const keysOutput = document.getElementById('keysOutput');
+const asciiOutput = document.getElementById('asciiOutput');
+const modExpStepsOutput = document.getElementById('modExpStepsOutput');
+const encryptedOutput = document.getElementById('encryptedOutput');
+const modExpDecryptStepsOutput = document.getElementById('modExpDecryptStepsOutput');
+const decryptedOutput = document.getElementById('decryptedOutput');
+const messageInput = document.getElementById('messageInput');
+
+function appendStep(outputElement, text, type = '') {
+  const step = document.createElement('div');
+  step.className = 'step fade-step';
+  if (type === 'multiply') {
+    step.innerHTML = `<span class="icon multiply">&#10003;</span> ${text}`;
+  } else if (type === 'skip') {
+    step.innerHTML = `<span class="icon skip">–</span> ${text}`;
+  } else {
+    step.textContent = text;
+  }
+  outputElement.appendChild(step);
+  outputElement.scrollTop = outputElement.scrollHeight;
+  return step;
+}
+
+async function modPowAnimated(base, exponent, modulus, outputElement) {
+  let result = 1n;
+  let b = BigInt(base) % BigInt(modulus);
+  let e = BigInt(exponent);
+  const m = BigInt(modulus);
+
+  outputElement.innerHTML = '';
+  appendStep(outputElement, `Starting modular exponentiation:`);
+  appendStep(outputElement, `Base (m) = ${b}`);
+  appendStep(outputElement, `Exponent (e) = ${e}`);
+  appendStep(outputElement, `Modulus (n) = ${m}\n`);
+
+  const binaryExp = e.toString(2);
+  appendStep(outputElement, `Exponent in binary: ${binaryExp}\n`);
+  appendStep(outputElement, `Initialize result = 1\n`);
+
+  for (let i = 0; i < binaryExp.length; i++) {
+    const bit = binaryExp[i];
+    appendStep(outputElement, `Step ${i + 1}: Processing bit '${bit}' (bit position ${i + 1} from left)`, '');
+
+    result = (result * result) % m;
+    appendStep(outputElement, `Square result: result = (result * result) mod ${m} = ${result}`, '');
+
+    await sleep(1200);
+
+    if (bit === '1') {
+      result = (result * b) % m;
+      appendStep(outputElement, `Bit is 1 → Multiply by base: result = (result * ${b}) mod ${m} = ${result}`, 'multiply');
+    } else {
+      appendStep(outputElement, `Bit is 0 → Skip multiplication, carry result as is`, 'skip');
+    }
+
+    appendStep(outputElement, '');
+    await sleep(1300);
+  }
+
+  appendStep(outputElement, `Final modular exponentiation result = ${result}`, '');
+  return result;
+}
+
+function generateKeys() {
+  message = messageInput.value || "HELLO";
+
+  const p = generatePrime();
+  const q = generatePrime();
+  n = p * q;
+  const phi = (p - 1) * (q - 1);
+  e = 65537;
+  function gcd(a, b) { return b === 0 ? a : gcd(b, a % b); }
+  if (gcd(e, phi) !== 1) {
+    e = 3;
+    while (gcd(e, phi) !== 1) e += 2;
+  }
+  d = modInverse(e, phi);
+
+  keysOutput.textContent =
+    `--- Key Generation ---\n` +
+    `Random primes selected:\n` +
+    `p = ${p}\nq = ${q}\n\n` +
+    `Modulus:\nn = p × q = ${n}\n\n` +
+    `Euler's Totient:\nφ(n) = (p-1)(q-1) = ${phi}\n\n` +
+    `Public exponent (e): ${e}\n` +
+    `Private exponent (d): ${d}\n\n` +
+    `Public Key: (n, e) = (${n}, ${e})\n` +
+    `Private Key: (n, d) = (${n}, ${d})`;
+
+  asciiOutput.textContent = "";
+  modExpStepsOutput.textContent = "";
+  encryptedOutput.textContent = "";
+  modExpDecryptStepsOutput.textContent = "";
+  decryptedOutput.textContent = "";
+  encryptedMessage = [];
+  encryptBtn.disabled = false;
+  decryptBtn.disabled = true;
+}
+
+async function encryptMessage() {
+  asciiOutput.textContent = "--- Message to ASCII codes ---\n";
+  encryptedOutput.textContent = "--- Encrypted Values ---\n";
+  modExpStepsOutput.textContent = "";
+  encryptedMessage = [];
+
+  // Check characters are less than modulus
+  for (let i = 0; i < message.length; i++) {
+    if (message.charCodeAt(i) >= n) {
+      alert(`Character '${message[i]}' has ASCII code >= modulus n. Please use smaller message or larger key.`);
+      return;
+    }
+  }
+
+  for (let i = 0; i < message.length; i++) {
+    const char = message[i];
+    const code = char.charCodeAt(0);
+    asciiOutput.textContent += `  '${char}' -> ${code}\n`;
+
+    if (i === 0) {
+      const result = await modPowAnimated(code, e, n, modExpStepsOutput);
+      encryptedMessage.push(result);
+      encryptedOutput.textContent += `  ${result.toString()} `;
+    } else {
+      let result = 1n;
+      let b = BigInt(code) % BigInt(n);
+      let exp = BigInt(e);
+      const m = BigInt(n);
+      while (exp > 0) {
+        if (exp % 2n === 1n) result = (result * b) % m;
+        exp = exp / 2n;
+        b = (b * b) % m;
+      }
+      encryptedMessage.push(result);
+      encryptedOutput.textContent += `  ${result.toString()} `;
+    }
+  }
+  decryptBtn.disabled = false;
+}
+
+async function decryptMessage() {
+  modExpDecryptStepsOutput.textContent = "--- Decryption Steps for first character ---\n";
+  decryptedOutput.textContent = "--- Decrypted Message ---\n";
+  let decryptedStr = "";
+
+  for (let i = 0; i < encryptedMessage.length; i++) {
+    const c = encryptedMessage[i];
+
+    if (i === 0) {
+      modExpDecryptStepsOutput.textContent += `Decrypting ciphertext ${c} using:\nplaintext = ${c}^${d} mod ${n}\n\n`;
+      const result = await modPowAnimated(c, d, n, modExpDecryptStepsOutput);
+      decryptedOutput.textContent += `  ${result.toString()} -> '${String.fromCharCode(Number(result))}'\n`;
+      decryptedStr += String.fromCharCode(Number(result));
+    } else {
+      let result = 1n;
+      let b = BigInt(c) % BigInt(n);
+      let exp = BigInt(d);
+      const m = BigInt(n);
+      while (exp > 0) {
+        if (exp % 2n === 1n) result = (result * b) % m;
+        exp = exp / 2n;
+        b = (b * b) % m;
+      }
+      decryptedOutput.textContent += `  ${result.toString()} -> '${String.fromCharCode(Number(result))}'\n`;
+      decryptedStr += String.fromCharCode(Number(result));
+    }
+  }
+  decryptedOutput.textContent += `\nDecrypted message:\n"${decryptedStr}"`;
+}
+
+generateKeysBtn.addEventListener('click', generateKeys);
+encryptBtn.addEventListener('click', encryptMessage);
+decryptBtn.addEventListener('click', decryptMessage);
+</script>
+
+</body>
+</html>

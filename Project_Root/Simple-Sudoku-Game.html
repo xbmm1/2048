@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sudoku Game</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    text-align: center;
+    background: #f0f0f0;
+    margin: 20px;
+  }
+  canvas {
+    background: white;
+    border: 2px solid black;
+    cursor: pointer;
+  }
+  button {
+    margin: 10px 15px;
+    font-size: 16px;
+    padding: 8px 16px;
+  }
+</style>
+</head>
+<body>
+
+<h1>Sudoku Game</h1>
+<canvas id="sudokuCanvas" width="450" height="450" tabindex="0"></canvas><br/>
+
+<button id="checkBtn">Check</button>
+<button id="resetBtn">Reset</button>
+
+<script>
+  const canvas = document.getElementById('sudokuCanvas');
+  const ctx = canvas.getContext('2d');
+  const size = canvas.width; // 450
+  const gridSize = 9;
+  const cellSize = size / gridSize;
+
+  // Initial puzzle: 0 = empty
+  const puzzle = [
+    [5,3,0, 0,7,0, 0,0,0],
+    [6,0,0, 1,9,5, 0,0,0],
+    [0,9,8, 0,0,0, 0,6,0],
+
+    [8,0,0, 0,6,0, 0,0,3],
+    [4,0,0, 8,0,3, 0,0,1],
+    [7,0,0, 0,2,0, 0,0,6],
+
+    [0,6,0, 0,0,0, 2,8,0],
+    [0,0,0, 4,1,9, 0,0,5],
+    [0,0,0, 0,8,0, 0,7,9]
+  ];
+
+  // Create a board to hold user inputs + fixed clues
+  // 0 means empty
+  let board = [];
+  // Track which cells are fixed clues (true/false)
+  let fixed = [];
+
+  // Currently selected cell coordinates
+  let selected = {row: -1, col: -1};
+
+  function initBoard() {
+    board = [];
+    fixed = [];
+    for(let r=0; r<gridSize; r++) {
+      board[r] = [];
+      fixed[r] = [];
+      for(let c=0; c<gridSize; c++) {
+        board[r][c] = puzzle[r][c];
+        fixed[r][c] = puzzle[r][c] !== 0;
+      }
+    }
+  }
+
+  // Draw grid lines
+  function drawGrid() {
+    ctx.clearRect(0, 0, size, size);
+
+    // Fill background white
+    ctx.fillStyle = 'white';
+    ctx.fillRect(0, 0, size, size);
+
+    // Highlight selected cell
+    if (selected.row >= 0 && selected.col >= 0) {
+      ctx.fillStyle = '#cceeff';
+      ctx.fillRect(selected.col * cellSize, selected.row * cellSize, cellSize, cellSize);
+    }
+
+    // Draw grid lines
+    for(let i=0; i<=gridSize; i++) {
+      ctx.beginPath();
+      ctx.lineWidth = (i % 3 === 0) ? 3 : 1;
+      ctx.strokeStyle = 'black';
+
+      // vertical lines
+      ctx.moveTo(i*cellSize, 0);
+      ctx.lineTo(i*cellSize, size);
+      ctx.stroke();
+
+      // horizontal lines
+      ctx.moveTo(0, i*cellSize);
+      ctx.lineTo(size, i*cellSize);
+      ctx.stroke();
+    }
+  }
+
+  // Draw numbers in cells
+  // errors: array of [row,col] cells to highlight as errors
+  function drawNumbers(errors=[]) {
+    ctx.font = `${cellSize * 0.6}px Arial`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    for(let r=0; r<gridSize; r++) {
+      for(let c=0; c<gridSize; c++) {
+        const val = board[r][c];
+        if(val !== 0) {
+          let x = c*cellSize + cellSize/2;
+          let y = r*cellSize + cellSize/2;
+
+          // Highlight errors with red background and text
+          const isError = errors.some(e => e[0] === r && e[1] === c);
+          if (isError) {
+            ctx.fillStyle = '#ff9999';
+            ctx.fillRect(c * cellSize, r * cellSize, cellSize, cellSize);
+            ctx.fillStyle = 'red';
+          } else if (fixed[r][c]) {
+            ctx.fillStyle = 'black'; // fixed clues in black
+          } else {
+            ctx.fillStyle = 'blue'; // user input in blue
+          }
+
+          ctx.fillText(val, x, y);
+        }
+      }
+    }
+  }
+
+  // Convert mouse pixel coords to cell coords
+  function getCellFromCoords(x, y) {
+    const rect = canvas.getBoundingClientRect();
+    const cx = x - rect.left;
+    const cy = y - rect.top;
+    const col = Math.floor(cx / cellSize);
+    const row = Math.floor(cy / cellSize);
+    if(row >= 0 && row < gridSize && col >= 0 && col < gridSize) {
+      return {row, col};
+    }
+    return null;
+  }
+
+  // Check for duplicates in rows, columns, and boxes
+  // Returns list of error cells: [ [r,c], ... ]
+  function findErrors() {
+    let errors = [];
+
+    // Check rows
+    for(let r=0; r<gridSize; r++) {
+      let seen = {};
+      for(let c=0; c<gridSize; c++) {
+        const val = board[r][c];
+        if(val === 0) continue;
+        if(seen[val]) {
+          errors.push([r,c]);
+          errors.push([r, seen[val]-1]);
+        } else {
+          seen[val] = c+1;
+        }
+      }
+    }
+
+    // Check columns
+    for(let c=0; c<gridSize; c++) {
+      let seen = {};
+      for(let r=0; r<gridSize; r++) {
+        const val = board[r][c];
+        if(val === 0) continue;
+        if(seen[val]) {
+          errors.push([r,c]);
+          errors.push([seen[val]-1, c]);
+        } else {
+          seen[val] = r+1;
+        }
+      }
+    }
+
+    // Check 3x3 boxes
+    for(let br=0; br<3; br++) {
+      for(let bc=0; bc<3; bc++) {
+        let seen = {};
+        for(let r=br*3; r<br*3+3; r++) {
+          for(let c=bc*3; c<bc*3+3; c++) {
+            const val = board[r][c];
+            if(val === 0) continue;
+            if(seen[val]) {
+              errors.push([r,c]);
+              errors.push(seen[val]);
+            } else {
+              seen[val] = [r,c];
+            }
+          }
+        }
+      }
+    }
+
+    // Remove duplicates
+    let uniqueErrors = [];
+    let seenCoords = new Set();
+    errors.forEach(([r,c]) => {
+      const key = r+','+c;
+      if(!seenCoords.has(key)) {
+        uniqueErrors.push([r,c]);
+        seenCoords.add(key);
+      }
+    });
+
+    return uniqueErrors;
+  }
+
+  // Redraw full board with optional errors highlighted
+  function redraw(errors=[]) {
+    drawGrid();
+    drawNumbers(errors);
+  }
+
+  // Handle canvas click to select cell
+  canvas.addEventListener('click', e => {
+    const cell = getCellFromCoords(e.clientX, e.clientY);
+    if(cell && !fixed[cell.row][cell.col]) {
+      selected = cell;
+      redraw();
+    }
+  });
+
+  // Handle keyboard input when canvas is focused
+  canvas.addEventListener('keydown', e => {
+    if(selected.row < 0 || selected.col < 0) return;
+
+    if(e.key >= '1' && e.key <= '9') {
+      board[selected.row][selected.col] = parseInt(e.key);
+      redraw();
+    } else if(e.key === 'Backspace' || e.key === 'Delete' || e.key === '0') {
+      board[selected.row][selected.col] = 0;
+      redraw();
+    }
+  });
+
+  // Check button
+  document.getElementById('checkBtn').addEventListener('click', () => {
+    const errors = findErrors();
+    redraw(errors);
+    if(errors.length === 0) {
+      alert('No errors found! Keep going.');
+    } else {
+      alert('Errors are highlighted in red.');
+    }
+  });
+
+  // Reset button
+  document.getElementById('resetBtn').addEventListener('click', () => {
+    initBoard();
+    selected = {row:-1, col:-1};
+    redraw();
+  });
+
+  // Initialize and draw first time
+  initBoard();
+  redraw();
+
+  // Make canvas focusable and focused to catch keyboard
+  canvas.setAttribute('tabindex', '0');
+  canvas.focus();
+</script>
+
+</body>
+</html>

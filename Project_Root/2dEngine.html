@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Physics Simulation with Gravity and Bounce Sliders</title>
+  <style>
+    body {
+      background: #222;
+      color: white;
+      font-family: sans-serif;
+      margin: 0;
+      padding: 10px;
+      text-align: center;
+      user-select: none;
+    }
+    canvas {
+      background: #333;
+      border: 1px solid #555;
+      display: block;
+      margin: 10px auto;
+      touch-action: none;
+    }
+    label {
+      font-size: 16px;
+      margin-right: 10px;
+    }
+    input[type="range"] {
+      width: 300px;
+      vertical-align: middle;
+      margin-bottom: 10px;
+    }
+    #angleValue, #restitutionValue {
+      display: inline-block;
+      width: 40px;
+      text-align: left;
+      font-weight: bold;
+    }
+    button {
+      margin: 5px;
+      padding: 8px 15px;
+      font-size: 14px;
+      cursor: pointer;
+      border: none;
+      border-radius: 3px;
+      background-color: #555;
+      color: white;
+      transition: background-color 0.3s;
+    }
+    button:hover {
+      background-color: #777;
+    }
+    #controls {
+      margin: 15px 0;
+    }
+    #ballCount {
+      margin-top: 10px;
+      font-weight: bold;
+    }
+    .slider-container {
+      margin: 10px 0;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="slider-container">
+    <label for="tiltSlider">Tilt Angle (degrees):</label>
+    <input type="range" id="tiltSlider" min="-45" max="45" step="1" value="0" />
+    <span id="angleValue">0°</span>
+  </div>
+
+  <div class="slider-container">
+    <label for="restitutionSlider">Bounciness:</label>
+    <input type="range" id="restitutionSlider" min="0" max="1" step="0.01" value="0.7" />
+    <span id="restitutionValue">0.70</span>
+  </div>
+
+  <div id="controls">
+    <button id="resetBtn">Reset Balls</button>
+    <button id="addBallBtn">Add Ball</button>
+    <button id="removeBallBtn">Remove Ball</button>
+  </div>
+
+  <div id="ballCount">Balls: 0</div>
+
+  <canvas id="canvas" width="600" height="400"></canvas>
+
+  <script>
+    class Vector2 {
+      constructor(x = 0, y = 0) {
+        this.x = x;
+        this.y = y;
+      }
+      add(v) {
+        this.x += v.x;
+        this.y += v.y;
+        return this;
+      }
+      subtract(v) {
+        this.x -= v.x;
+        this.y -= v.y;
+        return this;
+      }
+      multiplyScalar(s) {
+        this.x *= s;
+        this.y *= s;
+        return this;
+      }
+      clone() {
+        return new Vector2(this.x, this.y);
+      }
+    }
+
+    class PhysicsObject {
+      constructor(position, velocity, acceleration, radius, mass) {
+        this.position = position.clone();
+        this.velocity = velocity.clone();
+        this.acceleration = acceleration.clone();
+        this.radius = radius;
+        this.mass = mass;
+      }
+      applyForce(force) {
+        let f = force.clone().multiplyScalar(1 / this.mass);
+        this.acceleration.add(f);
+      }
+      update(deltaTime) {
+        this.velocity.add(this.acceleration.clone().multiplyScalar(deltaTime));
+        this.position.add(this.velocity.clone().multiplyScalar(deltaTime));
+        this.acceleration.multiplyScalar(0);
+      }
+      draw(ctx) {
+        ctx.beginPath();
+        ctx.arc(this.position.x, this.position.y, this.radius, 0, Math.PI * 2);
+        ctx.fillStyle = 'cyan';
+        ctx.fill();
+        ctx.strokeStyle = 'white';
+        ctx.stroke();
+      }
+      resetPosition(canvasWidth, canvasHeight) {
+        this.position.x = Math.random() * (canvasWidth - 2 * this.radius) + this.radius;
+        this.position.y = Math.random() * (canvasHeight / 2);
+        this.velocity.x = (Math.random() - 0.5) * 200;
+        this.velocity.y = (Math.random() - 0.5) * 200;
+        this.acceleration.x = 0;
+        this.acceleration.y = 0;
+      }
+    }
+
+    function degToRad(deg) {
+      return deg * Math.PI / 180;
+    }
+
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+
+    const gravityMagnitude = 980;
+    let gravity = new Vector2(0, gravityMagnitude);
+
+    const objects = [];
+
+    // Initialize with 5 balls
+    const initialBallCount = 5;
+    for (let i = 0; i < initialBallCount; i++) {
+      objects.push(createRandomBall());
+    }
+
+    let lastTime = null;
+    let draggedObject = null;
+    let dragOffset = new Vector2();
+
+    function createRandomBall() {
+      const radius = 20;
+      const mass = radius;
+      const position = new Vector2(
+        Math.random() * (canvas.width - 2 * radius) + radius,
+        Math.random() * (canvas.height / 2)
+      );
+      const velocity = new Vector2(
+        (Math.random() - 0.5) * 200,
+        (Math.random() - 0.5) * 200
+      );
+      const acceleration = new Vector2(0, 0);
+      return new PhysicsObject(position, velocity, acceleration, radius, mass);
+    }
+
+    function updateBallCount() {
+      const count = objects.length;
+      document.getElementById('ballCount').textContent = `Balls: ${count}`;
+    }
+    updateBallCount();
+
+    function getMousePos(evt) {
+      const rect = canvas.getBoundingClientRect();
+      return new Vector2(
+        evt.clientX - rect.left,
+        evt.clientY - rect.top
+      );
+    }
+
+    function isMouseOnBall(mousePos, ball) {
+      const distX = mousePos.x - ball.position.x;
+      const distY = mousePos.y - ball.position.y;
+      return distX * distX + distY * distY <= ball.radius * ball.radius;
+    }
+
+    canvas.addEventListener('mousedown', (evt) => {
+      const mousePos = getMousePos(evt);
+      for (let i = objects.length - 1; i >= 0; i--) {
+        const ball = objects[i];
+        if (isMouseOnBall(mousePos, ball)) {
+          draggedObject = ball;
+          dragOffset.x = mousePos.x - ball.position.x;
+          dragOffset.y = mousePos.y - ball.position.y;
+          draggedObject.velocity.x = 0;
+          draggedObject.velocity.y = 0;
+          break;
+        }
+      }
+    });
+
+    canvas.addEventListener('mousemove', (evt) => {
+      if (draggedObject) {
+        const mousePos = getMousePos(evt);
+        draggedObject.position.x = mousePos.x - dragOffset.x;
+        draggedObject.position.y = mousePos.y - dragOffset.y;
+        draggedObject.acceleration.multiplyScalar(0);
+      }
+    });
+
+    canvas.addEventListener('mouseup', () => {
+      draggedObject = null;
+    });
+
+    canvas.addEventListener('mouseleave', () => {
+      draggedObject = null;
+    });
+
+    canvas.addEventListener('touchstart', (evt) => {
+      evt.preventDefault();
+      if (evt.touches.length === 1) {
+        const touch = evt.touches[0];
+        const touchPos = getMousePos(touch);
+        for (let i = objects.length - 1; i >= 0; i--) {
+          const ball = objects[i];
+          if (isMouseOnBall(touchPos, ball)) {
+            draggedObject = ball;
+            dragOffset.x = touchPos.x - ball.position.x;
+            dragOffset.y = touchPos.y - ball.position.y;
+            draggedObject.velocity.x = 0;
+            draggedObject.velocity.y = 0;
+            break;
+          }
+        }
+      }
+    }, { passive: false });
+
+    canvas.addEventListener('touchmove', (evt) => {
+      evt.preventDefault();
+      if (draggedObject && evt.touches.length === 1) {
+        const touch = evt.touches[0];
+        const touchPos = getMousePos(touch);
+        draggedObject.position.x = touchPos.x - dragOffset.x;
+        draggedObject.position.y = touchPos.y - dragOffset.y;
+        draggedObject.acceleration.multiplyScalar(0);
+      }
+    }, { passive: false });
+
+    canvas.addEventListener('touchend', (evt) => {
+      evt.preventDefault();
+      draggedObject = null;
+    });
+
+    // Sliders and values
+    const tiltSlider = document.getElementById('tiltSlider');
+    const angleValue = document.getElementById('angleValue');
+    const restitutionSlider = document.getElementById('restitutionSlider');
+    const restitutionValue = document.getElementById('restitutionValue');
+
+    // Restitution coefficient (bounciness), default 0.7
+    let restitution = parseFloat(restitutionSlider.value);
+
+    tiltSlider.addEventListener('input', () => {
+      const angleDeg = Number(tiltSlider.value);
+      angleValue.textContent = angleDeg + '°';
+
+      const angleRad = degToRad(angleDeg);
+      gravity.x = gravityMagnitude * Math.sin(angleRad);
+      gravity.y = gravityMagnitude * Math.cos(angleRad);
+    });
+
+    restitutionSlider.addEventListener('input', () => {
+      restitution = parseFloat(restitutionSlider.value);
+      restitutionValue.textContent = restitution.toFixed(2);
+    });
+
+    // Initialize slider displays and gravity vector
+    angleValue.textContent = tiltSlider.value + '°';
+    restitutionValue.textContent = restitutionSlider.value;
+
+    {
+      const initialAngleRad = degToRad(Number(tiltSlider.value));
+      gravity.x = gravityMagnitude * Math.sin(initialAngleRad);
+      gravity.y = gravityMagnitude * Math.cos(initialAngleRad);
+    }
+
+    // Buttons
+    const resetBtn = document.getElementById('resetBtn');
+    const addBallBtn = document.getElementById('addBallBtn');
+    const removeBallBtn = document.getElementById('removeBallBtn');
+
+    resetBtn.addEventListener('click', () => {
+      objects.forEach(ball => ball.resetPosition(canvas.width, canvas.height));
+    });
+
+    addBallBtn.addEventListener('click', () => {
+      if (objects.length < 50) {
+        objects.push(createRandomBall());
+        updateBallCount();
+      }
+    });
+
+    removeBallBtn.addEventListener('click', () => {
+      if (objects.length > 0) {
+        objects.pop();
+        updateBallCount();
+      }
+    });
+
+    function update(time) {
+      if (!lastTime) lastTime = time;
+      const deltaTime = (time - lastTime) / 1000;
+      lastTime = time;
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      objects.forEach(obj => {
+        if (obj !== draggedObject) {
+          obj.applyForce(gravity.clone().multiplyScalar(obj.mass));
+          obj.update(deltaTime);
+
+          // Bounce with restitution controlling energy loss
+          if (obj.position.y + obj.radius > canvas.height) {
+            obj.position.y = canvas.height - obj.radius;
+            obj.velocity.y *= -restitution;
+          }
+          if (obj.position.y - obj.radius < 0) {
+            obj.position.y = obj.radius;
+            obj.velocity.y *= -restitution;
+          }
+          if (obj.position.x + obj.radius > canvas.width) {
+            obj.position.x = canvas.width - obj.radius;
+            obj.velocity.x *= -restitution;
+          }
+          if (obj.position.x - obj.radius < 0) {
+            obj.position.x = obj.radius;
+            obj.velocity.x *= -restitution;
+          }
+        }
+        obj.draw(ctx);
+      });
+
+      requestAnimationFrame(update);
+    }
+
+    updateBallCount();
+    requestAnimationFrame(update);
+  </script>
+
+</body>
+</html>

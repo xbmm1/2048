@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Interactive RSA Demo with Explanations</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    margin: 2em;
+    background: #f9f9f9;
+    color: #222;
+    max-width: 900px;
+  }
+  h1 {
+    color: #003366;
+    margin-bottom: 0.5em;
+  }
+  label {
+    font-weight: bold;
+    margin-top: 1em;
+    display: block;
+  }
+  input[type="text"] {
+    padding: 0.5em;
+    font-size: 1em;
+    width: 100%;
+    max-width: 400px;
+    box-sizing: border-box;
+  }
+  button {
+    background: #007bff;
+    border: none;
+    color: white;
+    padding: 0.6em 1em;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 1em;
+    margin: 0.5em 0;
+  }
+  button:disabled {
+    background: #ccc;
+    cursor: default;
+  }
+  .output {
+    background: white;
+    border-radius: 6px;
+    padding: 1em;
+    margin-top: 1em;
+    box-shadow: 0 0 8px rgba(0,0,0,0.1);
+    font-family: monospace;
+    white-space: pre-wrap;
+    min-height: 180px;
+    overflow-y: auto;
+  }
+  .section {
+    border-left: 5px solid #007bff;
+    padding-left: 1em;
+    margin-top: 1.5em;
+  }
+  .highlight {
+    color: #007bff;
+    font-weight: bold;
+  }
+</style>
+</head>
+<body>
+
+<h1>Interactive RSA Encryption / Decryption Demo</h1>
+
+<label for="messageInput">Enter your message:</label>
+<input type="text" id="messageInput" value="HELLO" />
+
+<button id="generateKeysBtn">Generate RSA Keys</button>
+<button id="encryptBtn" disabled>Encrypt Message (Step-by-Step for 1st Char)</button>
+<button id="decryptBtn" disabled>Decrypt Message (Step-by-Step for 1st Char)</button>
+
+<div id="keysOutput" class="output section"></div>
+<div id="asciiOutput" class="output section"></div>
+<div id="modExpStepsOutput" class="output section"></div>
+<div id="encryptedOutput" class="output section"></div>
+<div id="modExpDecryptStepsOutput" class="output section"></div>
+<div id="decryptedOutput" class="output section"></div>
+
+<script>
+// Utility: Compute gcd & Extended Euclidean Algorithm
+function egcd(a, b) {
+  if (b === 0) return [a, 1, 0];
+  const [g, x1, y1] = egcd(b, a % b);
+  return [g, y1, x1 - Math.floor(a / b) * y1];
+}
+
+// Modular inverse
+function modInverse(e, phi) {
+  const [g, x] = egcd(e, phi);
+  if (g !== 1) throw 'No modular inverse';
+  return (x % phi + phi) % phi;
+}
+
+// Check prime (simple)
+function isPrime(n) {
+  if (n < 2) return false;
+  for (let i = 2; i * i <= n; i++)
+    if (n % i === 0) return false;
+  return true;
+}
+
+// Generate small prime (for demo)
+function generatePrime(min = 50, max = 150) {
+  let p;
+  do {
+    p = Math.floor(Math.random() * (max - min)) + min;
+  } while (!isPrime(p));
+  return p;
+}
+
+// Sleep helper for animation delays
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// Square-and-multiply modular exponentiation with detailed step descriptions
+async function modPowWithSteps(base, exponent, modulus, outputElement) {
+  let result = 1n;
+  let b = BigInt(base) % BigInt(modulus);
+  let e = BigInt(exponent);
+  const m = BigInt(modulus);
+
+  outputElement.textContent = `Starting modular exponentiation:\nBase (m) = ${b}\nExponent (e) = ${e}\nModulus (n) = ${m}\n\n`;
+
+  const binaryExp = e.toString(2);
+  outputElement.textContent += `Exponent in binary: ${binaryExp}\n\n`;
+
+  outputElement.textContent += `Initialize result = 1\n\n`;
+
+  for (let i = 0; i < binaryExp.length; i++) {
+    const bit = binaryExp[i];
+    outputElement.textContent += `Step ${i + 1}: Processing bit '${bit}' (bit position ${i + 1} from left)\n`;
+
+    // Square the current result
+    result = (result * result) % m;
+    outputElement.textContent += `  Square result: result = (result * result) mod ${m} = ${result}\n`;
+
+    await sleep(1000);
+
+    if (bit === '1') {
+      // Multiply by base if bit is 1
+      result = (result * b) % m;
+      outputElement.textContent += `  Bit is 1 → Multiply by base: result = (result * ${b}) mod ${m} = ${result}\n`;
+    } else {
+      outputElement.textContent += `  Bit is 0 → Skip multiplication, carry result as is\n`;
+    }
+
+    outputElement.textContent += `\n`;
+    await sleep(1200);
+  }
+
+  outputElement.textContent += `Final modular exponentiation result = ${result}\n`;
+  return result;
+}
+
+// Globals
+let n, e, d;
+let encryptedMessage = [];
+let message = "";
+
+const generateKeysBtn = document.getElementById('generateKeysBtn');
+const encryptBtn = document.getElementById('encryptBtn');
+const decryptBtn = document.getElementById('decryptBtn');
+const keysOutput = document.getElementById('keysOutput');
+const asciiOutput = document.getElementById('asciiOutput');
+const modExpStepsOutput = document.getElementById('modExpStepsOutput');
+const encryptedOutput = document.getElementById('encryptedOutput');
+const modExpDecryptStepsOutput = document.getElementById('modExpDecryptStepsOutput');
+const decryptedOutput = document.getElementById('decryptedOutput');
+const messageInput = document.getElementById('messageInput');
+
+function generateKeys() {
+  message = messageInput.value || "HELLO";
+
+  const p = generatePrime();
+  const q = generatePrime();
+  n = p * q;
+  const phi = (p - 1) * (q - 1);
+  e = 65537;
+  // Ensure gcd(e, phi) = 1
+  function gcd(a, b) { return b === 0 ? a : gcd(b, a % b); }
+  if (gcd(e, phi) !== 1) {
+    e = 3;
+    while (gcd(e, phi) !== 1) e += 2;
+  }
+  d = modInverse(e, phi);
+
+  keysOutput.textContent =
+    `--- Key Generation ---\n` +
+    `Randomly selected primes:\n` +
+    `p = ${p}\nq = ${q}\n\n` +
+    `Calculate modulus (n = p × q):\n` +
+    `n = ${n}\n\n` +
+    `Calculate Euler's Totient (φ(n) = (p-1)(q-1)):\n` +
+    `φ(n) = ${phi}\n\n` +
+    `Choose public exponent e (coprime with φ(n)):\n` +
+    `e = ${e}\n\n` +
+    `Calculate private exponent d (modular inverse of e mod φ(n)):\n` +
+    `d = ${d}\n\n` +
+    `Public Key: (n, e) = (${n}, ${e})\n` +
+    `Private Key: (n, d) = (${n}, ${d})`;
+
+  asciiOutput.textContent = "";
+  modExpStepsOutput.textContent = "";
+  encryptedOutput.textContent = "";
+  modExpDecryptStepsOutput.textContent = "";
+  decryptedOutput.textContent = "";
+  encryptedMessage = [];
+  encryptBtn.disabled = false;
+  decryptBtn.disabled = true;
+}
+
+async function encryptMessage() {
+  asciiOutput.textContent =
+    `--- Message Conversion ---\n` +
+    `Each character is converted to its ASCII code:\n`;
+  encryptedOutput.textContent = "--- Encryption ---\nEncrypted numeric values:\n";
+  modExpStepsOutput.textContent = "";
+  encryptedMessage = [];
+
+  for (let i = 0; i < message.length; i++) {
+    const char = message[i];
+    const code = char.charCodeAt(0);
+    asciiOutput.textContent += `  '${char}' -> ${code}\n`;
+
+    if (i === 0) {
+      modExpStepsOutput.textContent =
+        "--- Modular Exponentiation Steps for first character ---\n" +
+        `Encrypting ASCII code of '${char}' (${code}) using:\n` +
+        `ciphertext = ${code}^${e} mod ${n}\n\n`;
+      const result = await modPowWithSteps(code, e, n, modExpStepsOutput);
+      encryptedMessage.push(result);
+      encryptedOutput.textContent += `  ${result.toString()} `;
+    } else {
+      // For other chars, encrypt directly without showing steps
+      let result = 1n;
+      let b = BigInt(code) % BigInt(n);
+      let exp = BigInt(e);
+      const m = BigInt(n);
+      while (exp > 0) {
+        if (exp % 2n === 1n) result = (result * b) % m;
+        exp = exp / 2n;
+        b = (b * b) % m;
+      }
+      encryptedMessage.push(result);
+      encryptedOutput.textContent += `  ${result.toString()} `;
+    }
+  }
+  decryptBtn.disabled = false;
+}
+
+async function decryptMessage() {
+  modExpDecryptStepsOutput.textContent = "--- Decryption Steps for first character ---\n";
+  decryptedOutput.textContent =
+    "--- Decryption ---\n" +
+    "Each encrypted number is decrypted back to ASCII code and character:\n";
+  let decryptedStr = "";
+
+  for (let i = 0; i < encryptedMessage.length; i++) {
+    const c = encryptedMessage[i];
+
+    if (i === 0) {
+      // Show detailed decryption steps for first character
+      modExpDecryptStepsOutput.textContent += `Decrypting ciphertext ${c} using:\nplaintext = ${c}^${d} mod ${n}\n\n`;
+      const result = await modPowWithSteps(c, d, n, modExpDecryptStepsOutput);
+      decryptedOutput.textContent += `  ${result.toString()} -> '${String.fromCharCode(Number(result))}'\n`;
+      decryptedStr += String.fromCharCode(Number(result));
+    } else {
+      // For others decrypt without showing steps
+      let result = 1n;
+      let b = BigInt(c) % BigInt(n);
+      let exp = BigInt(d);
+      const m = BigInt(n);
+      while (exp > 0) {
+        if (exp % 2n === 1n) result = (result * b) % m;
+        exp = exp / 2n;
+        b = (b * b) % m;
+      }
+      decryptedOutput.textContent += `  ${result.toString()} -> '${String.fromCharCode(Number(result))}'\n`;
+      decryptedStr += String.fromCharCode(Number(result));
+    }
+  }
+  decryptedOutput.textContent += `\nDecrypted Message: "${decryptedStr}"`;
+}
+
+generateKeysBtn.addEventListener('click', generateKeys);
+encryptBtn.addEventListener('click', encryptMessage);
+decryptBtn.addEventListener('click', decryptMessage);
+</script>
+
+</body>
+</html>

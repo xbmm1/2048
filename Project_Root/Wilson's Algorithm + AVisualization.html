@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Wilson's Maze Single Path A*</title>
+<style>
+  body {
+    font-family: monospace;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin: 20px;
+  }
+  canvas {
+    border: 2px solid #333;
+    image-rendering: pixelated;
+  }
+  #info {
+    margin: 10px;
+  }
+</style>
+</head>
+<body>
+
+<h1>Wilson's Algorithm Maze + A* Pathfinding</h1>
+<canvas id="mazeCanvas" width="400" height="400"></canvas>
+<br />
+<button id="generateBtn">Generate Maze (Wilson's Algorithm)</button>
+<button id="pathfindBtn">Find Path (A*)</button>
+
+<script>
+(() => {
+  const canvas = document.getElementById('mazeCanvas');
+  const ctx = canvas.getContext('2d');
+  const width = 20;   // number of cells horizontally
+  const height = 20;  // number of cells vertically
+  const cellSize = canvas.width / width;
+
+  // Maze representation:
+  // Each cell stores info about which walls are present:
+  // walls: { top, right, bottom, left } - true means wall is present.
+  // We'll store walls as bit flags for efficiency:
+  // 1 = top, 2 = right, 4 = bottom, 8 = left
+  // Initially all walls are present (1+2+4+8 = 15)
+  const WALL_TOP = 1;
+  const WALL_RIGHT = 2;
+  const WALL_BOTTOM = 4;
+  const WALL_LEFT = 8;
+  const ALL_WALLS = WALL_TOP | WALL_RIGHT | WALL_BOTTOM | WALL_LEFT;
+
+  let maze = []; // 2D array of cells
+
+  // Initialize maze cells with all walls
+  function initMaze() {
+    maze = [];
+    for(let y=0; y<height; y++) {
+      let row = [];
+      for(let x=0; x<width; x++) {
+        row.push(ALL_WALLS);
+      }
+      maze.push(row);
+    }
+  }
+
+  // Draw maze on canvas
+  function drawMaze(path = []) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 2;
+
+    // Draw walls
+    for(let y=0; y<height; y++) {
+      for(let x=0; x<width; x++) {
+        const cell = maze[y][x];
+        const px = x * cellSize;
+        const py = y * cellSize;
+
+        // top wall
+        if(cell & WALL_TOP) {
+          ctx.beginPath();
+          ctx.moveTo(px, py);
+          ctx.lineTo(px + cellSize, py);
+          ctx.stroke();
+        }
+        // right wall
+        if(cell & WALL_RIGHT) {
+          ctx.beginPath();
+          ctx.moveTo(px + cellSize, py);
+          ctx.lineTo(px + cellSize, py + cellSize);
+          ctx.stroke();
+        }
+        // bottom wall
+        if(cell & WALL_BOTTOM) {
+          ctx.beginPath();
+          ctx.moveTo(px + cellSize, py + cellSize);
+          ctx.lineTo(px, py + cellSize);
+          ctx.stroke();
+        }
+        // left wall
+        if(cell & WALL_LEFT) {
+          ctx.beginPath();
+          ctx.moveTo(px, py + cellSize);
+          ctx.lineTo(px, py);
+          ctx.stroke();
+        }
+      }
+    }
+
+    // Draw start and goal cells
+    ctx.fillStyle = 'green';
+    ctx.fillRect(2, 2, cellSize - 4, cellSize - 4);
+    ctx.fillStyle = 'red';
+    ctx.fillRect((width-1)*cellSize + 2, (height-1)*cellSize + 2, cellSize - 4, cellSize - 4);
+
+    // Draw path if provided
+    if(path.length > 0) {
+      ctx.strokeStyle = 'blue';
+      ctx.lineWidth = cellSize / 3;
+      ctx.beginPath();
+      const first = path[0];
+      ctx.moveTo(first.x * cellSize + cellSize/2, first.y * cellSize + cellSize/2);
+      for(let i=1; i<path.length; i++) {
+        ctx.lineTo(path[i].x * cellSize + cellSize/2, path[i].y * cellSize + cellSize/2);
+      }
+      ctx.stroke();
+    }
+  }
+
+  // Wilson's algorithm for maze generation
+  // Reference: https://en.wikipedia.org/wiki/Maze_generation_algorithm#Wilson's_algorithm
+  function generateMazeWilson() {
+    // Set of cells in the maze
+    const inMaze = new Set();
+
+    // Helper to get cell key string
+    function cellKey(x, y) { return `${x},${y}`; }
+
+    // Add a random cell to start the maze
+    const startX = Math.floor(Math.random() * width);
+    const startY = Math.floor(Math.random() * height);
+    inMaze.add(cellKey(startX, startY));
+
+    // Directions for neighbors and corresponding walls
+    const directions = [
+      { dx: 0, dy: -1, wall: WALL_TOP, opposite: WALL_BOTTOM },
+      { dx: 1, dy: 0, wall: WALL_RIGHT, opposite: WALL_LEFT },
+      { dx: 0, dy: 1, wall: WALL_BOTTOM, opposite: WALL_TOP },
+      { dx: -1, dy: 0, wall: WALL_LEFT, opposite: WALL_RIGHT }
+    ];
+
+    while(inMaze.size < width * height) {
+      // Pick a random cell NOT in the maze to start a random walk
+      let walkX, walkY;
+      do {
+        walkX = Math.floor(Math.random() * width);
+        walkY = Math.floor(Math.random() * height);
+      } while(inMaze.has(cellKey(walkX, walkY)));
+
+      let path = [{x: walkX, y: walkY}];
+      let pathSet = new Set([cellKey(walkX, walkY)]);
+
+      // Random walk until hitting a cell in the maze
+      while(!inMaze.has(cellKey(walkX, walkY))) {
+        // Choose a random neighbor
+        const neighbors = directions.filter(d => {
+          const nx = walkX + d.dx;
+          const ny = walkY + d.dy;
+          return nx >= 0 && nx < width && ny >= 0 && ny < height;
+        });
+
+        const next = neighbors[Math.floor(Math.random() * neighbors.length)];
+        walkX += next.dx;
+        walkY += next.dy;
+
+        const key = cellKey(walkX, walkY);
+        if(pathSet.has(key)) {
+          // Loop detected - erase loop
+          let loopStart = path.findIndex(c => c.x === walkX && c.y === walkY);
+          path = path.slice(0, loopStart + 1);
+          pathSet = new Set(path.map(c => cellKey(c.x, c.y)));
+        } else {
+          path.push({x: walkX, y: walkY});
+          pathSet.add(key);
+        }
+      }
+
+      // Carve path into maze
+      for(let i=0; i<path.length-1; i++) {
+        const c1 = path[i];
+        const c2 = path[i+1];
+
+        // Remove wall between c1 and c2
+        const dx = c2.x - c1.x;
+        const dy = c2.y - c1.y;
+
+        let dir = directions.find(d => d.dx === dx && d.dy === dy);
+        if(dir) {
+          maze[c1.y][c1.x] &= ~dir.wall;
+          maze[c2.y][c2.x] &= ~dir.opposite;
+        }
+        inMaze.add(cellKey(c1.x, c1.y));
+      }
+      // Also add the last cell in path to inMaze
+      inMaze.add(cellKey(path[path.length-1].x, path[path.length-1].y));
+    }
+  }
+
+  // A* Pathfinding on maze grid
+  // Returns array of cells from start to goal or empty if no path
+  function astar(start, goal) {
+    // Each node: {x, y, g, h, f, parent}
+    function heuristic(a, b) {
+      // Manhattan distance
+      return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
+    }
+
+    const openSet = [];
+    const closedSet = new Set();
+
+    function nodeKey(n) { return `${n.x},${n.y}`; }
+
+    const startNode = {x: start.x, y: start.y, g: 0, h: heuristic(start, goal)};
+    startNode.f = startNode.g + startNode.h;
+    openSet.push(startNode);
+
+    const directions = [
+      { dx: 0, dy: -1, wall: WALL_TOP, opposite: WALL_BOTTOM },
+      { dx: 1, dy: 0, wall: WALL_RIGHT, opposite: WALL_LEFT },
+      { dx: 0, dy: 1, wall: WALL_BOTTOM, opposite: WALL_TOP },
+      { dx: -1, dy: 0, wall: WALL_LEFT, opposite: WALL_RIGHT }
+    ];
+
+    while(openSet.length > 0) {
+      // Get node with lowest f
+      openSet.sort((a,b) => a.f - b.f);
+      const current = openSet.shift();
+      if(current.x === goal.x && current.y === goal.y) {
+        // Reconstruct path
+        const path = [];
+        let curr = current;
+        while(curr) {
+          path.push({x: curr.x, y: curr.y});
+          curr = curr.parent;
+        }
+        return path.reverse();
+      }
+
+      closedSet.add(nodeKey(current));
+
+      // Explore neighbors accessible (no wall)
+      for(const d of directions) {
+        const nx = current.x + d.dx;
+        const ny = current.y + d.dy;
+        if(nx < 0 || nx >= width || ny < 0 || ny >= height) continue;
+
+        // Check if wall between current and neighbor exists
+        // If there is a wall on current cell side, cannot go that way
+        if(maze[current.y][current.x] & d.wall) continue;
+
+        const neighborKey = `${nx},${ny}`;
+        if(closedSet.has(neighborKey)) continue;
+
+        const gScore = current.g + 1;
+        // Check if neighbor is in openSet
+        let neighbor = openSet.find(n => n.x === nx && n.y === ny);
+        if(!neighbor) {
+          neighbor = {x: nx, y: ny};
+          openSet.push(neighbor);
+        } else if(gScore >= neighbor.g) {
+          continue;
+        }
+
+        neighbor.g = gScore;
+        neighbor.h = heuristic(neighbor, goal);
+        neighbor.f = neighbor.g + neighbor.h;
+        neighbor.parent = current;
+      }
+    }
+
+    // No path found
+    return [];
+  }
+
+  // Initial setup
+  function setup() {
+    initMaze();
+    generateMazeWilson();
+    drawMaze();
+  }
+
+  document.getElementById('generateBtn').onclick = () => {
+    setup();
+  };
+
+  document.getElementById('pathfindBtn').onclick = () => {
+    const start = {x: 0, y: 0};
+    const goal = {x: width - 1, y: height - 1};
+    const path = astar(start, goal);
+    drawMaze(path);
+    if(path.length === 0) {
+      alert('No path found!');
+    }
+  };
+
+  // Generate maze on load
+  setup();
+})();
+</script>
+
+  <h1>Understanding Wilson's Algorithm and A* Search</h1>
+
+  <div class="section">
+    <h2>Wilson's Algorithm: Generating Uniform Mazes</h2>
+    <p>
+      Wilson's algorithm is a method for generating a <strong>uniform spanning tree</strong> of a graph.
+      When applied to grid graphs, it produces <em>perfect mazes</em>—mazes without loops,
+      where there is exactly one unique path between any two points.
+    </p>
+
+    <h3>How Wilson's Algorithm Works</h3>
+    <ol>
+      <li><strong>Initialize</strong>: Start with all cells considered unvisited (or walls).</li>
+      <li><strong>Seed the maze</strong>: Pick a random cell and mark it as part of the maze.</li>
+      <li><strong>Loop until all cells are included</strong>:
+        <ul>
+          <li>Pick a random unvisited cell and perform a random walk from it.</li>
+          <li>During the walk, if a cell is revisited, erase the loop formed (loop-erased random walk).</li>
+          <li>The walk continues until it reaches a cell already in the maze.</li>
+          <li>Add the entire loop-erased path to the maze, marking these cells as visited.</li>
+        </ul>
+      </li>
+    </ol>
+
+    <h3>Why Use Wilson’s Algorithm?</h3>
+    <ul>
+      <li><strong>Uniform randomness:</strong> Every possible maze (spanning tree) is equally likely.</li>
+      <li><strong>Perfect mazes:</strong> No cycles, so exactly one solution between any two points.</li>
+      <li><strong>Applications:</strong> Maze generation for games, procedural content, robotics path planning.</li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <h2>A* Search Algorithm: Efficient Pathfinding</h2>
+    <p>
+      The A* (A-star) algorithm is a widely used pathfinding and graph traversal algorithm.
+      It finds the shortest path between a start node and a goal node efficiently by combining:
+    </p>
+    <ul>
+      <li><strong>Actual cost</strong> from start to a node (<code>g(n)</code>).</li>
+      <li><strong>Heuristic estimate</strong> of cost from the node to the goal (<code>h(n)</code>).</li>
+    </ul>
+
+    <h3>How A* Works</h3>
+    <ol>
+      <li>Initialize an open set with the start node.</li>
+      <li>Loop:
+        <ul>
+          <li>Select the node with the lowest <code>f(n) = g(n) + h(n)</code> from the open set.</li>
+          <li>If this node is the goal, reconstruct and return the path.</li>
+          <li>Otherwise, explore its neighbors:
+            <ul>
+              <li>Calculate tentative <code>g</code> scores.</li>
+              <li>Update neighbor nodes if a better path is found.</li>
+              <li>Add neighbors to the open set as needed.</li>
+            </ul>
+          </li>
+          <li>Repeat until path found or no nodes left.</li>
+        </ul>
+      </li>
+    </ol>
+
+    <h3>Why Use A*?</h3>
+    <ul>
+      <li><strong>Optimality:</strong> Guarantees shortest path if heuristic is admissible (never overestimates).</li>
+      <li><strong>Efficiency:</strong> Uses heuristics to focus search, reducing exploration.</li>
+      <li><strong>Applications:</strong> Robotics navigation, game AI, GPS routing, network routing.</li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <h2>Summary and Real-World Uses</h2>
+    <p>
+      Both Wilson’s algorithm and A* play important roles in modern computing:
+    </p>
+    <ul>
+      <li><strong>Wilson’s Algorithm</strong> generates mazes and network spanning trees with uniform randomness, useful in procedural generation and simulations.</li>
+      <li><strong>A* Algorithm</strong> efficiently finds shortest paths in complex environments, crucial for navigation systems, robotics, and game development.</li>
+    </ul>
+    <p>
+      Their combination is common in games and simulations where a maze or map is generated first (Wilson’s algorithm) and then pathfinding is done on that maze (A*) to find routes or solve puzzles.
+    </p>
+  </div>
+
+</body>
+</html>

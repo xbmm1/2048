@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>RSA Modular Arithmetic Visualization</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    margin: 2em;
+    background: #f0f4f8;
+  }
+  h1 {
+    color: #222;
+  }
+  label {
+    font-weight: bold;
+    margin-top: 1em;
+    display: block;
+  }
+  input, button {
+    font-size: 1em;
+    padding: 0.4em;
+    margin-top: 0.3em;
+    width: 100%;
+    max-width: 200px;
+    box-sizing: border-box;
+  }
+  button {
+    margin-top: 1em;
+    cursor: pointer;
+    background: #007bff;
+    color: white;
+    border: none;
+    border-radius: 3px;
+  }
+  button:hover {
+    background: #0056b3;
+  }
+  .output {
+    margin-top: 1.5em;
+    padding: 1em;
+    background: white;
+    border-radius: 5px;
+    font-family: monospace;
+    white-space: pre-wrap;
+    max-width: 600px;
+  }
+  .step {
+    margin-bottom: 1em;
+  }
+</style>
+</head>
+<body>
+
+<h1>RSA Encryption/Decryption Visualization</h1>
+
+<label>Enter a message number (0 - 54):</label>
+<input type="number" id="messageInput" min="0" max="54" value="7" />
+
+<button onclick="startRSA()">Start RSA Process</button>
+
+<div id="output" class="output"></div>
+
+<script>
+// Modular exponentiation function (fast power)
+function modPow(base, exponent, modulus) {
+  let result = 1;
+  base = base % modulus;
+  while (exponent > 0) {
+    if (exponent % 2 === 1) {
+      result = (result * base) % modulus;
+    }
+    exponent = Math.floor(exponent / 2);
+    base = (base * base) % modulus;
+  }
+  return result;
+}
+
+// Extended Euclidean Algorithm for modular inverse
+function egcd(a, b) {
+  if (b === 0) return [a, 1, 0];
+  let [g, x1, y1] = egcd(b, a % b);
+  let x = y1;
+  let y = x1 - Math.floor(a / b) * y1;
+  return [g, x, y];
+}
+
+function modInverse(e, phi) {
+  const [g, x] = egcd(e, phi);
+  if (g !== 1) return null;
+  return (x % phi + phi) % phi;
+}
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// RSA parameters (small for demo)
+const p = 5;
+const q = 11;
+const n = p * q;
+const phi = (p - 1) * (q - 1);
+const e = 3;
+const d = modInverse(e, phi);
+
+const outputDiv = document.getElementById('output');
+
+async function startRSA() {
+  outputDiv.innerHTML = '';
+  let m = parseInt(document.getElementById('messageInput').value);
+  if (isNaN(m) || m < 0 || m >= n) {
+    outputDiv.innerHTML = 'Please enter a valid message number between 0 and ' + (n - 1);
+    return;
+  }
+
+  // Show keys
+  outputDiv.innerHTML += `<div class="step"><b>Step 1:</b> Primes chosen: p = ${p}, q = ${q}</div>`;
+  await sleep(1500);
+  outputDiv.innerHTML += `<div class="step"><b>Step 2:</b> Compute n = p × q = ${n}</div>`;
+  await sleep(1500);
+  outputDiv.innerHTML += `<div class="step"><b>Step 3:</b> Compute φ(n) = (p-1)(q-1) = ${phi}</div>`;
+  await sleep(1500);
+  outputDiv.innerHTML += `<div class="step"><b>Step 4:</b> Choose public exponent e = ${e}</div>`;
+  await sleep(1500);
+  outputDiv.innerHTML += `<div class="step"><b>Step 5:</b> Compute private key d such that d × e ≡ 1 mod φ(n)</div>`;
+  await sleep(1500);
+  outputDiv.innerHTML += `<div class="step">Calculated d = ${d}</div>`;
+  await sleep(1500);
+  outputDiv.innerHTML += `<div class="step"><b>Step 6:</b> Public key (n, e) = (${n}, ${e})</div>`;
+  outputDiv.innerHTML += `<div class="step">Private key (n, d) = (${n}, ${d})</div>`;
+  await sleep(2000);
+
+  // Encryption
+  outputDiv.innerHTML += `<div class="step"><b>Step 7:</b> Encrypt message m = ${m}</div>`;
+  await sleep(1500);
+  const c = modPow(m, e, n);
+  outputDiv.innerHTML += `<div class="step">Ciphertext c = m^e mod n = ${m}^${e} mod ${n} = ${c}</div>`;
+  await sleep(2000);
+
+  // Decryption with explanation
+  outputDiv.innerHTML += `<div class="step"><b>Step 8:</b> Decrypt ciphertext c = ${c}</div>`;
+  await sleep(1500);
+
+  outputDiv.innerHTML += `<div class="step">Calculate m = c^d mod n = ${c}^${d} mod ${n}</div>`;
+  await sleep(2000);
+
+  // Show modular exponentiation steps (simplified)
+  let steps = [];
+  function modPowSteps(base, exponent, modulus) {
+    let result = 1;
+    base = base % modulus;
+    while (exponent > 0) {
+      if (exponent % 2 === 1) {
+        result = (result * base) % modulus;
+        steps.push(`Multiply result by base: result = ${result}`);
+      }
+      exponent = Math.floor(exponent / 2);
+      base = (base * base) % modulus;
+      steps.push(`Square base: base = ${base}, exponent now = ${exponent}`);
+    }
+    return result;
+  }
+  steps = [];
+  const decrypted = modPowSteps(c, d, n);
+
+  for (let step of steps) {
+    outputDiv.innerHTML += `<div class="step">${step}</div>`;
+    await sleep(1000);
+  }
+
+  outputDiv.innerHTML += `<div class="step"><b>Decrypted message m = ${decrypted}</b></div>`;
+
+  if (decrypted === m) {
+    outputDiv.innerHTML += `<div class="step" style="color:green;"><b>Success! The decrypted message matches the original.</b></div>`;
+  } else {
+    outputDiv.innerHTML += `<div class="step" style="color:red;"><b>Error: Decrypted message does not match original.</b></div>`;
+  }
+}
+</script>
+
+</body>
+</html>

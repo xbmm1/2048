@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Fractal Example</title>
+  <style>
+    body { text-align: center; }
+    canvas { border: 1px solid black; }
+  </style>
+</head>
+<body>
+  <h1>Fractal Visual with JavaScript</h1>
+  <canvas id="fractalCanvas" width="600" height="600"></canvas>
+
+  <script>
+	// fractal.js
+
+const canvas = document.getElementById('fractalCanvas');
+const ctx = canvas.getContext('2d');
+
+// Function to draw a filled triangle given three points
+function drawTriangle(p1, p2, p3, color) {
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(p1.x, p1.y);
+  ctx.lineTo(p2.x, p2.y);
+  ctx.lineTo(p3.x, p3.y);
+  ctx.closePath();
+  ctx.fill();
+}
+
+// Recursive function to draw the Sierpinski triangle
+function sierpinski(p1, p2, p3, depth) {
+  if (depth === 0) {
+    drawTriangle(p1, p2, p3, 'black');
+    return;
+  }
+
+  // Calculate midpoints of each side
+  const mid12 = { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
+  const mid23 = { x: (p2.x + p3.x) / 2, y: (p2.y + p3.y) / 2 };
+  const mid31 = { x: (p3.x + p1.x) / 2, y: (p3.y + p1.y) / 2 };
+
+  // Recursively draw smaller triangles
+  sierpinski(p1, mid12, mid31, depth - 1);
+  sierpinski(mid12, p2, mid23, depth - 1);
+  sierpinski(mid31, mid23, p3, depth - 1);
+}
+
+// Initial triangle vertices
+const p1 = { x: 300, y: 50 };
+const p2 = { x: 50, y: 550 };
+const p3 = { x: 550, y: 550 };
+
+// Clear canvas
+ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+// Start drawing with desired recursion depth
+sierpinski(p1, p2, p3, 6);
+</script>
+
+
+</body>
+</html>

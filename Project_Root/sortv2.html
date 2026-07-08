@@ -1,0 +1,1936 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sorting Algorithms Teaching App + Visualizer + Effectiveness Metrics</title>
+  <style>
+    :root {
+      --bg: #f4f7fb;
+      --card: #ffffff;
+      --text: #1f2937;
+      --muted: #64748b;
+      --border: #dbe3ee;
+      --primary: #2563eb;
+      --primary-dark: #1d4ed8;
+      --good: #15803d;
+      --warn: #b45309;
+      --bad: #b91c1c;
+      --shadow: 0 4px 18px rgba(0,0,0,0.08);
+      --radius: 12px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding: 24px;
+    }
+
+    .container {
+      max-width: 1500px;
+      margin: 0 auto;
+    }
+
+    h1, h2, h3 {
+      margin-top: 0;
+      color: #0f172a;
+    }
+
+    p { line-height: 1.45; }
+
+    .subtitle {
+      color: var(--muted);
+      margin-top: -8px;
+      margin-bottom: 20px;
+    }
+
+    .grid {
+      display: grid;
+      gap: 18px;
+    }
+
+    .grid-2 { grid-template-columns: 1.2fr 1fr; }
+    .grid-3 { grid-template-columns: repeat(3, 1fr); }
+
+    @media (max-width: 1100px) {
+      .grid-2, .grid-3 { grid-template-columns: 1fr; }
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px;
+      box-shadow: var(--shadow);
+    }
+
+    .controls {
+      display: grid;
+      gap: 14px;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      align-items: end;
+    }
+
+    label {
+      display: block;
+      font-weight: bold;
+      margin-bottom: 6px;
+      font-size: 14px;
+    }
+
+    input, select, button {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid #cbd5e1;
+      font-size: 14px;
+      background: white;
+    }
+
+    button {
+      background: var(--primary);
+      color: white;
+      border: none;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    button:hover { background: var(--primary-dark); }
+    button:disabled {
+      background: #93c5fd;
+      cursor: not-allowed;
+    }
+
+    .secondary-btn {
+      background: #64748b;
+    }
+    .secondary-btn:hover {
+      background: #475569;
+    }
+
+    .status {
+      font-weight: bold;
+      color: #334155;
+    }
+
+    .small {
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .pill-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .pill {
+      font-size: 12px;
+      background: #eef2ff;
+      color: #3730a3;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid #c7d2fe;
+    }
+
+    .algo-select-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 10px;
+      margin-top: 6px;
+    }
+
+    .check {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: #f8fafc;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+    }
+
+    .check input[type="checkbox"] {
+      width: auto;
+      margin: 0;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+      font-size: 14px;
+    }
+
+    th, td {
+      border: 1px solid var(--border);
+      padding: 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th { background: #eff6ff; }
+
+    .good { color: var(--good); font-weight: bold; }
+    .warn { color: var(--warn); font-weight: bold; }
+    .bad  { color: var(--bad); font-weight: bold; }
+
+    .mono {
+      font-family: Consolas, Monaco, monospace;
+      font-size: 13px;
+      background: #0f172a;
+      color: #e2e8f0;
+      padding: 12px;
+      border-radius: 10px;
+      overflow: auto;
+      white-space: pre-wrap;
+    }
+
+    .code-lite {
+      font-family: Consolas, Monaco, monospace;
+      background: #eef2f7;
+      padding: 2px 6px;
+      border-radius: 6px;
+      font-size: 13px;
+    }
+
+    .teaching-box {
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px;
+    }
+
+    canvas {
+      width: 100%;
+      max-width: 100%;
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      display: block;
+    }
+
+    .two-cols {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    @media (max-width: 900px) {
+      .two-cols { grid-template-columns: 1fr; }
+    }
+
+    .highlight {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      padding: 12px;
+      border-radius: 10px;
+    }
+
+    ul.compact {
+      margin-top: 8px;
+      margin-bottom: 0;
+      padding-left: 18px;
+    }
+
+    .metric-box {
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      margin-top: 12px;
+    }
+
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 10px;
+    }
+
+    .metric-tile {
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px;
+    }
+
+    .metric-label {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .metric-value {
+      font-size: 20px;
+      font-weight: bold;
+      margin-top: 4px;
+    }
+
+    /* Visualizer */
+    .visualizer-wrap {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 18px;
+    }
+
+    @media (max-width: 1000px) {
+      .visualizer-wrap {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .bars-panel {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px;
+    }
+
+    .bars {
+      height: 340px;
+      display: flex;
+      align-items: flex-end;
+      gap: 4px;
+      padding: 10px;
+      background: linear-gradient(to top, #f8fafc, #ffffff);
+      border: 1px solid #e5edf7;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    .bar {
+      flex: 1;
+      min-width: 10px;
+      background: #60a5fa;
+      border-radius: 6px 6px 0 0;
+      position: relative;
+      transition: height 0.15s linear, background 0.15s linear;
+    }
+
+    .bar-label {
+      position: absolute;
+      top: -22px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 11px;
+      color: #334155;
+      white-space: nowrap;
+    }
+
+    .bar.active { background: #f59e0b; }
+    .bar.swap { background: #ef4444; }
+    .bar.sorted { background: #22c55e; }
+    .bar.pivot { background: #8b5cf6; }
+    .bar.range { background: #38bdf8; }
+
+    .step-box {
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      min-height: 130px;
+    }
+
+    .control-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 10px;
+      font-size: 13px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 6px 10px;
+    }
+
+    .legend-swatch {
+      width: 14px;
+      height: 14px;
+      border-radius: 4px;
+    }
+
+    .step-counter {
+      font-weight: bold;
+      color: #0f172a;
+    }
+
+    .score-pill {
+      display: inline-block;
+      min-width: 56px;
+      text-align: center;
+      padding: 4px 8px;
+      border-radius: 999px;
+      font-weight: bold;
+      background: #dbeafe;
+      color: #1d4ed8;
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Sorting Algorithms Teaching App + Visualizer + Effectiveness Metrics</h1>
+    <p class="subtitle">
+      Compare runtime, correctness, comparisons, swaps, writes, and an effectiveness score — then watch the algorithms work step by step.
+    </p>
+
+    <div class="grid grid-2">
+      <div class="card">
+        <h2>1) Benchmark Lab</h2>
+
+        <div class="controls">
+          <div>
+            <label for="arraySize">Array Size</label>
+            <input id="arraySize" type="number" min="10" max="50000" value="3000" />
+          </div>
+
+          <div>
+            <label for="dataShape">Data Shape</label>
+            <select id="dataShape">
+              <option value="random">Random</option>
+              <option value="nearlySorted">Nearly Sorted</option>
+              <option value="reversed">Reversed</option>
+              <option value="fewUnique">Few Unique Values</option>
+            </select>
+          </div>
+
+          <div>
+            <label for="runs">Runs Per Algorithm</label>
+            <input id="runs" type="number" min="1" max="10" value="3" />
+          </div>
+
+          <div>
+            <label for="pivotStyle">Quick Sort Pivot Style</label>
+            <select id="pivotStyle">
+              <option value="middle">Middle Element</option>
+              <option value="last">Last Element</option>
+              <option value="random">Random Element</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="margin-top:14px;">
+          <label>Algorithms to Benchmark</label>
+          <div class="algo-select-grid" id="algoChecks"></div>
+        </div>
+
+        <div style="margin-top:14px;">
+          <button id="runBenchmarkBtn">Run Benchmark</button>
+        </div>
+
+        <div id="status" class="status" style="margin-top:12px;">Ready.</div>
+        <div class="small" style="margin-top:8px;">
+          Bubble Sort is included for teaching, but it will be skipped on larger arrays to avoid freezing the page.
+        </div>
+
+        <div class="metric-box">
+          <h3 style="margin-bottom:10px;">Benchmark Summary</h3>
+          <div class="metric-grid" id="summaryMetrics">
+            <div class="metric-tile">
+              <div class="metric-label">Fastest</div>
+              <div class="metric-value">—</div>
+            </div>
+            <div class="metric-tile">
+              <div class="metric-label">Best Effectiveness</div>
+              <div class="metric-value">—</div>
+            </div>
+            <div class="metric-tile">
+              <div class="metric-label">Fewest Comparisons</div>
+              <div class="metric-value">—</div>
+            </div>
+            <div class="metric-tile">
+              <div class="metric-label">Fewest Writes</div>
+              <div class="metric-value">—</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>2) Production Use-Case Recommender</h2>
+        <div class="controls">
+          <div>
+            <label for="useCase">Use Case</label>
+            <select id="useCase">
+              <option value="general">General in-memory sorting</option>
+              <option value="stable">Stable sorting of records/objects</option>
+              <option value="nearlySorted">Nearly sorted data</option>
+              <option value="worstCase">Need worst-case safety</option>
+              <option value="bigData">Large data / external sorting</option>
+              <option value="numeric">Fixed-width numeric keys</option>
+              <option value="tiny">Very small arrays</option>
+            </select>
+          </div>
+          <div>
+            <button id="recommendBtn">Recommend Algorithm</button>
+          </div>
+        </div>
+        <div id="recommendation" class="teaching-box" style="margin-top:12px;"></div>
+      </div>
+    </div>
+
+    <div class="grid grid-2" style="margin-top:18px;">
+      <div class="card">
+        <h2>3) Benchmark Results</h2>
+        <div class="table-wrap">
+          <table id="resultsTable">
+            <thead>
+              <tr>
+                <th>Algorithm</th>
+                <th>Median ms</th>
+                <th>Min</th>
+                <th>Max</th>
+                <th>Comparisons</th>
+                <th>Swaps</th>
+                <th>Writes</th>
+                <th>Correct</th>
+                <th>Stable?</th>
+                <th>Effectiveness</th>
+                <th>Notes</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>4) Speed Chart</h2>
+        <canvas id="chart" width="700" height="400"></canvas>
+        <div class="small" style="margin-top:8px;">
+          Lower median runtime is better.
+        </div>
+      </div>
+    </div>
+
+    <div class="grid grid-2" style="margin-top:18px;">
+      <div class="card">
+        <h2>5) Stability Playground</h2>
+        <p class="small">
+          Stability means equal keys keep their original relative order. That matters a lot in multi-step record sorting.
+        </p>
+
+        <div class="controls">
+          <div>
+            <label for="stabilityAlgo">Algorithm</label>
+            <select id="stabilityAlgo"></select>
+          </div>
+          <div>
+            <label for="stabilitySortKey">Sort By</label>
+            <select id="stabilitySortKey">
+              <option value="group">group</option>
+              <option value="score">score</option>
+            </select>
+          </div>
+          <div>
+            <button id="runStabilityBtn">Run Stability Demo</button>
+          </div>
+        </div>
+
+        <div class="two-cols" style="margin-top:14px;">
+          <div>
+            <h3>Original Records</h3>
+            <div id="stabilityOriginal" class="mono"></div>
+          </div>
+          <div>
+            <h3>Sorted Output</h3>
+            <div id="stabilitySorted" class="mono"></div>
+          </div>
+        </div>
+
+        <div id="stabilityResult" class="highlight" style="margin-top:14px;"></div>
+      </div>
+
+      <div class="card">
+        <h2>6) Teaching Panel</h2>
+        <div class="controls">
+          <div>
+            <label for="teachAlgo">Choose Algorithm</label>
+            <select id="teachAlgo"></select>
+          </div>
+          <div>
+            <button id="showTeachBtn">Explain This Algorithm</button>
+          </div>
+        </div>
+        <div id="teachPanel" style="margin-top:12px;"></div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:18px;">
+      <h2>7) Sorting Visualizer Lab</h2>
+
+      <div class="controls">
+        <div>
+          <label for="vizAlgo">Visualizer Algorithm</label>
+          <select id="vizAlgo">
+            <option value="bubble">Bubble Sort</option>
+            <option value="insertion">Insertion Sort</option>
+            <option value="merge">Merge Sort</option>
+            <option value="quick">Quick Sort</option>
+          </select>
+        </div>
+
+        <div>
+          <label for="vizSize">Visualizer Array Size</label>
+          <input id="vizSize" type="number" min="5" max="30" value="12" />
+        </div>
+
+        <div>
+          <label for="vizShape">Visualizer Data Shape</label>
+          <select id="vizShape">
+            <option value="random">Random</option>
+            <option value="nearlySorted">Nearly Sorted</option>
+            <option value="reversed">Reversed</option>
+            <option value="fewUnique">Few Unique Values</option>
+          </select>
+        </div>
+
+        <div>
+          <label for="vizSpeed">Playback Speed (ms/step)</label>
+          <input id="vizSpeed" type="number" min="20" max="2000" value="300" />
+        </div>
+      </div>
+
+      <div class="control-row">
+        <button id="generateVizBtn">Generate Steps</button>
+        <button id="playPauseVizBtn">Play</button>
+        <button id="stepVizBtn" class="secondary-btn">Step Forward</button>
+        <button id="resetVizBtn" class="secondary-btn">Reset</button>
+      </div>
+
+      <div class="legend">
+        <div class="legend-item"><span class="legend-swatch" style="background:#60a5fa;"></span>Normal</div>
+        <div class="legend-item"><span class="legend-swatch" style="background:#f59e0b;"></span>Active / Compared</div>
+        <div class="legend-item"><span class="legend-swatch" style="background:#ef4444;"></span>Swap / Write</div>
+        <div class="legend-item"><span class="legend-swatch" style="background:#8b5cf6;"></span>Pivot</div>
+        <div class="legend-item"><span class="legend-swatch" style="background:#38bdf8;"></span>Working Range</div>
+        <div class="legend-item"><span class="legend-swatch" style="background:#22c55e;"></span>Sorted</div>
+      </div>
+
+      <div class="visualizer-wrap" style="margin-top:14px;">
+        <div class="bars-panel">
+          <div id="bars" class="bars"></div>
+        </div>
+
+        <div>
+          <div class="step-box">
+            <div class="step-counter" id="vizStepCounter">Step 0 / 0</div>
+            <div style="margin-top:10px;"><b>Current Action</b></div>
+            <div id="vizMessage" style="margin-top:6px;">Generate a visualization to begin.</div>
+            <div style="margin-top:12px;"><b>Current Array</b></div>
+            <div id="vizArrayText" class="mono" style="margin-top:6px; max-height:140px;"></div>
+          </div>
+
+          <div class="teaching-box" style="margin-top:14px;">
+            <h3>How to read the visualizer</h3>
+            <ul class="compact">
+              <li>Orange bars are being compared or examined.</li>
+              <li>Red bars were just swapped or overwritten.</li>
+              <li>Purple marks the pivot in Quick Sort.</li>
+              <li>Green bars are confirmed sorted.</li>
+              <li>Blue-cyan bars show the active working range.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:18px;">
+      <h2>8) Big Picture Comparison</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Algorithm</th>
+            <th>Average</th>
+            <th>Worst Case</th>
+            <th>Space</th>
+            <th>Stable</th>
+            <th>Production Reality</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Bubble Sort</td>
+            <td>O(n²)</td>
+            <td>O(n²)</td>
+            <td>O(1)</td>
+            <td>Usually Yes</td>
+            <td>Teaching only</td>
+          </tr>
+          <tr>
+            <td>Insertion Sort</td>
+            <td>O(n²)</td>
+            <td>O(n²)</td>
+            <td>O(1)</td>
+            <td>Yes</td>
+            <td>Great for tiny arrays and nearly sorted inputs; often part of hybrids</td>
+          </tr>
+          <tr>
+            <td>Merge Sort</td>
+            <td>O(n log n)</td>
+            <td>O(n log n)</td>
+            <td>O(n)</td>
+            <td>Yes</td>
+            <td>Excellent for stable sorting and external merge sort</td>
+          </tr>
+          <tr>
+            <td>Quick Sort</td>
+            <td>O(n log n)</td>
+            <td>O(n²)</td>
+            <td>O(log n) avg stack</td>
+            <td>No</td>
+            <td>Fast in practice, but plain quicksort is not a universal library default</td>
+          </tr>
+          <tr>
+            <td>Heap Sort</td>
+            <td>O(n log n)</td>
+            <td>O(n log n)</td>
+            <td>O(1)</td>
+            <td>No</td>
+            <td>Useful as a safe fallback in hybrid approaches</td>
+          </tr>
+          <tr>
+            <td>Native JS Sort</td>
+            <td>Engine optimized</td>
+            <td>Engine optimized</td>
+            <td>Engine dependent</td>
+            <td>Modern engines stable</td>
+            <td>Usually the best practical JS baseline</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="pill-row">
+        <span class="pill">Production libraries prefer hybrids</span>
+        <span class="pill">Stability matters for records</span>
+        <span class="pill">Worst-case safety matters in libraries</span>
+        <span class="pill">Nearly sorted data is common in real systems</span>
+        <span class="pill">External merge sort matters for big data</span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // =========================
+    // Metadata
+    // =========================
+    const algorithmMeta = {
+      bubble: {
+        name: 'Bubble Sort',
+        stable: true,
+        note: 'Educational only; extremely slow at scale.',
+        avg: 'O(n²)',
+        worst: 'O(n²)',
+        space: 'O(1)',
+        bestFor: 'Teaching and understanding repeated swaps',
+        avoid: 'Anything performance-sensitive'
+      },
+      insertion: {
+        name: 'Insertion Sort',
+        stable: true,
+        note: 'Strong for tiny arrays and nearly sorted data.',
+        avg: 'O(n²)',
+        worst: 'O(n²)',
+        space: 'O(1)',
+        bestFor: 'Small arrays, nearly sorted data, hybrid sort cutoff',
+        avoid: 'Large random arrays'
+      },
+      merge: {
+        name: 'Merge Sort',
+        stable: true,
+        note: 'Dependable and stable; extra memory cost.',
+        avg: 'O(n log n)',
+        worst: 'O(n log n)',
+        space: 'O(n)',
+        bestFor: 'Stable sorting, external sort, linked structures',
+        avoid: 'Tight memory situations when in-place is critical'
+      },
+      quick: {
+        name: 'Quick Sort',
+        stable: false,
+        note: 'Fast average-case, but plain versions can degrade badly.',
+        avg: 'O(n log n)',
+        worst: 'O(n²)',
+        space: 'O(log n) avg',
+        bestFor: 'Fast in-memory sorting when carefully implemented',
+        avoid: 'Cases needing guaranteed stability or worst-case protection'
+      },
+      heap: {
+        name: 'Heap Sort',
+        stable: false,
+        note: 'Good worst-case guarantee, often slower in practice.',
+        avg: 'O(n log n)',
+        worst: 'O(n log n)',
+        space: 'O(1)',
+        bestFor: 'Worst-case safety with low extra memory',
+        avoid: 'When cache-friendliness and practical speed matter most'
+      },
+      native: {
+        name: 'Native JS Sort',
+        stable: true,
+        note: 'Best practical JavaScript baseline; engine optimized.',
+        avg: 'Engine optimized',
+        worst: 'Engine optimized',
+        space: 'Engine dependent',
+        bestFor: 'Most JS production use cases',
+        avoid: 'Strict algorithm teaching where you need full control'
+      }
+    };
+
+    const algoOrder = ['bubble', 'insertion', 'merge', 'quick', 'heap', 'native'];
+
+    // =========================
+    // UI bootstrap
+    // =========================
+    const algoChecks = document.getElementById('algoChecks');
+    const teachAlgo = document.getElementById('teachAlgo');
+    const stabilityAlgo = document.getElementById('stabilityAlgo');
+
+    function buildAlgorithmSelectors() {
+      algoChecks.innerHTML = '';
+      teachAlgo.innerHTML = '';
+      stabilityAlgo.innerHTML = '';
+
+      algoOrder.forEach(key => {
+        const meta = algorithmMeta[key];
+
+        const wrap = document.createElement('label');
+        wrap.className = 'check';
+        wrap.innerHTML = `
+          <input type="checkbox" value="${key}" ${key !== 'bubble' ? 'checked' : ''}>
+          <span>${meta.name}</span>
+        `;
+        algoChecks.appendChild(wrap);
+
+        const opt1 = document.createElement('option');
+        opt1.value = key;
+        opt1.textContent = meta.name;
+        teachAlgo.appendChild(opt1);
+
+        const opt2 = document.createElement('option');
+        opt2.value = key;
+        opt2.textContent = meta.name;
+        stabilityAlgo.appendChild(opt2);
+      });
+
+      teachAlgo.value = 'quick';
+      stabilityAlgo.value = 'merge';
+    }
+
+    buildAlgorithmSelectors();
+
+    // =========================
+    // Data generation
+    // =========================
+    function randomArray(n) {
+      return Array.from({ length: n }, () => Math.floor(Math.random() * 100000));
+    }
+
+    function nearlySortedArray(n) {
+      const arr = Array.from({ length: n }, (_, i) => i + 1);
+      const swaps = Math.max(1, Math.floor(n * 0.02));
+      for (let i = 0; i < swaps; i++) {
+        const a = Math.floor(Math.random() * n);
+        const b = Math.floor(Math.random() * n);
+        [arr[a], arr[b]] = [arr[b], arr[a]];
+      }
+      return arr;
+    }
+
+    function reversedArray(n) {
+      return Array.from({ length: n }, (_, i) => n - i);
+    }
+
+    function fewUniqueArray(n) {
+      return Array.from({ length: n }, () => Math.floor(Math.random() * 10));
+    }
+
+    function generateData(type, n) {
+      switch (type) {
+        case 'nearlySorted': return nearlySortedArray(n);
+        case 'reversed': return reversedArray(n);
+        case 'fewUnique': return fewUniqueArray(n);
+        default: return randomArray(n);
+      }
+    }
+
+    function isSorted(arr, getValue = x => x) {
+      for (let i = 1; i < arr.length; i++) {
+        if (getValue(arr[i - 1]) > getValue(arr[i])) return false;
+      }
+      return true;
+    }
+
+    function median(values) {
+      const s = [...values].sort((a, b) => a - b);
+      const mid = Math.floor(s.length / 2);
+      return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
+    }
+
+    // =========================
+    // Basic sorting algorithms
+    // =========================
+    function bubbleSort(input, compare = (a, b) => a - b) {
+      const a = input.slice();
+      const n = a.length;
+      for (let i = 0; i < n - 1; i++) {
+        let swapped = false;
+        for (let j = 0; j < n - i - 1; j++) {
+          if (compare(a[j], a[j + 1]) > 0) {
+            [a[j], a[j + 1]] = [a[j + 1], a[j]];
+            swapped = true;
+          }
+        }
+        if (!swapped) break;
+      }
+      return a;
+    }
+
+    function insertionSort(input, compare = (a, b) => a - b) {
+      const a = input.slice();
+      for (let i = 1; i < a.length; i++) {
+        const key = a[i];
+        let j = i - 1;
+        while (j >= 0 && compare(a[j], key) > 0) {
+          a[j + 1] = a[j];
+          j--;
+        }
+        a[j + 1] = key;
+      }
+      return a;
+    }
+
+    function mergeSort(input, compare = (a, b) => a - b) {
+      if (input.length <= 1) return input.slice();
+
+      function merge(left, right) {
+        const out = [];
+        let i = 0, j = 0;
+        while (i < left.length && j < right.length) {
+          if (compare(left[i], right[j]) <= 0) out.push(left[i++]);
+          else out.push(right[j++]);
+        }
+        while (i < left.length) out.push(left[i++]);
+        while (j < right.length) out.push(right[j++]);
+        return out;
+      }
+
+      const mid = Math.floor(input.length / 2);
+      const left = mergeSort(input.slice(0, mid), compare);
+      const right = mergeSort(input.slice(mid), compare);
+      return merge(left, right);
+    }
+
+    function quickSort(input, compare = (a, b) => a - b, pivotStyle = 'middle') {
+      const a = input.slice();
+
+      function choosePivotIndex(lo, hi) {
+        if (pivotStyle === 'last') return hi;
+        if (pivotStyle === 'random') return lo + Math.floor(Math.random() * (hi - lo + 1));
+        return Math.floor((lo + hi) / 2);
+      }
+
+      function qs(lo, hi) {
+        if (lo >= hi) return;
+        const pivot = a[choosePivotIndex(lo, hi)];
+        let i = lo, j = hi;
+
+        while (i <= j) {
+          while (compare(a[i], pivot) < 0) i++;
+          while (compare(a[j], pivot) > 0) j--;
+          if (i <= j) {
+            [a[i], a[j]] = [a[j], a[i]];
+            i++;
+            j--;
+          }
+        }
+
+        if (lo < j) qs(lo, j);
+        if (i < hi) qs(i, hi);
+      }
+
+      qs(0, a.length - 1);
+      return a;
+    }
+
+    function heapSort(input, compare = (a, b) => a - b) {
+      const a = input.slice();
+      const n = a.length;
+
+      function heapify(end, i) {
+        let largest = i;
+        const left = 2 * i + 1;
+        const right = 2 * i + 2;
+
+        if (left < end && compare(a[left], a[largest]) > 0) largest = left;
+        if (right < end && compare(a[right], a[largest]) > 0) largest = right;
+
+        if (largest !== i) {
+          [a[i], a[largest]] = [a[largest], a[i]];
+          heapify(end, largest);
+        }
+      }
+
+      for (let i = Math.floor(n / 2) - 1; i >= 0; i--) heapify(n, i);
+      for (let end = n - 1; end > 0; end--) {
+        [a[0], a[end]] = [a[end], a[0]];
+        heapify(end, 0);
+      }
+      return a;
+    }
+
+    function nativeSort(input, compare = (a, b) => a - b) {
+      return input.slice().sort(compare);
+    }
+
+    function getSortFunction(key, pivotStyle = 'middle') {
+      switch (key) {
+        case 'bubble': return (arr, cmp) => bubbleSort(arr, cmp);
+        case 'insertion': return (arr, cmp) => insertionSort(arr, cmp);
+        case 'merge': return (arr, cmp) => mergeSort(arr, cmp);
+        case 'quick': return (arr, cmp) => quickSort(arr, cmp, pivotStyle);
+        case 'heap': return (arr, cmp) => heapSort(arr, cmp);
+        case 'native': return (arr, cmp) => nativeSort(arr, cmp);
+        default: throw new Error('Unknown algorithm: ' + key);
+      }
+    }
+
+    // =========================
+    // Measured sorting helpers
+    // =========================
+    function createMetrics() {
+      return {
+        comparisons: 0,
+        swaps: 0,
+        writes: 0
+      };
+    }
+
+    function makeInstrumentedComparator(metrics, compare = (a, b) => a - b) {
+      return (a, b) => {
+        metrics.comparisons++;
+        return compare(a, b);
+      };
+    }
+
+    function swapWithMetrics(arr, i, j, metrics) {
+      if (i === j) return;
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+      metrics.swaps++;
+      metrics.writes += 2;
+    }
+
+    function writeWithMetrics(arr, index, value, metrics) {
+      arr[index] = value;
+      metrics.writes++;
+    }
+
+    function normalizeScore(value, min, max, invert = false) {
+      if (max === min) return 100;
+      const ratio = (value - min) / (max - min);
+      const normalized = invert ? (1 - ratio) : ratio;
+      return Math.max(0, Math.min(100, normalized * 100));
+    }
+
+    function bubbleSortMeasured(input, compare = (a, b) => a - b) {
+      const a = input.slice();
+      const metrics = createMetrics();
+      const cmp = makeInstrumentedComparator(metrics, compare);
+
+      for (let i = 0; i < a.length - 1; i++) {
+        let swapped = false;
+        for (let j = 0; j < a.length - i - 1; j++) {
+          if (cmp(a[j], a[j + 1]) > 0) {
+            swapWithMetrics(a, j, j + 1, metrics);
+            swapped = true;
+          }
+        }
+        if (!swapped) break;
+      }
+
+      return { output: a, metrics };
+    }
+
+    function insertionSortMeasured(input, compare = (a, b) => a - b) {
+      const a = input.slice();
+      const metrics = createMetrics();
+      const cmp = makeInstrumentedComparator(metrics, compare);
+
+      for (let i = 1; i < a.length; i++) {
+        const key = a[i];
+        let j = i - 1;
+
+        while (j >= 0 && cmp(a[j], key) > 0) {
+          writeWithMetrics(a, j + 1, a[j], metrics);
+          j--;
+        }
+        writeWithMetrics(a, j + 1, key, metrics);
+      }
+
+      return { output: a, metrics };
+    }
+
+    function mergeSortMeasured(input, compare = (a, b) => a - b) {
+      const metrics = createMetrics();
+      const cmp = makeInstrumentedComparator(metrics, compare);
+
+      function mergeSortInner(arr) {
+        if (arr.length <= 1) return arr.slice();
+
+        const mid = Math.floor(arr.length / 2);
+        const left = mergeSortInner(arr.slice(0, mid));
+        const right = mergeSortInner(arr.slice(mid));
+
+        const merged = [];
+        let i = 0, j = 0;
+
+        while (i < left.length && j < right.length) {
+          if (cmp(left[i], right[j]) <= 0) {
+            merged.push(left[i++]);
+          } else {
+            merged.push(right[j++]);
+          }
+          metrics.writes++;
+        }
+
+        while (i < left.length) {
+          merged.push(left[i++]);
+          metrics.writes++;
+        }
+
+        while (j < right.length) {
+          merged.push(right[j++]);
+          metrics.writes++;
+        }
+
+        return merged;
+      }
+
+      return { output: mergeSortInner(input), metrics };
+    }
+
+    function quickSortMeasured(input, compare = (a, b) => a - b, pivotStyle = 'middle') {
+      const a = input.slice();
+      const metrics = createMetrics();
+      const cmp = makeInstrumentedComparator(metrics, compare);
+
+      function choosePivotIndex(lo, hi) {
+        if (pivotStyle === 'last') return hi;
+        if (pivotStyle === 'random') return lo + Math.floor(Math.random() * (hi - lo + 1));
+        return Math.floor((lo + hi) / 2);
+      }
+
+      function qs(lo, hi) {
+        if (lo >= hi) return;
+
+        const pivot = a[choosePivotIndex(lo, hi)];
+        let i = lo;
+        let j = hi;
+
+        while (i <= j) {
+          while (cmp(a[i], pivot) < 0) i++;
+          while (cmp(a[j], pivot) > 0) j--;
+
+          if (i <= j) {
+            swapWithMetrics(a, i, j, metrics);
+            i++;
+            j--;
+          }
+        }
+
+        if (lo < j) qs(lo, j);
+        if (i < hi) qs(i, hi);
+      }
+
+      qs(0, a.length - 1);
+      return { output: a, metrics };
+    }
+
+    function heapSortMeasured(input, compare = (a, b) => a - b) {
+      const a = input.slice();
+      const metrics = createMetrics();
+      const cmp = makeInstrumentedComparator(metrics, compare);
+
+      function heapify(end, i) {
+        let largest = i;
+        const left = 2 * i + 1;
+        const right = 2 * i + 2;
+
+        if (left < end && cmp(a[left], a[largest]) > 0) largest = left;
+        if (right < end && cmp(a[right], a[largest]) > 0) largest = right;
+
+        if (largest !== i) {
+          swapWithMetrics(a, i, largest, metrics);
+          heapify(end, largest);
+        }
+      }
+
+      for (let i = Math.floor(a.length / 2) - 1; i >= 0; i--) {
+        heapify(a.length, i);
+      }
+
+      for (let end = a.length - 1; end > 0; end--) {
+        swapWithMetrics(a, 0, end, metrics);
+        heapify(end, 0);
+      }
+
+      return { output: a, metrics };
+    }
+
+    function nativeSortMeasured(input, compare = (a, b) => a - b) {
+      const metrics = createMetrics();
+      const cmp = makeInstrumentedComparator(metrics, compare);
+      const output = input.slice().sort(cmp);
+
+      return {
+        output,
+        metrics: {
+          ...metrics,
+          swaps: null,
+          writes: null
+        }
+      };
+    }
+
+    function getMeasuredSortFunction(key, pivotStyle = 'middle') {
+      switch (key) {
+        case 'bubble': return (arr, cmp) => bubbleSortMeasured(arr, cmp);
+        case 'insertion': return (arr, cmp) => insertionSortMeasured(arr, cmp);
+        case 'merge': return (arr, cmp) => mergeSortMeasured(arr, cmp);
+        case 'quick': return (arr, cmp) => quickSortMeasured(arr, cmp, pivotStyle);
+        case 'heap': return (arr, cmp) => heapSortMeasured(arr, cmp);
+        case 'native': return (arr, cmp) => nativeSortMeasured(arr, cmp);
+        default: throw new Error('Unknown measured algorithm: ' + key);
+      }
+    }
+
+    function measureAlgorithmEffectiveness(key, input, pivotStyle = 'middle', compare = (a, b) => a - b) {
+      const measuredFn = getMeasuredSortFunction(key, pivotStyle);
+      const t0 = performance.now();
+      const result = measuredFn(input, compare);
+      const t1 = performance.now();
+
+      return {
+        algorithm: key,
+        output: result.output,
+        timeMs: t1 - t0,
+        correct: isSorted(result.output, x => x),
+        comparisons: result.metrics.comparisons,
+        swaps: result.metrics.swaps,
+        writes: result.metrics.writes
+      };
+    }
+
+    async function measureAlgorithmsEffectiveness(keys, input, runs = 3, pivotStyle = 'middle') {
+      const rawResults = [];
+
+      for (const key of keys) {
+        if (key === 'bubble' && input.length > 8000) {
+          rawResults.push({
+            key,
+            name: algorithmMeta[key].name,
+            skipped: true,
+            correct: false,
+            timeMsMedian: NaN,
+            timeMsMin: NaN,
+            timeMsMax: NaN,
+            comparisonsMedian: NaN,
+            swapsMedian: null,
+            writesMedian: null,
+            effectivenessScore: null,
+            stable: algorithmMeta[key].stable ? 'Yes' : 'No',
+            note: 'Skipped for safety at this size'
+          });
+          continue;
+        }
+
+        const samples = [];
+
+        for (let r = 0; r < runs; r++) {
+          const measurement = measureAlgorithmEffectiveness(key, input.slice(), pivotStyle);
+          samples.push(measurement);
+          await new Promise(resolve => setTimeout(resolve, 0));
+        }
+
+        const times = samples.map(x => x.timeMs);
+        const comparisons = samples.map(x => x.comparisons);
+        const swaps = samples.map(x => x.swaps).filter(v => v !== null);
+        const writes = samples.map(x => x.writes).filter(v => v !== null);
+
+        rawResults.push({
+          key,
+          name: algorithmMeta[key].name,
+          skipped: false,
+          correct: samples.every(x => x.correct),
+          timeMsMedian: median(times),
+          timeMsMin: Math.min(...times),
+          timeMsMax: Math.max(...times),
+          comparisonsMedian: median(comparisons),
+          swapsMedian: swaps.length ? median(swaps) : null,
+          writesMedian: writes.length ? median(writes) : null,
+          stable: algorithmMeta[key].stable ? 'Yes' : 'No',
+          note: algorithmMeta[key].note
+        });
+      }
+
+      const valid = rawResults.filter(r => !r.skipped && !Number.isNaN(r.timeMsMedian));
+
+      if (valid.length) {
+        const validTimes = valid.map(r => r.timeMsMedian);
+        const validComparisons = valid.map(r => r.comparisonsMedian);
+        const validWrites = valid.map(r => r.writesMedian).filter(v => v !== null);
+
+        const minTime = Math.min(...validTimes);
+        const maxTime = Math.max(...validTimes);
+        const minCmp = Math.min(...validComparisons);
+        const maxCmp = Math.max(...validComparisons);
+        const minWrites = validWrites.length ? Math.min(...validWrites) : 0;
+        const maxWrites = validWrites.length ? Math.max(...validWrites) : 1;
+
+        for (const r of rawResults) {
+          if (r.skipped || Number.isNaN(r.timeMsMedian)) {
+            r.effectivenessScore = null;
+            continue;
+          }
+
+          const timeScore = normalizeScore(r.timeMsMedian, minTime, maxTime, true);
+          const comparisonScore = normalizeScore(r.comparisonsMedian, minCmp, maxCmp, true);
+          const writeScore = r.writesMedian === null
+            ? 50
+            : normalizeScore(r.writesMedian, minWrites, maxWrites, true);
+
+          r.effectivenessScore = r.correct
+            ? +(timeScore * 0.5 + comparisonScore * 0.3 + writeScore * 0.2).toFixed(1)
+            : 0;
+        }
+      }
+
+      return rawResults.sort((a, b) => {
+        if (a.effectivenessScore === null) return 1;
+        if (b.effectivenessScore === null) return -1;
+        return b.effectivenessScore - a.effectivenessScore;
+      });
+    }
+
+    // =========================
+    // Benchmark UI
+    // =========================
+    const statusEl = document.getElementById('status');
+    const resultsTableBody = document.querySelector('#resultsTable tbody');
+    const chartCanvas = document.getElementById('chart');
+    const chartCtx = chartCanvas.getContext('2d');
+
+    function getSelectedAlgorithms() {
+      return [...algoChecks.querySelectorAll('input[type="checkbox"]:checked')].map(x => x.value);
+    }
+
+    function correctnessClass(value) {
+      if (value === 'Yes') return 'good';
+      if (value === 'Skipped') return 'warn';
+      return 'bad';
+    }
+
+    function drawChart(results) {
+      const ctx = chartCtx;
+      const w = chartCanvas.width;
+      const h = chartCanvas.height;
+      const pad = 46;
+
+      ctx.clearRect(0, 0, w, h);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, w, h);
+
+      const plot = results.filter(r => !Number.isNaN(r.timeMsMedian));
+      if (!plot.length) return;
+
+      const max = Math.max(...plot.map(r => r.timeMsMedian), 1);
+      const chartW = w - pad * 2;
+      const chartH = h - pad * 2;
+      const slot = chartW / plot.length;
+      const barW = Math.max(28, slot * 0.62);
+
+      ctx.strokeStyle = '#64748b';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(pad, pad);
+      ctx.lineTo(pad, h - pad);
+      ctx.lineTo(w - pad, h - pad);
+      ctx.stroke();
+
+      ctx.font = '12px Arial';
+      ctx.fillStyle = '#334155';
+
+      plot.sort((a, b) => a.timeMsMedian - b.timeMsMedian).forEach((r, i) => {
+        const x = pad + i * slot + (slot - barW) / 2;
+        const barH = (r.timeMsMedian / max) * (chartH - 20);
+        const y = h - pad - barH;
+
+        ctx.fillStyle = '#3b82f6';
+        ctx.fillRect(x, y, barW, barH);
+
+        ctx.fillStyle = '#1e293b';
+        ctx.fillText(r.name.replace(' Sort', ''), x, h - pad + 16);
+        ctx.fillText(r.timeMsMedian.toFixed(2) + 'ms', x, y - 6);
+      });
+
+      ctx.fillStyle = '#334155';
+      ctx.fillText('Median time (ms)', 8, 18);
+    }
+
+    function updateSummaryMetrics(results) {
+      const summaryEl = document.getElementById('summaryMetrics');
+      const valid = results.filter(r => !r.skipped && !Number.isNaN(r.timeMsMedian));
+
+      if (!valid.length) {
+        summaryEl.innerHTML = `
+          <div class="metric-tile"><div class="metric-label">Fastest</div><div class="metric-value">—</div></div>
+          <div class="metric-tile"><div class="metric-label">Best Effectiveness</div><div class="metric-value">—</div></div>
+          <div class="metric-tile"><div class="metric-label">Fewest Comparisons</div><div class="metric-value">—</div></div>
+          <div class="metric-tile"><div class="metric-label">Fewest Writes</div><div class="metric-value">—</div></div>
+        `;
+        return;
+      }
+
+      const fastest = [...valid].sort((a, b) => a.timeMsMedian - b.timeMsMedian)[0];
+      const bestEffectiveness = [...valid].sort((a, b) => b.effectivenessScore - a.effectivenessScore)[0];
+      const fewestComparisons = [...valid].sort((a, b) => a.comparisonsMedian - b.comparisonsMedian)[0];
+      const fewestWrites = [...valid]
+        .filter(r => r.writesMedian !== null)
+        .sort((a, b) => a.writesMedian - b.writesMedian)[0];
+
+      summaryEl.innerHTML = `
+        <div class="metric-tile">
+          <div class="metric-label">Fastest</div>
+          <div class="metric-value">${fastest.name}</div>
+        </div>
+        <div class="metric-tile">
+          <div class="metric-label">Best Effectiveness</div>
+          <div class="metric-value">${bestEffectiveness.name}</div>
+        </div>
+        <div class="metric-tile">
+          <div class="metric-label">Fewest Comparisons</div>
+          <div class="metric-value">${fewestComparisons.name}</div>
+        </div>
+        <div class="metric-tile">
+          <div class="metric-label">Fewest Writes</div>
+          <div class="metric-value">${fewestWrites ? fewestWrites.name : 'N/A'}</div>
+        </div>
+      `;
+    }
+
+    async function runBenchmark() {
+      const n = parseInt(document.getElementById('arraySize').value, 10);
+      const shape = document.getElementById('dataShape').value;
+      const runs = parseInt(document.getElementById('runs').value, 10);
+      const pivotStyle = document.getElementById('pivotStyle').value;
+      const selected = getSelectedAlgorithms();
+
+      if (!selected.length) {
+        alert('Select at least one algorithm.');
+        return;
+      }
+
+      document.getElementById('runBenchmarkBtn').disabled = true;
+      resultsTableBody.innerHTML = '';
+      statusEl.textContent = 'Generating data...';
+
+      const baseData = generateData(shape, n);
+
+      statusEl.textContent = 'Running instrumented benchmark...';
+      const results = await measureAlgorithmsEffectiveness(selected, baseData, runs, pivotStyle);
+
+      for (const r of results) {
+        const tr = document.createElement('tr');
+
+        const correctLabel = r.skipped ? 'Skipped' : (r.correct ? 'Yes' : 'No');
+        const eff = r.effectivenessScore === null ? '—' : `<span class="score-pill">${r.effectivenessScore}</span>`;
+
+        tr.innerHTML = `
+          <td>${r.name}</td>
+          <td>${Number.isNaN(r.timeMsMedian) ? '—' : r.timeMsMedian.toFixed(2)}</td>
+          <td>${Number.isNaN(r.timeMsMin) ? '—' : r.timeMsMin.toFixed(2)}</td>
+          <td>${Number.isNaN(r.timeMsMax) ? '—' : r.timeMsMax.toFixed(2)}</td>
+          <td>${Number.isNaN(r.comparisonsMedian) ? '—' : Math.round(r.comparisonsMedian)}</td>
+          <td>${r.swapsMedian === null ? '—' : Math.round(r.swapsMedian)}</td>
+          <td>${r.writesMedian === null ? '—' : Math.round(r.writesMedian)}</td>
+          <td class="${correctnessClass(correctLabel)}">${correctLabel}</td>
+          <td>${r.stable}</td>
+          <td>${eff}</td>
+          <td>${r.note}</td>
+        `;
+        resultsTableBody.appendChild(tr);
+      }
+
+      drawChart(results);
+      updateSummaryMetrics(results);
+      statusEl.textContent = `Done. Shape=${shape}, size=${n}, runs=${runs}.`;
+      document.getElementById('runBenchmarkBtn').disabled = false;
+    }
+
+    document.getElementById('runBenchmarkBtn').addEventListener('click', runBenchmark);
+
+    // =========================
+    // Stability playground
+    // =========================
+    const sampleRecords = [
+      { id: 'A', group: 2, score: 90, originalIndex: 0 },
+      { id: 'B', group: 1, score: 90, originalIndex: 1 },
+      { id: 'C', group: 2, score: 75, originalIndex: 2 },
+      { id: 'D', group: 1, score: 90, originalIndex: 3 },
+      { id: 'E', group: 2, score: 75, originalIndex: 4 },
+      { id: 'F', group: 1, score: 60, originalIndex: 5 },
+      { id: 'G', group: 2, score: 90, originalIndex: 6 }
+    ];
+
+    function formatRecords(arr) {
+      return arr.map(x => `${x.id}  group=${x.group}  score=${x.score}  originalIndex=${x.originalIndex}`).join('\n');
+    }
+
+    function isStableRelativeTo(original, sorted, key) {
+      const origGroups = {};
+      for (const item of original) {
+        const k = item[key];
+        if (!origGroups[k]) origGroups[k] = [];
+        origGroups[k].push(item.id);
+      }
+
+      const sortedGroups = {};
+      for (const item of sorted) {
+        const k = item[key];
+        if (!sortedGroups[k]) sortedGroups[k] = [];
+        sortedGroups[k].push(item.id);
+      }
+
+      const keys = Object.keys(origGroups);
+      for (const k of keys) {
+        const a = origGroups[k].join('|');
+        const b = (sortedGroups[k] || []).join('|');
+        if (a !== b) return false;
+      }
+      return true;
+    }
+
+    function runStabilityDemo() {
+      const algo = document.getElementById('stabilityAlgo').value;
+      const sortKey = document.getElementById('stabilitySortKey').value;
+      const pivotStyle = document.getElementById('pivotStyle').value;
+      const fn = getSortFunction(algo, pivotStyle);
+
+      const original = sampleRecords.map(x => ({ ...x }));
+      const sorted = fn(original, (a, b) => a[sortKey] - b[sortKey]);
+      const stable = isStableRelativeTo(original, sorted, sortKey);
+
+      document.getElementById('stabilityOriginal').textContent = formatRecords(original);
+      document.getElementById('stabilitySorted').textContent = formatRecords(sorted);
+
+      const meta = algorithmMeta[algo];
+      document.getElementById('stabilityResult').innerHTML = `
+        <b>${meta.name}</b> sorting by <span class="code-lite">${sortKey}</span><br><br>
+        Observed stability in this demo: <span class="${stable ? 'good' : 'bad'}">${stable ? 'Stable behavior observed' : 'Order of equal keys changed'}</span><br>
+        General expectation: <b>${meta.stable ? 'Stable' : 'Not stable'}</b><br><br>
+        Why this matters: if two records have the same ${sortKey}, a stable sort preserves their prior order.
+      `;
+    }
+
+    document.getElementById('runStabilityBtn').addEventListener('click', runStabilityDemo);
+    runStabilityDemo();
+
+    // =========================
+    // Teaching panel
+    // =========================
+    function renderTeachingPanel(key) {
+      const meta = algorithmMeta[key];
+      let html = `
+        <div class="teaching-box">
+          <h3>${meta.name}</h3>
+          <p><b>Average:</b> ${meta.avg}<br>
+          <b>Worst case:</b> ${meta.worst}<br>
+          <b>Extra space:</b> ${meta.space}<br>
+          <b>Stable:</b> ${meta.stable ? 'Yes' : 'No'}</p>
+
+          <p><b>Best for:</b> ${meta.bestFor}</p>
+          <p><b>Avoid when:</b> ${meta.avoid}</p>
+          <p><b>Production note:</b> ${meta.note}</p>
+        </div>
+      `;
+
+      if (key === 'quick') {
+        html += `
+          <div class="teaching-box" style="margin-top:12px;">
+            <h3>Why libraries don't just use plain Quick Sort</h3>
+            <ul class="compact">
+              <li>Worst-case can degrade to <b>O(n²)</b></li>
+              <li>It's usually <b>not stable</b></li>
+              <li>Bad pivot choice can hurt performance badly</li>
+              <li>Real-world data is often partially sorted, where adaptive and hybrid algorithms do better</li>
+            </ul>
+            <p style="margin-top:10px;">
+              That's why many standard libraries prefer <b>Introsort</b> or other hybrids instead of plain textbook quicksort.
+            </p>
+          </div>
+        `;
+      }
+
+      if (key === 'merge') {
+        html += `
+          <div class="teaching-box" style="margin-top:12px;">
+            <h3>Why Merge Sort matters in real systems</h3>
+            <ul class="compact">
+              <li>Stable sorting for records and business data</li>
+              <li>Excellent for <b>external sorting</b> when data is too large for RAM</li>
+              <li>Very important in databases, ETL, and big data systems</li>
+            </ul>
+          </div>
+        `;
+      }
+
+      if (key === 'insertion') {
+        html += `
+          <div class="teaching-box" style="margin-top:12px;">
+            <h3>Why Insertion Sort still matters</h3>
+            <p>
+              Even though it's O(n²), it's extremely useful for <b>small arrays</b> and <b>nearly sorted data</b>.
+              That's why many high-performance hybrid sorts switch to insertion sort for tiny partitions.
+            </p>
+          </div>
+        `;
+      }
+
+      if (key === 'native') {
+        html += `
+          <div class="teaching-box" style="margin-top:12px;">
+            <h3>Native JS Sort in practice</h3>
+            <p>
+              For most JavaScript apps, the engine's built-in sort is the practical production baseline.
+              Modern engines use optimized internals and modern implementations are stable.
+            </p>
+          </div>
+        `;
+      }
+
+      document.getElementById('teachPanel').innerHTML = html;
+    }
+
+    document.getElementById('showTeachBtn').addEventListener('click', () => {
+      renderTeachingPanel(document.getElementById('teachAlgo').value);
+    });
+    renderTeachingPanel('quick');
+
+    // =========================
+    // Recommender
+    // =========================
+    function getRecommendation(useCase) {
+      switch (useCase) {
+        case 'general':
+          return {
+            title: 'General in-memory sorting',
+            recommendation: 'Use Introsort-like hybrids or your language runtime sort',
+            why: [
+              'Good average performance',
+              'Safer than plain quicksort',
+              'Standard libraries are heavily tuned'
+            ],
+            caveat: 'In JavaScript, native sort is usually your best practical default.'
+          };
+        case 'stable':
+          return {
+            title: 'Stable sorting of records/objects',
+            recommendation: 'Use Timsort-like or Merge Sort style strategies',
+            why: [
+              'Stability preserves prior order of equal elements',
+              'Great for multi-column business sorting',
+              'Very common requirement in apps and backend systems'
+            ],
+            caveat: 'Stable sorting is often more important than micro-optimizing raw speed.'
+          };
+        case 'nearlySorted':
+          return {
+            title: 'Nearly sorted data',
+            recommendation: 'Insertion Sort for tiny inputs, Timsort-like approaches for larger ones',
+            why: [
+              'Insertion sort can be excellent when disorder is low',
+              'Adaptive algorithms exploit existing runs',
+              'Real-world UI and incremental data often looks like this'
+            ],
+            caveat: 'Plain quicksort does not exploit presorted runs nearly as well.'
+          };
+        case 'worstCase':
+          return {
+            title: 'Need worst-case safety',
+            recommendation: 'Heap Sort or Introsort',
+            why: [
+              'Heap Sort guarantees O(n log n)',
+              'Introsort starts fast and falls back safely',
+              'Important for libraries and adversarial input'
+            ],
+            caveat: 'Heap sort is often slower in practice than better hybrids.'
+          };
+        case 'bigData':
+          return {
+            title: 'Large data / external sorting',
+            recommendation: 'External Merge Sort',
+            why: [
+              'Works when data exceeds RAM',
+              'Supports chunking and merging sorted runs',
+              'Foundational in databases and data platforms'
+            ],
+            caveat: 'This is more about I/O and system design than a simple in-memory function.'
+          };
+        case 'numeric':
+          return {
+            title: 'Fixed-width numeric keys',
+            recommendation: 'Radix Sort can be excellent',
+            why: [
+              'Can beat comparison sorts on suitable numeric keys',
+              'Great for IDs, timestamps, integers',
+              'Very strong in specialized systems'
+            ],
+            caveat: 'More specialized; not a universal replacement.'
+          };
+        case 'tiny':
+          return {
+            title: 'Very small arrays',
+            recommendation: 'Insertion Sort',
+            why: [
+              'Low overhead',
+              'Simple and cache-friendly for tiny partitions',
+              'Used internally by many hybrid sorts'
+            ],
+            caveat: 'Not for large random inputs.'
+          };
+        default:
+          return {
+            title: 'General',
+            recommendation: 'Use a proven hybrid',
+            why: ['That is what production systems usually do.'],
+            caveat: 'Avoid plain textbook algorithms as universal defaults.'
+          };
+      }
+    }
+
+    function renderRecommendation() {
+      const useCase = document.getElementById('useCase').value;
+      const rec = getRecommendation(useCase);
+
+      document.getElementById('recommendation').innerHTML = `
+        <h3>${rec.title}</h3>
+        <p><b>Recommendation:</b> ${rec.recommendation}</p>
+        <p><b>Why:</b></p>
+        <ul class="compact">
+          ${rec.why.map(x => `<li>${x}</li>`).join('')}
+        </ul>
+        <p style="margin-top:10px;"><b>Caveat:</b> ${rec.caveat}</p>
+      `;
+    }
+
+    document.getElementById('recommendBtn').addEventListener('click', renderRecommendation);
+    renderRecommendation();
+
+    // =========================
+    // Visualizer helpers
+    // =========================
+    const barsEl = document.getElementById('bars');
+    const vizMessageEl = document.getElementById('vizMessage');
+    const vizArrayTextEl = document.getElementById('vizArrayText');
+    const vizStepCounterEl = document.getElementById('vizStepCounter');
+
+    let vizSteps = [];
+    let vizStepIndex = 0;
+    let vizTimer = null;
+    let vizPlaying = false;
+
+    function cloneArr(arr) {
+      return arr.slice();
+    }
+
+    function makeStep(arr, message, options = {}) {
+      return {
+        array: cloneArr(arr),
+        message,
+        active: options.active || [],
+        swap: options.swap || [],
+        sorted: options.sorted || [],
+        pivot: options.pivot ?? null,
+        range: options.range || null
+      };
+    }
+
+    function finalSortedIndices(arr) {
+      return Array.from({ length: arr.length }, (_, i) => i);
+    }
+
+    function renderBars(step) {
+      if (!step) return;
+      barsEl.innerHTML = '';
+
+      const arr = step.array;
+      const maxVal = Math.max(...arr, 1);
+
+      arr.forEach((value, idx) => {
+        const bar = document.createElement('div');
+        bar.className = 'bar';
+
+        if (step.range && idx >= step.range[0] && idx <= step.range[1]) {
+          bar.classList.add('range');
+        }
+        if (step.active.includes(idx)) bar.classList.add('active');
+        if (step.swap.includes(idx)) bar.classList.add('swap');
+        if (step.sorted.includes(idx)) bar.classList.add('sorted');
+        if (step.pivot === idx) bar.classList.add('pivot');
+
+        bar.style.height = `${Math.max(20, (value / maxVal) * 290)}px`;
+
+        const label = document.createElement('div');
+        label.className = 'bar-label';
+        label.textContent = value;
+        bar.appendChild(label);
+
+        barsEl.appendChild(bar);
+      });
+
+      vizMessageEl.textContent = step.message;
+      vizArrayTextEl.textContent = `[${step.array.join(', ')}]`;
+      vizStepCounterEl.textContent = `Step ${vizStepIndex + 1} / ${vizSteps.length}`;
+    }
+
+    function stopVizPlayback() {
+      if (vizTimer !== null) {
+        clearInterval(vizTimer);
+        vizTimer = null;
+      }
+      vizPlaying = false;
+      document.getElementById('playPauseVizBtn').textContent = 'Play';
+    }
+
+    function playViz() {
+      if (!vizSteps.length) return;
+      stopVizPlayback();
+      vizPlaying = true;
+      document.getElementById('playPauseVizBtn').textContent = 'Pause';
+
+      const speed = parseInt(document.getElementById('vizSpeed').value, 10);
+
+      vizTimer = setInterval(() => {
+        if (vizStepIndex >= vizSteps.length - 1) {
+          stopVizPlayback();
+          return;
+        }
+        vizStepIndex++;
+        renderBars(vizSteps[vizStepIndex]);
+      }, speed);
+    }
+
+    function stepForwardViz() {
+      stopVizPlayback();
+      if (!vizSteps.length) return;
+      if (vizStepIndex < vizSteps.length - 1) {
+        vizStepIndex++;
+        renderBars(vizSteps[vizStepIndex]);
+      }
+    }
+
+    function resetViz() {
+      stopVizPlayback();
+      if (!vizSteps.length) return;
+      vizStepIndex = 0;
+      renderBars(vizSteps[vizStepIndex]);
+    }
+
+    // =========================
+    // Visualizer step generators
+    // =========================
+    function generateBubbleSteps(input) {
+      const a = input.slice();
+      const steps = [];
+      const n = a.length;
+      let sorted = [];
+
+      steps.push(makeStep(a, 'Initial array'));
+
+      for (let i = 0; i < n - 1; i++) {
+        let swapped = false;
+        for (let j = 0; j < n - i - 1; j++) {
+          steps.push(makeStep(a, `Compare index ${j} (${a[j]}) and ${j + 1} (${a[j + 1]})`, {
+            active: [j, j + 1],
+            sorted
+          }));
+
+          if (a[j] > a[j + 1]) {
+            [a[j], a[j + 1]] = [a[j + 1], a[j]];
+            swapped = true;
+            steps.push(makeStep(a, `Swap them because ${a[j]} should come before ${a[j + 1]}`, {
+              swap: [j, j + 1],
+              sorted
+            }));
+          }
+        }
+
+        sorted = Array.from({ length: i + 1 }, (_, k) => n - 1 - k);
+        steps.push(makeStep(a, `Pass complete: index ${n - 1 - i} is now fixed`, { sorted }));
+
+        if (!swapped) {
+          steps.push(makeStep(a, 'No swaps this pass, so the array is already sorted', {
+            sorted: finalSortedIndices(a)
+          }));
+          return steps;
+        }
+      }
+
+      steps.push(makeStep(a, 'Bubble Sort complete', { sorted: finalSortedIndices(a) }));
+      return steps;
+    }
+
+    function generateInsertionSteps(input) {
+      const a = input.slice();
+      const steps = [];
+      const n = a.length;
+
+      steps.push(makeStep(a, 'Initial array', { sorted: [0] }));
+
+      for (let i = 1; i < n; i++) {
+        const key = a[i];
+        let j = i - 1;
+
+        steps.push(makeStep(a, `Take value ${key} from index ${i} and insert it into the sorted left side`, {
+          active: [i],
+          sorted: Array.from({ length: i }, (_, k) => k)
+        }));
+
+        while (j >= 0 && a[j] > key) {
+          steps.push(makeStep(a, `Compare key ${key} with ${a[j]} at index ${j}`, {
+            active: [j, j + 1],
+            sorted: Array.from({ length: i }, (_, k) => k)
+          }));
+
+          a[j + 1] = a[j];
+          steps.push(makeStep(a, `Shift ${a[j]} right from index ${j} to ${j + 1}`, {
+            swap: [j, j + 1],
+            sorted: Array.from({ length: i }, (_, k) => k)
+          }));
+          j--;
+        }
+
+        a[j + 1] = key;
+        steps.push(makeStep(a, `Insert ${key} at index ${j + 1}`, {
+          swap: [j + 1],
+         

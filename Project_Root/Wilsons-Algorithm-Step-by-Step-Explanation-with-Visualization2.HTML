@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Wilson's Algorithm Step-by-Step Visualization</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    text-align: center;
+    margin: 20px;
+  }
+  canvas {
+    border: 1px solid #333;
+    image-rendering: pixelated;
+    background: #fff;
+  }
+  button {
+    margin: 5px;
+    padding: 8px 15px;
+    font-size: 16px;
+  }
+  #info {
+    margin-top: 10px;
+  }
+</style>
+</head>
+<body>
+
+<h1>Wilson's Algorithm Step-by-Step</h1>
+<canvas id="mazeCanvas" width="400" height="400"></canvas>
+<br />
+<button id="stepBtn">Step</button>
+<button id="autoBtn">Auto Run</button>
+<button id="resetBtn">Reset</button>
+<select id="speedSelect" title="Select auto run speed">
+  <option value="500">Slow</option>
+  <option value="200" selected>Medium</option>
+  <option value="50">Fast</option>
+</select>
+
+<div id="info"></div>
+
+<script>
+(() => {
+  const canvas = document.getElementById('mazeCanvas');
+  const ctx = canvas.getContext('2d');
+  const width = 20;
+  const height = 20;
+  const cellSize = canvas.width / width;
+
+  // Wall flags
+  const WALL_TOP = 1;
+  const WALL_RIGHT = 2;
+  const WALL_BOTTOM = 4;
+  const WALL_LEFT = 8;
+  const ALL_WALLS = WALL_TOP | WALL_RIGHT | WALL_BOTTOM | WALL_LEFT;
+
+  let maze = [];
+  let inMaze = new Set();
+
+  // Directions with wall bits and opposites
+  const directions = [
+    { dx: 0, dy: -1, wall: WALL_TOP, opposite: WALL_BOTTOM },
+    { dx: 1, dy: 0, wall: WALL_RIGHT, opposite: WALL_LEFT },
+    { dx: 0, dy: 1, wall: WALL_BOTTOM, opposite: WALL_TOP },
+    { dx: -1, dy: 0, wall: WALL_LEFT, opposite: WALL_RIGHT }
+  ];
+
+  // State for Wilson's algorithm stepwise
+  let walk = [];          // current loop-erased random walk path [{x,y}, ...]
+  let walkSet = new Set(); // for loop detection
+  let walkPos = null;     // current walk position {x,y}
+  let autoInterval = null;
+  let infoDiv = document.getElementById('info');
+
+  // Initialize maze with all walls intact
+  function initMaze() {
+    maze = [];
+    for(let y=0; y<height; y++){
+      let row = [];
+      for(let x=0; x<width; x++){
+        row.push(ALL_WALLS);
+      }
+      maze.push(row);
+    }
+    inMaze.clear();
+  }
+
+  // Draw maze, walk path, and highlights
+  function drawMaze(walkHighlightIndex = -1) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = '#000';
+
+    // Draw walls
+    for(let y=0; y<height; y++){
+      for(let x=0; x<width; x++){
+        const cell = maze[y][x];
+        const px = x * cellSize;
+        const py = y * cellSize;
+        if(cell & WALL_TOP){
+          ctx.beginPath();
+          ctx.moveTo(px, py);
+          ctx.lineTo(px + cellSize, py);
+          ctx.stroke();
+        }
+        if(cell & WALL_RIGHT){
+          ctx.beginPath();
+          ctx.moveTo(px + cellSize, py);
+          ctx.lineTo(px + cellSize, py + cellSize);
+          ctx.stroke();
+        }
+        if(cell & WALL_BOTTOM){
+          ctx.beginPath();
+          ctx.moveTo(px + cellSize, py + cellSize);
+          ctx.lineTo(px, py + cellSize);
+          ctx.stroke();
+        }
+        if(cell & WALL_LEFT){
+          ctx.beginPath();
+          ctx.moveTo(px, py + cellSize);
+          ctx.lineTo(px, py);
+          ctx.stroke();
+        }
+      }
+    }
+
+    // Fill cells that are in the maze
+    ctx.fillStyle = '#eee';
+    for(let key of inMaze){
+      const [x,y] = key.split(',').map(Number);
+      ctx.fillRect(x*cellSize+2, y*cellSize+2, cellSize-4, cellSize-4);
+    }
+
+    // Draw walk path
+    if(walk.length > 0){
+      ctx.strokeStyle = 'blue';
+      ctx.lineWidth = cellSize / 3;
+      ctx.beginPath();
+      const first = walk[0];
+      ctx.moveTo(first.x*cellSize + cellSize/2, first.y*cellSize + cellSize/2);
+      for(let i=1; i<walk.length; i++){
+        ctx.lineTo(walk[i].x*cellSize + cellSize/2, walk[i].y*cellSize + cellSize/2);
+      }
+      ctx.stroke();
+
+      // Highlight current walk position
+      if(walkHighlightIndex >= 0 && walkHighlightIndex < walk.length){
+        const c = walk[walkHighlightIndex];
+        ctx.fillStyle = 'orange';
+        ctx.beginPath();
+        ctx.arc(c.x*cellSize + cellSize/2, c.y*cellSize + cellSize/2, cellSize/4, 0, Math.PI*2);
+        ctx.fill();
+      }
+    }
+
+    // Highlight initial cell in maze
+    if(inMaze.size > 0){
+      const firstKey = Array.from(inMaze)[0];
+      const [x,y] = firstKey.split(',').map(Number);
+      ctx.fillStyle = 'green';
+      ctx.fillRect(x*cellSize+6, y*cellSize+6, cellSize-12, cellSize-12);
+    }
+  }
+
+  // Helper: cell key string
+  function cellKey(x,y){ return `${x},${y}`; }
+
+  // Check if position in grid
+  function inBounds(x,y){
+    return x >=0 && x < width && y >= 0 && y < height;
+  }
+
+  // Wilson's algorithm step state machine:
+  // States: 'select_start', 'walk', 'carve', 'done'
+  let state = 'select_start';
+
+  // For walk state:
+  // walk array and walkSet track the current loop-erased random walk path
+  // walkPos is current position in the walk
+
+  // Start the algorithm by picking a random start cell for maze
+  function startWilson(){
+    initMaze();
+    // Pick a random cell to seed maze
+    const sx = Math.floor(Math.random()*width);
+    const sy = Math.floor(Math.random()*height);
+    inMaze.add(cellKey(sx, sy));
+
+    state = 'select_start';
+    walk = [];
+    walkSet.clear();
+    walkPos = null;
+
+    infoDiv.textContent = `Start cell added to maze at (${sx},${sy}). Select next random cell not in maze to start random walk.`;
+
+    drawMaze();
+  }
+
+  // One step of Wilson's algorithm
+  function stepWilson(){
+    if(state === 'done'){
+      infoDiv.textContent = 'Maze generation complete!';
+      clearInterval(autoInterval);
+      autoInterval = null;
+      return;
+    }
+
+    if(state === 'select_start'){
+      // Pick random cell not in maze
+      let candidates = [];
+      for(let y=0; y<height; y++){
+        for(let x=0; x<width; x++){
+          if(!inMaze.has(cellKey(x,y))){
+            candidates.push({x,y});
+          }
+        }
+      }
+      if(candidates.length === 0){
+        state = 'done';
+        infoDiv.textContent = 'Maze generation complete!';
+        drawMaze();
+        return;
+      }
+      // Pick random start for walk
+      walkPos = candidates[Math.floor(Math.random()*candidates.length)];
+      walk = [walkPos];
+      walkSet = new Set([cellKey(walkPos.x, walkPos.y)]);
+      state = 'walk';
+      infoDiv.textContent = `Starting random walk from (${walkPos.x},${walkPos.y}). Loop-erased random walk until hitting maze.`;
+      drawMaze(0);
+      return;
+    }
+
+    if(state === 'walk'){
+      // Walk one step in random direction
+      let neighbors = directions.filter(d => inBounds(walkPos.x + d.dx, walkPos.y + d.dy));
+      let nextDir = neighbors[Math.floor(Math.random()*neighbors.length)];
+      let nextPos = {x: walkPos.x + nextDir.dx, y: walkPos.y + nextDir.dy};
+      let nextKey = cellKey(nextPos.x, nextPos.y);
+
+      // Check for loops in walk
+      if(walkSet.has(nextKey)){
+        // Loop detected, erase loop
+        let loopStartIndex = walk.findIndex(c => c.x === nextPos.x && c.y === nextPos.y);
+        walk = walk.slice(0, loopStartIndex + 1);
+        walkSet = new Set(walk.map(c => cellKey(c.x, c.y)));
+        walkPos = nextPos;
+        infoDiv.textContent = `Loop detected at (${nextPos.x},${nextPos.y}). Loop erased, continuing walk.`;
+        drawMaze(walk.length - 1);
+        return;
+      }
+
+      // Move forward
+      walk.push(nextPos);
+      walkSet.add(nextKey);
+      walkPos = nextPos;
+
+      // Check if walk hit the maze
+      if(inMaze.has(nextKey)){
+        state = 'carve';
+        infoDiv.textContent = `Walk hit the maze at (${nextPos.x},${nextPos.y}). Carving path.`;
+        drawMaze(walk.length - 1);
+        return;
+      }
+
+      infoDiv.textContent = `Random walk to (${nextPos.x},${nextPos.y}). Continuing...`;
+      drawMaze(walk.length - 1);
+      return;
+    }
+
+    if(state === 'carve'){
+      // Carve the path from walk start to end by removing walls between adjacent cells
+      for(let i=0; i<walk.length-1; i++){
+        let c1 = walk[i];
+        let c2 = walk[i+1];
+        let dx = c2.x - c1.x;
+        let dy = c2.y - c1.y;
+
+        let dir = directions.find(d => d.dx === dx && d.dy === dy);
+        if(dir){
+          maze[c1.y][c1.x] &= ~dir.wall;
+          maze[c2.y][c2.x] &= ~dir.opposite;
+        }
+        // Add to maze set
+        inMaze.add(cellKey(c1.x, c1.y));
+      }
+      // Also add last cell
+      let last = walk[walk.length - 1];
+      inMaze.add(cellKey(last.x, last.y));
+
+      infoDiv.textContent = `Carved path of length ${walk.length} into maze. Selecting new start cell.`;
+      walk = [];
+      walkSet.clear();
+      walkPos = null;
+      state = 'select_start';
+      drawMaze();
+      return;
+    }
+  }
+
+  // Controls
+  document.getElementById('stepBtn').onclick = () => {
+    if(autoInterval){
+      clearInterval(autoInterval);
+      autoInterval = null;
+      document.getElementById('autoBtn').textContent = 'Auto Run';
+    }
+    stepWilson();
+  };
+
+  document.getElementById('autoBtn').onclick = () => {
+    if(autoInterval){
+      clearInterval(autoInterval);
+      autoInterval = null;
+      document.getElementById('autoBtn').textContent = 'Auto Run';
+    } else {
+      const speed = Number(document.getElementById('speedSelect').value);
+      autoInterval = setInterval(() => {
+        stepWilson();
+      }, speed);
+      document.getElementById('autoBtn').textContent = 'Pause';
+    }
+  };
+
+  document.getElementById('resetBtn').onclick = () => {
+    if(autoInterval){
+      clearInterval(autoInterval);
+      autoInterval = null;
+      document.getElementById('autoBtn').textContent = 'Auto Run';
+    }
+    startWilson();
+  };
+
+  // Start on page load
+  startWilson();
+
+})();
+</script>
+
+</body>
+</html>

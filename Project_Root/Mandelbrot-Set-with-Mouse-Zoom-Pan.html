@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Mandelbrot Set with Mouse Zoom & Pan</title>
+  <style>
+    body {
+      text-align: center;
+      font-family: Arial, sans-serif;
+      background: #111;
+      color: white;
+    }
+    canvas {
+      border: 1px solid #555;
+      cursor: grab;
+      display: block;
+      margin: 20px auto;
+      background: black;
+    }
+    .controls {
+      max-width: 600px;
+      margin: 0 auto 20px;
+      text-align: left;
+    }
+    .controls button {
+      margin-top: 10px;
+      padding: 7px 14px;
+      background: #2b7cff;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .controls button:hover {
+      background: #4b90ff;
+    }
+    #jumpLabel {
+      margin-top: 6px;
+      font-size: 13px;
+      color: #aaa;
+    }
+  </style>
+</head>
+<body>
+
+<h1>Mandelbrot Set Visualization</h1>
+
+<canvas id="mandelbrotCanvas" width="600" height="600"></canvas>
+
+<div class="controls">
+  <label for="iterationRange">Max Iterations: <span id="iterationValue">100</span></label><br/>
+  <input type="range" id="iterationRange" min="10" max="1000" value="100" step="10" />
+  <br/><br/>
+  <label for="paletteShiftRange">Palette Shift: <span id="paletteShiftValue">0.00</span></label><br/>
+  <input type="range" id="paletteShiftRange" min="0" max="1" value="0" step="0.01" />
+  <br/>
+  <button id="randomJumpBtn">Random Jump</button>
+  <div id="jumpLabel"></div>
+</div>
+
+<script>
+  const canvas = document.getElementById('mandelbrotCanvas');
+  const ctx = canvas.getContext('2d');
+  const width = canvas.width;
+  const height = canvas.height;
+
+  const originalBounds = {
+    xmin: -2.5,
+    xmax: 1,
+    ymin: -1.5,
+    ymax: 1.5
+  };
+
+  let zoom = 1;
+  let offsetX = 0;
+  let offsetY = 0;
+  let maxIterations = 100;
+  let paletteShift = 0;
+
+  let isDragging = false;
+  let dragStart = { x: 0, y: 0 };
+  let dragStartOffset = { x: 0, y: 0 };
+
+  const iterationRange = document.getElementById('iterationRange');
+  const iterationValue = document.getElementById('iterationValue');
+  const paletteShiftRange = document.getElementById('paletteShiftRange');
+  const paletteShiftValue = document.getElementById('paletteShiftValue');
+
+  iterationRange.addEventListener('input', () => {
+    maxIterations = parseInt(iterationRange.value, 10);
+    iterationValue.textContent = maxIterations;
+    drawMandelbrot();
+  });
+
+  paletteShiftRange.addEventListener('input', () => {
+    paletteShift = parseFloat(paletteShiftRange.value);
+    paletteShiftValue.textContent = paletteShift.toFixed(2);
+    drawMandelbrot();
+  });
+
+  function pixelToComplex(x, y) {
+    const viewWidth = (originalBounds.xmax - originalBounds.xmin) / zoom;
+    const viewHeight = (originalBounds.ymax - originalBounds.ymin) / zoom;
+
+    const real = originalBounds.xmin + offsetX + (x / width) * viewWidth;
+    const imag = originalBounds.ymin + offsetY + (y / height) * viewHeight;
+
+    return { real, imag };
+  }
+
+  function mandelbrotIterations(cReal, cImag, maxIter) {
+    let zReal = 0;
+    let zImag = 0;
+    let n = 0;
+
+    while (n < maxIter) {
+      const zRealSquared = zReal * zReal;
+      const zImagSquared = zImag * zImag;
+
+      if (zRealSquared + zImagSquared > 4) break;
+
+      const tempZReal = zRealSquared - zImagSquared + cReal;
+      zImag = 2 * zReal * zImag + cImag;
+      zReal = tempZReal;
+
+      n++;
+    }
+    return n;
+  }
+
+  function getColor(iter, maxIter) {
+    if (iter === maxIter) {
+      return [0, 0, 0];
+    }
+    let t = (iter / maxIter + paletteShift) % 1;
+    const r = Math.floor(9 * (1 - t) * t * t * t * 255);
+    const g = Math.floor(15 * (1 - t) * (1 - t) * t * t * 255);
+    const b = Math.floor(8.5 * (1 - t) * (1 - t) * (1 - t) * t * 255);
+    return [r, g, b];
+  }
+
+  function drawMandelbrot() {
+    const imageData = ctx.createImageData(width, height);
+    const data = imageData.data;
+
+    const viewWidth = (originalBounds.xmax - originalBounds.xmin) / zoom;
+    const viewHeight = (originalBounds.ymax - originalBounds.ymin) / zoom;
+
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const cReal = originalBounds.xmin + offsetX + (x / width) * viewWidth;
+        const cImag = originalBounds.ymin + offsetY + (y / height) * viewHeight;
+
+        const iter = mandelbrotIterations(cReal, cImag, maxIterations);
+        const [r, g, b] = getColor(iter, maxIterations);
+
+        const idx = (y * width + x) * 4;
+        data[idx] = r;
+        data[idx + 1] = g;
+        data[idx + 2] = b;
+        data[idx + 3] = 255;
+      }
+    }
+
+    ctx.putImageData(imageData, 0, 0);
+  }
+
+  canvas.addEventListener('wheel', (e) => {
+    e.preventDefault();
+
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+
+    const { real: mouseReBefore, imag: mouseImBefore } = pixelToComplex(mouseX, mouseY);
+
+    const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
+    zoom *= zoomFactor;
+    zoom = Math.min(Math.max(zoom, 1), 1e10);
+
+    const { real: mouseReAfter, imag: mouseImAfter } = pixelToComplex(mouseX, mouseY);
+
+    offsetX += mouseReBefore - mouseReAfter;
+    offsetY += mouseImBefore - mouseImAfter;
+
+    drawMandelbrot();
+  });
+
+  canvas.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    isDragging = true;
+    dragStart.x = e.clientX;
+    dragStart.y = e.clientY;
+    dragStartOffset.x = offsetX;
+    dragStartOffset.y = offsetY;
+    canvas.style.cursor = 'grabbing';
+  });
+
+  window.addEventListener('mouseup', () => {
+    if (isDragging) {
+      isDragging = false;
+      canvas.style.cursor = 'grab';
+    }
+  });
+
+  window.addEventListener('mousemove', (e) => {
+    if (!isDragging) return;
+
+    const dx = e.clientX - dragStart.x;
+    const dy = e.clientY - dragStart.y;
+
+    const viewWidth = (originalBounds.xmax - originalBounds.xmin) / zoom;
+    const viewHeight = (originalBounds.ymax - originalBounds.ymin) / zoom;
+
+    offsetX = dragStartOffset.x - dx / width * viewWidth;
+    offsetY = dragStartOffset.y - dy / height * viewHeight;
+
+    drawMandelbrot();
+  });
+
+  const randomJumpBtn = document.getElementById('randomJumpBtn');
+  const jumpLabel = document.getElementById('jumpLabel');
+
+  const jumpSpots = [
+    { name: 'Seahorse Valley',  cx: -0.7436438870371587, cy:  0.13182590420531197, zoom: 8000 },
+    { name: 'Elephant Valley',  cx:  0.285,              cy:  0.01,               zoom: 400 },
+    { name: 'Triple Spiral',    cx: -0.088,              cy:  0.654,              zoom: 300 },
+    { name: 'Needle Point',     cx: -1.25066,            cy:  0.02012,            zoom: 50000 },
+    { name: 'Mini Mandelbrot',  cx: -1.7498,             cy:  0.0,               zoom: 2000 },
+    { name: 'Spiral Coast',     cx: -0.761574,           cy: -0.0847596,         zoom: 60000 },
+    { name: 'Antenna',          cx: -1.401155,           cy:  0.0,               zoom: 5000 },
+    { name: 'Upper Bulb Edge',  cx: -0.16,               cy:  1.04,              zoom: 150 }
+  ];
+
+  function jumpToRandom() {
+    const spot = jumpSpots[Math.floor(Math.random() * jumpSpots.length)];
+    const viewWidth  = (originalBounds.xmax - originalBounds.xmin);
+    const viewHeight = (originalBounds.ymax - originalBounds.ymin);
+    zoom = spot.zoom;
+    // Center the view on the spot by computing the needed offsets
+    offsetX = spot.cx - originalBounds.xmin - (viewWidth  / zoom) / 2;
+    offsetY = spot.cy - originalBounds.ymin - (viewHeight / zoom) / 2;
+    jumpLabel.textContent = 'Jumped to: ' + spot.name;
+    drawMandelbrot();
+  }
+
+  randomJumpBtn.addEventListener('click', jumpToRandom);
+
+  drawMandelbrot();
+</script>
+
+</body>
+</html>

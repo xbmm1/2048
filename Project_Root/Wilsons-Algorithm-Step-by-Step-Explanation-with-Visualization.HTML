@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Wilson's Algorithm Step-by-Step Explanation with Visualization</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    max-width: 900px;
+    margin: 20px auto;
+    padding: 0 15px;
+    line-height: 1.6;
+    color: #333;
+  }
+  h1, h2 {
+    color: #2c3e50;
+  }
+  #canvas-container {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 20px;
+  }
+  canvas {
+    border: 2px solid #333;
+    image-rendering: pixelated;
+    background-color: #000;
+  }
+  #steps {
+    background: #f9f9f9;
+    border: 1px solid #ddd;
+    padding: 15px;
+    border-radius: 6px;
+  }
+  .highlight {
+    color: #007acc;
+    font-weight: bold;
+  }
+  #status {
+    margin-top: 15px;
+    font-size: 1.1em;
+    font-weight: bold;
+  }
+</style>
+</head>
+<body>
+
+<h1>Wilson's Algorithm: Step-by-Step Explanation with Visualization</h1>
+
+<div id="canvas-container">
+  <canvas id="mazeCanvas" width="600" height="600"></canvas>
+</div>
+<li>
+ 
+  <button onclick="window.open('Wilsons-Algorithm-Step-by-Step-Explanation-with-Visualization2.HTML', '_blank')">
+    Open Version 2
+  </button>
+</li>
+<div id="steps">
+  <h2>Algorithm Steps</h2>
+  <ol>
+    <li><span class="highlight">Initialize the grid:</span> The maze starts fully walled.</li>
+    <li><span class="highlight">Pick a random starting cell:</span> This cell becomes the first path cell.</li>
+    <li><span class="highlight">Randomly select an unvisited cell:</span> This cell will perform a random walk.</li>
+    <li><span class="highlight">Perform a loop-erased random walk:</span> Randomly move to neighbors until a visited cell is reached, erasing loops.</li>
+    <li><span class="highlight">Add the loop-erased path to the maze:</span> Mark all cells in the path as part of the maze.</li>
+    <li><span class="highlight">Repeat steps 3-5:</span> Continue until 50% of cells are part of the maze.</li>
+  </ol>
+</div>
+
+<div id="status">Status: Initializing...</div>
+
+<script>
+const canvas = document.getElementById('mazeCanvas');
+const ctx = canvas.getContext('2d');
+
+const cols = 30;
+const rows = 30;
+const cellSize = canvas.width / cols;
+
+const WALL = 1;
+const PATH = 0;
+
+let grid = [];
+let visited = new Set();
+
+const directions = [
+  {x: 0, y: -1},  // North
+  {x: 0, y: 1},   // South
+  {x: 1, y: 0},   // East
+  {x: -1, y: 0}   // West
+];
+
+// Initialize grid with all walls
+function initGrid() {
+  grid = [];
+  for (let y = 0; y < rows; y++) {
+    let row = [];
+    for (let x = 0; x < cols; x++) {
+      row.push(WALL);
+    }
+    grid.push(row);
+  }
+}
+
+// Draw the grid on canvas
+function drawGrid(highlightPath = [], currentCell = null, walkCells = new Set()) {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  for(let y=0; y<rows; y++){
+    for(let x=0; x<cols; x++){
+      let cellKey = y*cols + x;
+      if(grid[y][x] === WALL){
+        ctx.fillStyle = '#000'; // black walls
+      } else {
+        ctx.fillStyle = '#fff'; // white path
+      }
+
+      ctx.fillRect(x*cellSize, y*cellSize, cellSize, cellSize);
+
+      // Highlight current random walk path cells in light blue
+      if(walkCells.has(cellKey) && grid[y][x] === PATH){
+        ctx.fillStyle = 'rgba(30, 144, 255, 0.4)';
+        ctx.fillRect(x*cellSize, y*cellSize, cellSize, cellSize);
+      }
+
+      // Highlight the loop-erased path in bright blue
+      for(let p of highlightPath){
+        if(p.x === x && p.y === y){
+          ctx.fillStyle = 'rgba(0, 120, 215, 0.7)';
+          ctx.fillRect(x*cellSize, y*cellSize, cellSize, cellSize);
+          break;
+        }
+      }
+
+      // Highlight the current cell of random walk in orange
+      if(currentCell && currentCell.x === x && currentCell.y === y){
+        ctx.fillStyle = 'orange';
+        ctx.beginPath();
+        ctx.arc(x*cellSize + cellSize/2, y*cellSize + cellSize/2, cellSize/3, 0, Math.PI*2);
+        ctx.fill();
+      }
+
+      // Draw grid lines for clarity
+      ctx.strokeStyle = '#ccc';
+      ctx.lineWidth = 0.5;
+      ctx.strokeRect(x*cellSize, y*cellSize, cellSize, cellSize);
+    }
+  }
+}
+
+// Check if coordinates are inside grid
+function inBounds(x, y) {
+  return x >= 0 && y >= 0 && x < cols && y < rows;
+}
+
+// Sleep helper for animation delay
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// Main Wilson's algorithm with visualization and status updates
+async function wilsonsAlgorithm() {
+  document.getElementById('status').innerText = 'Status: Initializing grid with walls.';
+  initGrid();
+  visited = new Set();
+
+  // Pick a random starting cell and mark it visited
+  let firstX = Math.floor(Math.random()*cols);
+  let firstY = Math.floor(Math.random()*rows);
+  visited.add(firstY*cols + firstX);
+  grid[firstY][firstX] = PATH;
+  drawGrid();
+  document.getElementById('status').innerText = 'Status: Random starting cell chosen.';
+  await sleep(1000);
+
+  // Main loop: continue until all cells visited
+  while (visited.size < (cols * rows) / 2) {
+    // Pick a random unvisited cell to start the walk
+    let walkX, walkY;
+    do {
+      walkX = Math.floor(Math.random()*cols);
+      walkY = Math.floor(Math.random()*rows);
+    } while (visited.has(walkY*cols + walkX));
+
+    document.getElementById('status').innerText = `Status: Starting random walk from cell (${walkX}, ${walkY}).`;
+
+    let path = [];
+    let pathMap = new Map();
+    let pos = {x: walkX, y: walkY};
+
+    // Perform loop-erased random walk until hitting visited cell
+    while (!visited.has(pos.y*cols + pos.x)) {
+      path.push({x: pos.x, y: pos.y});
+      pathMap.set(pos.y*cols + pos.x, path.length - 1);
+
+      // Visualize current walk path
+      let walkCellsSet = new Set(path.map(c => c.y*cols + c.x));
+      drawGrid(path, pos, walkCellsSet);
+      await sleep(50);
+
+      // Choose random neighbor to walk to
+      let neighbors = directions.filter(d => inBounds(pos.x + d.x, pos.y + d.y));
+      let next = neighbors[Math.floor(Math.random()*neighbors.length)];
+      pos = {x: pos.x + next.x, y: pos.y + next.y};
+
+      // Loop erasure: if pos already in path, erase the loop
+      if(pathMap.has(pos.y*cols + pos.x)){
+        let loopStart = pathMap.get(pos.y*cols + pos.x);
+        path = path.slice(0, loopStart + 1);
+        // Remove keys after loopStart
+        for(let key of pathMap.keys()){
+          if(pathMap.get(key) > loopStart){
+            pathMap.delete(key);
+          }
+        }
+      }
+    }
+
+    document.getElementById('status').innerText = `Status: Loop-erased path found with length ${path.length}. Adding path to maze...`;
+
+    // Add the loop-erased path to the maze (mark visited)
+    for(let cell of path){
+      visited.add(cell.y*cols + cell.x);
+      grid[cell.y][cell.x] = PATH;
+      drawGrid(path, null);
+      await sleep(30);
+    }
+  }
+
+  document.getElementById('status').innerText = 'Status: Maze generation complete!';
+  drawGrid();
+}
+
+// Run visualization
+wilsonsAlgorithm();
+
+</script>
+
+</body>
+</html>

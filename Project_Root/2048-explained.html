@@ -1,0 +1,838 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Understanding the 2048 Game Code</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    max-width: 900px;
+    margin: 20px auto;
+    padding: 0 15px;
+    background: #faf8ef;
+    color: #333;
+  }
+  h1, h2 {
+    text-align: center;
+    color: #776e65;
+  }
+  details {
+    background: #eee4da;
+    margin: 12px 0;
+    padding: 12px 15px;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+  }
+  summary {
+    font-weight: bold;
+    font-size: 18px;
+    cursor: pointer;
+  }
+  pre {
+    background: #f7f4f0;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    padding: 12px;
+    overflow-x: auto;
+    font-size: 14px;
+    line-height: 1.4;
+  }
+  code {
+    font-family: Consolas, monospace;
+  }
+  #fullCode {
+    max-height: 400px;
+    overflow-y: scroll;
+  }
+  a {
+    color: #8f7a66;
+    text-decoration: none;
+  }
+  a:hover {
+    text-decoration: underline;
+  }
+  footer {
+    text-align: center;
+    margin: 30px 0;
+    font-size: 14px;
+    color: #999;
+  }
+</style>
+</head>
+<body>
+
+<h1>Understanding the Simple 2048 Game</h1>
+<p>Explore the main parts of a simple 2048 game implemented in JavaScript. Click each section to expand and see explanation and code snippets.</p>
+
+<details open>
+  <summary>1. Initializing the Board</summary>
+  <p>The game board is created as a 4x4 grid filled with zeros representing empty cells. Two tiles (2 or 4) are added randomly to start the game.</p>
+  <pre><code>function initBoard() {
+  board = [];
+  score = 0;
+  message.textContent = '';
+  for(let i=0; i&lt;size; i++) {
+    board[i] = [];
+    for(let j=0; j&lt;size; j++) {
+      board[i][j] = 0; // Empty cell
+    }
+  }
+  addRandomTile();
+  addRandomTile();
+  updateBoard();
+  updateScore();
+}</code></pre>
+</details>
+
+<details>
+  <summary>2. Adding a Random Tile</summary>
+  <p>This function finds all empty cells and places a new tile (usually a 2, sometimes a 4) in a random empty spot.</p>
+  <pre><code>function addRandomTile() {
+  let empty = [];
+  for(let r=0; r&lt;size; r++) {
+    for(let c=0; c&lt;size; c++) {
+      if(board[r][c] === 0) empty.push({r, c});
+    }
+  }
+  if(empty.length === 0) return;
+  const {r, c} = empty[Math.floor(Math.random() * empty.length)];
+  board[r][c] = Math.random() &lt; 0.9 ? 2 : 4;
+}</code></pre>
+</details>
+
+<details>
+  <summary>3. Rendering the Board</summary>
+  <p>The board is drawn by creating and styling <code>&lt;div&gt;</code> elements for each tile, coloring them according to their value.</p>
+  <pre><code>function updateBoard() {
+  gameBoard.innerHTML = '';
+  for(let r=0; r&lt;size; r++) {
+    for(let c=0; c&lt;size; c++) {
+      const val = board[r][c];
+      const tile = document.createElement('div');
+      tile.classList.add('tile');
+      if(val !== 0) {
+        tile.classList.add('tile-' + val);
+        tile.textContent = val;
+      }
+      gameBoard.appendChild(tile);
+    }
+  }
+}</code></pre>
+</details>
+
+<details>
+  <summary>4. Updating the Score</summary>
+  <p>Simple function to update the score display.</p>
+  <pre><code>function updateScore() {
+  scoreDisplay.textContent = 'Score: ' + score;
+}</code></pre>
+</details>
+
+<details>
+  <summary>5. Sliding and Merging Tiles</summary>
+  <p>This is the core logic: compressing tiles to one side, merging equal tiles, and updating the score.</p>
+  <pre><code>function slide(row) {
+  let arr = row.filter(v =&gt; v !== 0);
+  for(let i=0; i &lt; arr.length -1; i++) {
+    if(arr[i] === arr[i+1]) {
+      arr[i] *= 2;
+      score += arr[i];
+      arr[i+1] = 0;
+      i++;
+    }
+  }
+  arr = arr.filter(v =&gt; v !== 0);
+  while(arr.length &lt; size) arr.push(0);
+  return arr;
+}</code></pre>
+</details>
+
+<details>
+  <summary>6. Moving in All Directions</summary>
+  <p>Handles moves by applying <code>slide()</code> on rows or columns depending on the direction.</p>
+  <pre><code>function move(direction) {
+  let moved = false;
+  switch(direction) {
+    case 'left':
+      for(let r=0; r&lt;size; r++) {
+        let newRow = slide(board[r]);
+        if(newRow.toString() !== board[r].toString()) {
+          moved = true;
+          board[r] = newRow;
+        }
+      }
+      break;
+    case 'right':
+      for(let r=0; r&lt;size; r++) {
+        let reversed = board[r].slice().reverse();
+        let newRow = slide(reversed);
+        newRow.reverse();
+        if(newRow.toString() !== board[r].toString()) {
+          moved = true;
+          board[r] = newRow;
+        }
+      }
+      break;
+    case 'up':
+      for(let c=0; c&lt;size; c++) {
+        let col = [];
+        for(let r=0; r&lt;size; r++) col.push(board[r][c]);
+        let newCol = slide(col);
+        for(let r=0; r&lt;size; r++) {
+          if(board[r][c] !== newCol[r]) {
+            moved = true;
+            board[r][c] = newCol[r];
+          }
+        }
+      }
+      break;
+    case 'down':
+      for(let c=0; c&lt;size; c++) {
+        let col = [];
+        for(let r=0; r&lt;size; r++) col.push(board[r][c]);
+        let reversed = col.slice().reverse();
+        let newCol = slide(reversed);
+        newCol.reverse();
+        for(let r=0; r&lt;size; r++) {
+          if(board[r][c] !== newCol[r]) {
+            moved = true;
+            board[r][c] = newCol[r];
+          }
+        }
+      }
+      break;
+  }
+  if(moved) {
+    addRandomTile();
+    updateBoard();
+    updateScore();
+    if(checkGameOver()) {
+      message.textContent = 'Game Over! Press Restart to try again.';
+    }
+  }
+}</code></pre>
+</details>
+
+<details>
+  <summary>7. Checking Game Over</summary>
+  <p>Checks if any moves are possible. If none, the game ends.</p>
+  <pre><code>function checkGameOver() {
+  for(let r=0; r&lt;size; r++) {
+    for(let c=0; c&lt;size; c++) {
+      if(board[r][c] === 0) return false;
+      if(c &lt; size -1 &amp;&amp; board[r][c] === board[r][c+1]) return false;
+      if(r &lt; size -1 &amp;&amp; board[r][c] === board[r+1][c]) return false;
+    }
+  }
+  return true;
+}</code></pre>
+</details>
+
+<details>
+  <summary>8. Handling Keyboard Input</summary>
+  <p>Listens for arrow keys and calls move accordingly.</p>
+  <pre><code>window.addEventListener('keydown', e =&gt; {
+  if(message.textContent !== '') return;
+  switch(e.key) {
+    case 'ArrowLeft':
+      e.preventDefault();
+      move('left');
+      break;
+    case 'ArrowRight':
+      e.preventDefault();
+      move('right');
+      break;
+    case 'ArrowUp':
+      e.preventDefault();
+      move('up');
+      break;
+    case 'ArrowDown':
+      e.preventDefault();
+      move('down');
+      break;
+  }
+});</code></pre>
+</details>
+
+<details>
+  <summary>9. Restart Button</summary>
+  <p>Resets the game by reinitializing the board.</p>
+  <pre><code>restartBtn.addEventListener('click', () =&gt; {
+  initBoard();
+});</code></pre>
+</details>
+
+<details>
+  <summary>10. Time Complexity Analysis of the 2048 Game</summary>
+  <p><strong>Key operations and their complexities:</strong></p>
+  <ul>
+    <li><strong>Board Initialization (<code>initBoard</code>)</strong><br>
+      Loops through all cells once to set up the board: O(N²) where N=4 (grid size). For typical 2048, N=4 is constant and small → effectively O(1) in practice.</li>
+    <li><strong>Adding a Random Tile (<code>addRandomTile</code>)</strong><br>
+      Scans the entire board to find empty cells: O(N²). Randomly selects one empty cell: O(1). Overall: O(N²).</li>
+    <li><strong>Rendering the Board (<code>updateBoard</code>)</strong><br>
+      Creates and appends one DOM element per cell: O(N²). DOM operations can be expensive, especially frequent clearing and rebuilding. For small N=4, this is fast enough.</li>
+    <li><strong>Sliding and Merging a Row (<code>slide</code>)</strong><br>
+      Processes one array of length N: O(N). Called once per row or column: total O(N) per move per direction.</li>
+    <li><strong>Moving Tiles (<code>move</code>)</strong><br>
+      Applies <code>slide</code> on all rows or columns: O(N²). For each move, loops over all rows/columns to process tiles.</li>
+    <li><strong>Checking Game Over (<code>checkGameOver</code>)</strong><br>
+      Checks every cell and adjacent neighbors: O(N²). Constant time per cell.</li>
+    <li><strong>Keyboard Event Handler</strong><br>
+      Calls <code>move</code> once per key press, so complexity depends on <code>move</code>.</li>
+  </ul>
+  <p><strong>Overall Complexity Per Move:</strong> Dominated by sliding/merging and rendering, both O(N²). For standard 4x4 grid, operations are effectively constant time.</p>
+</details>
+
+<details>
+  <summary>11. Optimizations and Potential Bottlenecks</summary>
+  <p><strong>Current Optimizations:</strong></p>
+  <ul>
+    <li><strong>Simple Data Structures:</strong> Using a 2D array makes state management straightforward.</li>
+    <li><strong>Efficient Slide Logic:</strong> <code>slide</code> compresses and merges tiles in a single pass.</li>
+    <li><strong>Conditional Updates:</strong> Board updates only if the move changes the state.</li>
+    <li><strong>DOM Updates After Moves:</strong> Board re-rendered only after a successful move.</li>
+  </ul>
+  <p><strong>Potential Bottlenecks:</strong></p>
+  <ul>
+    <li><strong>Full Board Re-rendering:</strong> <code>updateBoard</code> clears and rebuilds all tile elements on each move, which can be costly on larger grids or slower devices.<br>
+      <em>Optimization:</em> Update only changed tiles or reuse DOM elements.</li>
+    <li><strong>Random Tile Addition:</strong> Scans entire board for empty cells each time.<br>
+      <em>Optimization:</em> Maintain a list of empty cells for O(1) random selection.</li>
+    <li><strong>Row Comparison Using String Conversion:</strong> Uses <code>toString()</code> for detecting changes, which is less efficient.<br>
+      <em>Optimization:</em> Compare arrays element-wise.</li>
+    <li><strong>No Early Exit in <code>slide</code>:</strong> Processes entire row even if no change.<br>
+      <em>Optimization:</em> Add checks to skip unnecessary processing.</li>
+    <li><strong>No Input Throttling:</strong> Rapid key presses may cause overlapping moves.<br>
+      <em>Optimization:</em> Debounce input events.</li>
+  </ul>
+  <p>For a 4x4 grid, performance is generally very good. However, these improvements could help if you plan to extend the game to larger grids or add animations.</p>
+</details>
+
+<details>
+  <summary>12. Pattern Solver Algorithm Explained</summary>
+  <style>
+    .solver-explanation {
+      font-family: Consolas, monospace;
+      background: #f7f4f0;
+      border: 1px solid #ddd;
+      padding: 10px;
+      margin: 10px 0;
+      white-space: pre-wrap;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+    .solver-controls {
+      margin-top: 10px;
+    }
+    button {
+      padding: 6px 12px;
+      margin-right: 10px;
+      font-size: 14px;
+      cursor: pointer;
+      border-radius: 4px;
+      border: none;
+      background-color: #8f7a66;
+      color: white;
+    }
+    button:hover {
+      background-color: #9f8b76;
+    }
+    #solver-output {
+      margin-top: 10px;
+      font-family: Arial, sans-serif;
+      background: #eee;
+      padding: 10px;
+      border-radius: 6px;
+      max-height: 150px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+    }
+  </style>
+
+  <p>
+    This solver tries moves in the following pattern:<br>
+    1. Repeatedly tries <strong>Up</strong> moves until no moves possible.<br>
+    2. Then repeatedly tries <strong>Right</strong> moves until no moves possible.<br>
+    3. Then alternates <strong>Left</strong> and <strong>Right</strong> moves once each.<br>
+    4. Then repeats from step 1.<br><br>
+    The solver runs automatically step-by-step with a delay so you can observe its decisions.
+  </p>
+
+  <div class="solver-controls">
+    <button id="startSolverBtn">Start Solver Demo</button>
+    <button id="stepSolverBtn" disabled>Step Solver Once</button>
+    <button id="stopSolverBtn" disabled>Stop Solver</button>
+  </div>
+
+  <div id="solver-output">Press "Start Solver Demo" to begin.</div>
+
+  <div class="solver-explanation" id="solverCode">
+function patternSolverStep(state) {
+  if (state.phase === 1) {
+    // Try Up moves repeatedly
+    if (state.canMove('up')) {
+      state.move('up');
+      return 'Moved Up';
+    } else {
+      state.phase = 2;
+      return 'Switching to Right moves';
+    }
+  }
+  if (state.phase === 2) {
+    // Try Right moves repeatedly
+    if (state.canMove('right')) {
+      state.move('right');
+      return 'Moved Right';
+    } else {
+      state.phase = 3;
+      state.leftRightToggle = false;
+      return 'Switching to Left/Right alternation';
+    }
+  }
+  if (state.phase === 3) {
+    // Alternate Left and Right moves once each
+    let dir = state.leftRightToggle ? 'right' : 'left';
+    if (state.canMove(dir)) {
+      state.move(dir);
+      state.leftRightToggle = !state.leftRightToggle;
+      if (!state.leftRightToggle) {
+        state.phase = 1; // back to phase 1 after one left and one right move
+      }
+      return 'Moved ' + dir.charAt(0).toUpperCase() + dir.slice(1);
+    } else {
+      // If can't move in chosen direction, just toggle and maybe change phase
+      state.leftRightToggle = !state.leftRightToggle;
+      if (!state.leftRightToggle) {
+        state.phase = 1;
+      }
+      return 'No move possible, toggling direction';
+    }
+  }
+}
+  </div>
+
+  <script>
+    (function(){
+      const startBtn = document.getElementById('startSolverBtn');
+      const stepBtn = document.getElementById('stepSolverBtn');
+      const stopBtn = document.getElementById('stopSolverBtn');
+      const output = document.getElementById('solver-output');
+
+      // Simple mock state object simulating moves allowed
+      let solverState = null;
+      let intervalId = null;
+
+      // For demo, define which moves are possible, change over time
+      // This simulates the board state allowing or blocking moves
+      const demoMoveSequences = [
+        { up: true, right: true, left: true },
+        { up: true, right: false, left: true },
+        { up: false, right: true, left: true },
+        { up: false, right: false, left: true },
+        { up: false, right: false, left: false }
+      ];
+      let demoIndex = 0;
+
+      function canMoveMock(dir) {
+        // For demo, cycle through demoMoveSequences over time
+        return demoMoveSequences[demoIndex][dir];
+      }
+      function moveMock(dir) {
+        output.textContent += '\nPerforming move: ' + dir.toUpperCase();
+        // Change demoIndex to simulate moves becoming unavailable over time
+        if (demoIndex < demoMoveSequences.length - 1) {
+          demoIndex++;
+        }
+      }
+
+      function resetDemo() {
+        demoIndex = 0;
+        solverState = {
+          phase: 1,
+          leftRightToggle: false,
+          canMove: canMoveMock,
+          move: moveMock
+        };
+        output.textContent = 'Solver demo started.\n';
+      }
+
+      function stepSolver() {
+        if (!solverState) {
+          output.textContent = 'Click "Start Solver Demo" first.';
+          return;
+        }
+        const result = patternSolverStep(solverState);
+        output.textContent += '\n' + result;
+        output.scrollTop = output.scrollHeight;
+      }
+
+      function patternSolverStep(state) {
+  if (state.phase === 1) {
+    // Phase 1: Try moving UP repeatedly
+    if (state.canMove('up')) {
+      state.move('up');
+      return 'Moved Up';
+    } else {
+      // Can't move up anymore → switch to phase 2
+      state.phase = 2;
+      return 'Switching to Right moves';
+    }
+  }
+
+  if (state.phase === 2) {
+    // Phase 2: Try moving RIGHT repeatedly
+    if (state.canMove('right')) {
+      state.move('right');
+      return 'Moved Right';
+    } else {
+      // Can't move right anymore → switch to phase 3 and reset toggle
+      state.phase = 3;
+      state.leftRightToggle = false; // false means next move will be LEFT
+      return 'Switching to Left/Right alternation';
+    }
+  }
+
+  if (state.phase === 3) {
+    // Phase 3: Alternate LEFT and RIGHT moves once each
+    let dir = state.leftRightToggle ? 'right' : 'left';
+    if (state.canMove(dir)) {
+      state.move(dir);
+      // Toggle direction for next call
+      state.leftRightToggle = !state.leftRightToggle;
+
+      // After completing both left and right moves (toggle back to false),
+      // loop back to phase 1
+      if (!state.leftRightToggle) {
+        state.phase = 1;
+      }
+
+      return 'Moved ' + dir.charAt(0).toUpperCase() + dir.slice(1);
+    } else {
+      // If move not possible in chosen direction, still toggle and check phase
+      state.leftRightToggle = !state.leftRightToggle;
+
+      if (!state.leftRightToggle) {
+        // After attempting both moves, go back to phase 1 regardless
+        state.phase = 1;
+      }
+
+      return 'No move possible, returning to phase 1';
+    }
+  }
+}
+
+
+      startBtn.addEventListener('click', () => {
+        if(intervalId) return; // prevent multiple intervals
+        resetDemo();
+        stepBtn.disabled = false;
+        stopBtn.disabled = false;
+        startBtn.disabled = true;
+
+        intervalId = setInterval(() => {
+          stepSolver();
+        }, 1000);
+      });
+
+      stepBtn.addEventListener('click', () => {
+        stepSolver();
+      });
+
+      stopBtn.addEventListener('click', () => {
+        if(intervalId) {
+          clearInterval(intervalId);
+          intervalId = null;
+          output.textContent += '\nSolver stopped.';
+          startBtn.disabled = false;
+          stepBtn.disabled = true;
+          stopBtn.disabled = true;
+        }
+      });
+
+    })();
+  </script>
+</details>
+
+
+
+<hr />
+<h2>Full Source Code</h2>
+<div id="fullCode">
+<pre><code>&lt;!DOCTYPE html&gt;
+&lt;html lang="en"&gt;
+&lt;head&gt;
+&lt;meta charset="UTF-8" /&gt;
+&lt;meta name="viewport" content="width=device-width, initial-scale=1" /&gt;
+&lt;title&gt;Simple 2048 Game&lt;/title&gt;
+&lt;style&gt;
+  body {
+    font-family: Arial, sans-serif;
+    background: #faf8ef;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin: 20px;
+  }
+
+  h1 {
+    margin-bottom: 10px;
+  }
+
+  #score {
+    font-size: 20px;
+    margin-bottom: 10px;
+  }
+
+  #gameBoard {
+    background: #bbada0;
+    border-radius: 10px;
+    padding: 10px;
+    width: 420px;
+    height: 420px;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    grid-gap: 10px;
+  }
+
+  .tile {
+    width: 100px;
+    height: 100px;
+    background: #cdc1b4;
+    border-radius: 6px;
+    font-weight: bold;
+    font-size: 45px;
+    line-height: 100px;
+    text-align: center;
+    color: #776e65;
+    user-select: none;
+  }
+
+  .tile-2 { background: #eee4da; color: #776e65; }
+  .tile-4 { background: #ede0c8; color: #776e65; }
+  .tile-8 { background: #f2b179; color: #f9f6f2; }
+  .tile-16 { background: #f59563; color: #f9f6f2; }
+  .tile-32 { background: #f67c5f; color: #f9f6f2; }
+  .tile-64 { background: #f65e3b; color: #f9f6f2; }
+  .tile-128 { background: #edcf72; color: #f9f6f2; font-size: 35px; }
+  .tile-256 { background: #edcc61; color: #f9f6f2; font-size: 35px; }
+  .tile-512 { background: #edc850; color: #f9f6f2; font-size: 35px; }
+  .tile-1024 { background: #edc53f; color: #f9f6f2; font-size: 25px; }
+  .tile-2048 { background: #edc22e; color: #f9f6f2; font-size: 25px; }
+
+  #message {
+    margin-top: 15px;
+    font-size: 24px;
+    color: #776e65;
+  }
+
+  button {
+    margin-top: 20px;
+    padding: 10px 20px;
+    font-size: 16px;
+    background: #8f7a66;
+    border: none;
+    border-radius: 5px;
+    color: white;
+    cursor: pointer;
+  }
+  button:hover {
+    background: #9f8b76;
+  }
+&lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+
+&lt;h1&gt;2048 Game&lt;/h1&gt;
+&lt;div id="score"&gt;Score: 0&lt;/div&gt;
+&lt;div id="gameBoard"&gt;&lt;/div&gt;
+&lt;div id="message"&gt;&lt;/div&gt;
+&lt;button id="restartBtn"&gt;Restart&lt;/button&gt;
+
+&lt;script&gt;
+  const size = 4;
+  let board = [];
+  let score = 0;
+  const gameBoard = document.getElementById('gameBoard');
+  const scoreDisplay = document.getElementById('score');
+  const message = document.getElementById('message');
+  const restartBtn = document.getElementById('restartBtn');
+
+  function initBoard() {
+    board = [];
+    score = 0;
+    message.textContent = '';
+    for(let i=0; i&lt;size; i++) {
+      board[i] = [];
+      for(let j=0; j&lt;size; j++) {
+        board[i][j] = 0;
+      }
+    }
+    addRandomTile();
+    addRandomTile();
+    updateBoard();
+    updateScore();
+  }
+
+  function addRandomTile() {
+    let empty = [];
+    for(let r=0; r&lt;size; r++) {
+      for(let c=0; c&lt;size; c++) {
+        if(board[r][c] === 0) empty.push({r, c});
+      }
+    }
+    if(empty.length === 0) return;
+    const {r, c} = empty[Math.floor(Math.random() * empty.length)];
+    board[r][c] = Math.random() &lt; 0.9 ? 2 : 4;
+  }
+
+  function updateBoard() {
+    gameBoard.innerHTML = '';
+    for(let r=0; r&lt;size; r++) {
+      for(let c=0; c&lt;size; c++) {
+        const val = board[r][c];
+        const tile = document.createElement('div');
+        tile.classList.add('tile');
+        if(val !== 0) {
+          tile.classList.add('tile-' + val);
+          tile.textContent = val;
+        }
+        gameBoard.appendChild(tile);
+      }
+    }
+  }
+
+  function updateScore() {
+    scoreDisplay.textContent = 'Score: ' + score;
+  }
+
+  function slide(row) {
+    let arr = row.filter(v =&gt; v !== 0);
+    for(let i=0; i &lt; arr.length -1; i++) {
+      if(arr[i] === arr[i+1]) {
+        arr[i] *= 2;
+        score += arr[i];
+        arr[i+1] = 0;
+        i++;
+      }
+    }
+    arr = arr.filter(v =&gt; v !== 0);
+    while(arr.length &lt; size) arr.push(0);
+    return arr;
+  }
+
+  function move(direction) {
+    let moved = false;
+    switch(direction) {
+      case 'left':
+        for(let r=0; r&lt;size; r++) {
+          let newRow = slide(board[r]);
+          if(newRow.toString() !== board[r].toString()) {
+            moved = true;
+            board[r] = newRow;
+          }
+        }
+        break;
+      case 'right':
+        for(let r=0; r&lt;size; r++) {
+          let reversed = board[r].slice().reverse();
+          let newRow = slide(reversed);
+          newRow.reverse();
+          if(newRow.toString() !== board[r].toString()) {
+            moved = true;
+            board[r] = newRow;
+          }
+        }
+        break;
+      case 'up':
+        for(let c=0; c&lt;size; c++) {
+          let col = [];
+          for(let r=0; r&lt;size; r++) col.push(board[r][c]);
+          let newCol = slide(col);
+          for(let r=0; r&lt;size; r++) {
+            if(board[r][c] !== newCol[r]) {
+              moved = true;
+              board[r][c] = newCol[r];
+            }
+          }
+        }
+        break;
+      case 'down':
+        for(let c=0; c&lt;size; c++) {
+          let col = [];
+          for(let r=0; r&lt;size; r++) col.push(board[r][c]);
+          let reversed = col.slice().reverse();
+          let newCol = slide(reversed);
+          newCol.reverse();
+          for(let r=0; r&lt;size; r++) {
+            if(board[r][c] !== newCol[r]) {
+              moved = true;
+              board[r][c] = newCol[r];
+            }
+          }
+        }
+        break;
+    }
+    if(moved) {
+      addRandomTile();
+      updateBoard();
+      updateScore();
+      if(checkGameOver()) {
+        message.textContent = 'Game Over! Press Restart to try again.';
+      }
+    }
+  }
+
+  function checkGameOver() {
+    for(let r=0; r&lt;size; r++) {
+      for(let c=0; c&lt;size; c++) {
+        if(board[r][c] === 0) return false;
+        if(c &lt; size -1 &amp;&amp; board[r][c] === board[r][c+1]) return false;
+        if(r &lt; size -1 &amp;&amp; board[r][c] === board[r+1][c]) return false;
+      }
+    }
+    return true;
+  }
+
+  window.addEventListener('keydown', e =&gt; {
+    if(message.textContent !== '') return;
+    switch(e.key) {
+      case 'ArrowLeft':
+        e.preventDefault();
+        move('left');
+        break;
+      case 'ArrowRight':
+        e.preventDefault();
+        move('right');
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        move('up');
+        break;
+      case 'ArrowDown':
+        e.preventDefault();
+        move('down');
+        break;
+    }
+  });
+
+  restartBtn.addEventListener('click', () =&gt; {
+    initBoard();
+  });
+
+  initBoard();
+
+&lt;/script&gt;
+
+&lt;/body&gt;
+&lt;/html&gt;
+</code></pre>
+</div>
+
+<footer>
+  &copy; 2025 Simple 2048 Explanation — Created by Brian (and ai)
+</footer>
+
+</body>
+</html>
