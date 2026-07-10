@@ -1,6 +1,9 @@
 // js/maze.js
 // Wilson's algorithm: generates a Uniform Spanning Tree over a grid of cells
 // via loop-erased random walks, then expands it into a wall/floor tile grid.
+// A "braiding" pass afterwards knocks out extra walls at random, turning
+// some of the tree's dead ends / single paths into loops so there are
+// multiple distinct routes between the spawn and the exit.
 
 const Maze = (() => {
   function cellKey(x, y) {
@@ -16,9 +19,37 @@ const Maze = (() => {
     return n;
   }
 
+  // Randomly adds extra edges between adjacent cells that the spanning tree
+  // didn't already connect. Each added edge closes a loop, so the maze stops
+  // being "perfect" (exactly one path between any two cells) and instead
+  // offers several alternate routes. `chance` is the probability (0..1)
+  // that any given unconnected adjacent pair gets linked.
+  function braid(cols, rows, connections, chance) {
+    if (chance <= 0) return;
+    for (let x = 0; x < cols; x++) {
+      for (let y = 0; y < rows; y++) {
+        const k = cellKey(x, y);
+        const nbrs = neighborsOf(x, y, cols, rows);
+        for (const [nx, ny] of nbrs) {
+          const nk = cellKey(nx, ny);
+          const conns = connections.get(k);
+          if (conns && conns.has(nk)) continue; // already linked
+          if (Math.random() >= chance) continue;
+          if (!connections.has(k)) connections.set(k, new Set());
+          if (!connections.has(nk)) connections.set(nk, new Set());
+          connections.get(k).add(nk);
+          connections.get(nk).add(k);
+        }
+      }
+    }
+  }
+
   // Returns { cols, rows, connections } where connections maps a cellKey to
-  // a Set of cellKeys it is directly connected to (an edge in the tree).
-  function generate(cols, rows) {
+  // a Set of cellKeys it is directly connected to (an edge in the tree/graph).
+  // `braidChance` (default 0.16) controls how many extra loop-forming edges
+  // get added on top of the base spanning tree -- higher means more
+  // alternate paths to the exit, 0 reproduces the original perfect maze.
+  function generate(cols, rows, braidChance = 0.16) {
     const inMaze = new Set();
     const connections = new Map();
 
@@ -74,6 +105,8 @@ const Maze = (() => {
         py = ny;
       }
     }
+
+    braid(cols, rows, connections, braidChance);
 
     return { cols, rows, connections };
   }
