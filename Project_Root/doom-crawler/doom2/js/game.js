@@ -486,7 +486,7 @@
 
     const sprites = [];
     for (const e of state.enemies) {
-      if (e.alive) sprites.push({ x: e.x, y: e.y, color: '#e33333', scale: 1 });
+      if (e.alive) sprites.push({ x: e.x, y: e.y, color: '#eaf3ff', scale: 1, ghost: true });
     }
     for (const pk of state.pickups) {
       if (!pk.taken) {
