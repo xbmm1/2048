@@ -37,6 +37,24 @@
           <li>Enemies hunt you with <b>A* pathfinding</b></li>
           <li>Find the <b>exit</b> to descend deeper</li>
         </ul>
+        <div class="legend">
+          <div class="legend-row">
+            <span class="legend-icon key"></span>
+            <span><b>Key</b> — pick up glowing keys scattered around the level</span>
+          </div>
+          <div class="legend-row">
+            <span class="legend-icon door"></span>
+            <span><b>Door</b> — the glowing exit; opens once you have enough keys</span>
+          </div>
+          <div class="legend-row">
+            <span class="legend-icon health"></span>
+            <span><b>Health Pack</b> — restores HP when picked up</span>
+          </div>
+          <div class="legend-row">
+            <span class="legend-icon ghost-ranged"></span>
+            <span><b>Pale Ghost</b> — melee only; <b>Violet Ghost</b> — shoots bolts from range</span>
+          </div>
+        </div>
         <div class="controls">
           <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Move</div>
           <div><kbd>←</kbd><kbd>→</kbd> / Mouse — Turn</div>
@@ -77,8 +95,21 @@
             <input id="setting-enemy-speed" type="range" min="0.7" max="1.6" step="0.05" />
           </label>
 
+          <label>
+            Enemy Count
+            <span id="setting-enemy-count-value"></span>
+            <input id="setting-enemy-count" type="range" min="0.5" max="2.5" step="0.1" />
+          </label>
+
+          <label>
+            Enemy Health
+            <span id="setting-enemy-health-value"></span>
+            <input id="setting-enemy-health" type="range" min="0.5" max="2.5" step="0.1" />
+          </label>
+
           <label class="check-row"><input id="setting-minimap" type="checkbox" /> Show Minimap</label>
           <label class="check-row"><input id="setting-paths" type="checkbox" /> Show Enemy A* Paths</label>
+          <label class="check-row"><input id="setting-fog" type="checkbox" /> Fog of War Minimap</label>
           <label class="check-row"><input id="setting-crosshair" type="checkbox" /> Show Crosshair</label>
           <label class="check-row"><input id="setting-invert-look" type="checkbox" /> Invert Horizontal Look</label>
 

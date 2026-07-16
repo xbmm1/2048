@@ -12,6 +12,89 @@
   const W = canvas.width;
   const H = canvas.height;
 
+  // ---- Sky ----
+  // Procedural 360 backdrop (gradient + stars + distant silhouette) used by
+  // default; drop a real equirectangular photo at assets/sky.jpg and it will
+  // be swapped in automatically once it finishes loading.
+  const proceduralSky = document.createElement('canvas');
+  proceduralSky.width = 2048;
+  proceduralSky.height = 300;
+  (function paintProceduralSky() {
+    const sctx = proceduralSky.getContext('2d');
+    const w = proceduralSky.width, h = proceduralSky.height;
+    const grad = sctx.createLinearGradient(0, 0, 0, h);
+    grad.addColorStop(0, '#05060c');
+    grad.addColorStop(0.55, '#141827');
+    grad.addColorStop(1, '#2a2233');
+    sctx.fillStyle = grad;
+    sctx.fillRect(0, 0, w, h);
+
+    let seed = 1337;
+    function rand() { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return (seed % 10000) / 10000; }
+    for (let i = 0; i < 500; i++) {
+      const sx = rand() * w, sy = rand() * h * 0.7;
+      const r = rand() * 1.2 + 0.2;
+      sctx.globalAlpha = 0.4 + rand() * 0.6;
+      sctx.fillStyle = '#ffffff';
+      sctx.beginPath();
+      sctx.arc(sx, sy, r, 0, Math.PI * 2);
+      sctx.fill();
+    }
+    sctx.globalAlpha = 1;
+
+    sctx.fillStyle = '#0c0d14';
+    sctx.beginPath();
+    sctx.moveTo(0, h);
+    let py = h * 0.78;
+    for (let x = 0; x <= w; x += 24) {
+      py += (rand() - 0.5) * 18;
+      py = Math.max(h * 0.65, Math.min(h * 0.88, py));
+      sctx.lineTo(x, py);
+    }
+    sctx.lineTo(w, h);
+    sctx.closePath();
+    sctx.fill();
+  })();
+
+  let activeSky = proceduralSky;
+  const customSky = new Image();
+  customSky.onload = () => {
+    if (customSky.naturalWidth > 0) activeSky = customSky;
+  };
+  customSky.src = 'assets/sky.jpg';
+
+  // ---- Per-floor themes ----
+  // Walls/floor/ceiling/sky gradually shift from warm brick to cold, icy
+  // tones the deeper the player descends, for a sense of progression.
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const lerpColor = (c1, c2, t) => [
+    lerp(c1[0], c2[0], t) | 0,
+    lerp(c1[1], c2[1], t) | 0,
+    lerp(c1[2], c2[2], t) | 0,
+  ];
+  const WARM_WALL_A = [150, 90, 60];
+  const WARM_WALL_B = [126, 74, 48];
+  const COLD_WALL_A = [70, 95, 135];
+  const COLD_WALL_B = [50, 68, 105];
+  const WARM_FLOOR = [38, 36, 26];
+  const COLD_FLOOR = [16, 22, 36];
+  const WARM_CEIL = [21, 21, 29];
+  const COLD_CEIL = [8, 11, 22];
+
+  function themeForFloor(floorNum) {
+    const t = Math.min(1, (floorNum - 1) / 9);
+    const floorC = lerpColor(WARM_FLOOR, COLD_FLOOR, t);
+    const ceilC = lerpColor(WARM_CEIL, COLD_CEIL, t);
+    const tintAlpha = t * 0.35;
+    return {
+      wallA: lerpColor(WARM_WALL_A, COLD_WALL_A, t),
+      wallB: lerpColor(WARM_WALL_B, COLD_WALL_B, t),
+      floorColor: `rgb(${floorC[0]},${floorC[1]},${floorC[2]})`,
+      ceilingFallback: `rgb(${ceilC[0]},${ceilC[1]},${ceilC[2]})`,
+      skyTint: tintAlpha > 0.02 ? `rgba(60,90,160,${tintAlpha.toFixed(2)})` : null,
+    };
+  }
+
   // ---- UI elements ----
   const hudFloor = document.getElementById('floor');
   const hudHp = document.getElementById('hp');
@@ -41,8 +124,13 @@
   const turnValue = document.getElementById('setting-turnspeed-value');
   const enemySpeedInput = document.getElementById('setting-enemy-speed');
   const enemySpeedValue = document.getElementById('setting-enemy-speed-value');
+  const enemyCountInput = document.getElementById('setting-enemy-count');
+  const enemyCountValue = document.getElementById('setting-enemy-count-value');
+  const enemyHealthInput = document.getElementById('setting-enemy-health');
+  const enemyHealthValue = document.getElementById('setting-enemy-health-value');
   const minimapCheckbox = document.getElementById('setting-minimap');
   const pathsCheckbox = document.getElementById('setting-paths');
+  const fogCheckbox = document.getElementById('setting-fog');
   const crosshairCheckbox = document.getElementById('setting-crosshair');
   const invertLookCheckbox = document.getElementById('setting-invert-look');
   const settingsResetBtn = document.getElementById('setting-reset');
@@ -53,8 +141,11 @@
     sensitivity: 0.0025,
     turnSpeed: 2.6,
     enemySpeed: 1.0,
+    enemyCountMult: 1.0,
+    enemyHealthMult: 1.0,
     minimap: true,
     paths: false,
+    fogOfWar: false,
     crosshair: true,
     invertLook: false,
   };
@@ -84,8 +175,13 @@
     turnValue.textContent = settings.turnSpeed.toFixed(1);
     enemySpeedInput.value = settings.enemySpeed;
     enemySpeedValue.textContent = settings.enemySpeed.toFixed(2) + 'x';
+    enemyCountInput.value = settings.enemyCountMult;
+    enemyCountValue.textContent = settings.enemyCountMult.toFixed(1) + 'x';
+    enemyHealthInput.value = settings.enemyHealthMult;
+    enemyHealthValue.textContent = settings.enemyHealthMult.toFixed(1) + 'x';
     minimapCheckbox.checked = settings.minimap;
     pathsCheckbox.checked = settings.paths;
+    fogCheckbox.checked = settings.fogOfWar;
     crosshairCheckbox.checked = settings.crosshair;
     invertLookCheckbox.checked = settings.invertLook;
     applyVisualSettings();
@@ -111,6 +207,16 @@
     enemySpeedValue.textContent = settings.enemySpeed.toFixed(2) + 'x';
     saveSettings();
   });
+  enemyCountInput.addEventListener('input', () => {
+    settings.enemyCountMult = parseFloat(enemyCountInput.value);
+    enemyCountValue.textContent = settings.enemyCountMult.toFixed(1) + 'x';
+    saveSettings();
+  });
+  enemyHealthInput.addEventListener('input', () => {
+    settings.enemyHealthMult = parseFloat(enemyHealthInput.value);
+    enemyHealthValue.textContent = settings.enemyHealthMult.toFixed(1) + 'x';
+    saveSettings();
+  });
   minimapCheckbox.addEventListener('change', () => {
     settings.minimap = minimapCheckbox.checked;
     applyVisualSettings();
@@ -118,6 +224,10 @@
   });
   pathsCheckbox.addEventListener('change', () => {
     settings.paths = pathsCheckbox.checked;
+    saveSettings();
+  });
+  fogCheckbox.addEventListener('change', () => {
+    settings.fogOfWar = fogCheckbox.checked;
     saveSettings();
   });
   crosshairCheckbox.addEventListener('change', () => {
@@ -150,6 +260,9 @@
     pickups: [],
     exit: null,
     keysHeld: {},
+    projectiles: [],
+    visited: null,
+    theme: null,
   };
 
   const dist2 = (a, b) => (a.x - b.x) ** 2 + (a.y - b.y) ** 2;
@@ -192,6 +305,9 @@
     state.tiles = tiles;
     state.tw = w;
     state.th = h;
+    state.theme = themeForFloor(floorNum);
+    state.visited = Array.from({ length: h }, () => new Array(w).fill(false));
+    state.projectiles = [];
 
     const spawn = randomFloorCell(tiles, w, h);
     state.player.x = spawn.x + 0.5;
@@ -215,19 +331,22 @@
     }
 
     state.enemies = [];
-    const enemyCount = 2 + floorNum;
+    const enemyCount = Math.max(1, Math.round((2 + floorNum) * settings.enemyCountMult));
     for (let i = 0; i < enemyCount; i++) {
       const c = randomFloorCell(tiles, w, h);
+      const ranged = Math.random() < Math.min(0.55, 0.25 + floorNum * 0.03);
       state.enemies.push({
         x: c.x + 0.5,
         y: c.y + 0.5,
-        health: 30,
+        health: 30 * settings.enemyHealthMult,
         baseSpeed: 1.25 + floorNum * 0.08,
         path: null,
         pathIndex: 1,
         repathAt: 0,
         cooldown: 0,
         alive: true,
+        ranged,
+        shootCooldown: Math.random() * 1.2,
       });
     }
   }
@@ -465,13 +584,46 @@
           e.y += (ddy / d) * speed * dt;
         }
       }
-      if (dist2(e, p) < 0.55 && e.cooldown <= 0) {
+      if (e.cooldown > 0) e.cooldown -= dt;
+
+      if (e.ranged) {
+        if (e.shootCooldown > 0) e.shootCooldown -= dt;
+        const rdx = p.x - e.x, rdy = p.y - e.y;
+        const rdist = Math.hypot(rdx, rdy);
+        if (e.shootCooldown <= 0 && rdist <= 6 && rdist > 0.6 && lineClear(e.x, e.y, p.x, p.y)) {
+          state.projectiles.push({
+            x: e.x, y: e.y,
+            dx: rdx / rdist, dy: rdy / rdist,
+            speed: 3.2,
+            damage: 12,
+            life: 3,
+          });
+          e.shootCooldown = 1.6 + Math.random() * 0.6;
+        }
+      } else if (dist2(e, p) < 0.55 && e.cooldown <= 0) {
         p.health -= 8;
         e.cooldown = 1.0;
         flashDamage();
       }
-      if (e.cooldown > 0) e.cooldown -= dt;
     }
+
+    for (let i = state.projectiles.length - 1; i >= 0; i--) {
+      const proj = state.projectiles[i];
+      proj.x += proj.dx * proj.speed * dt;
+      proj.y += proj.dy * proj.speed * dt;
+      proj.life -= dt;
+      let hit = false;
+      if (proj.life <= 0 || !tileFree(state.tiles, Math.floor(proj.x), Math.floor(proj.y))) {
+        hit = true;
+      } else if (dist2(proj, p) < 0.2) {
+        p.health -= proj.damage;
+        flashDamage();
+        hit = true;
+      }
+      if (hit) state.projectiles.splice(i, 1);
+    }
+
+    revealAround(Math.floor(p.x), Math.floor(p.y), 5);
 
     if (p.health <= 0) {
       p.health = 0;
@@ -481,12 +633,28 @@
     }
   }
 
+  // ---- Fog of war ----
+  function revealAround(cx, cy, radius) {
+    const visited = state.visited;
+    if (!visited) return;
+    const y0 = Math.max(0, cy - radius), y1 = Math.min(state.th - 1, cy + radius);
+    const x0 = Math.max(0, cx - radius), x1 = Math.min(state.tw - 1, cx + radius);
+    for (let y = y0; y <= y1; y++) {
+      for (let x = x0; x <= x1; x++) {
+        if ((x - cx) ** 2 + (y - cy) ** 2 <= radius * radius) visited[y][x] = true;
+      }
+    }
+  }
+
   function draw() {
     if (!state.tiles) return;
 
     const sprites = [];
     for (const e of state.enemies) {
-      if (e.alive) sprites.push({ x: e.x, y: e.y, color: '#eaf3ff', scale: 1, ghost: true });
+      if (e.alive) sprites.push({ x: e.x, y: e.y, color: e.ranged ? '#d9b3ff' : '#eaf3ff', scale: 1, ghost: true });
+    }
+    for (const proj of state.projectiles) {
+      sprites.push({ x: proj.x, y: proj.y, color: '#ff5fd6', scale: 0.22, bolt: true });
     }
     for (const pk of state.pickups) {
       if (!pk.taken) {
@@ -494,12 +662,14 @@
           x: pk.x, y: pk.y,
           color: pk.type === 'key' ? '#ffd23f' : '#3fbf5f',
           scale: 0.5,
+          key: pk.type === 'key',
+          health: pk.type === 'health',
         });
       }
     }
-    sprites.push({ x: state.exit.x, y: state.exit.y, color: '#39c8ff', scale: 1.3 });
+    sprites.push({ x: state.exit.x, y: state.exit.y, color: '#39c8ff', scale: 1.3, door: true });
 
-    Raycaster.render(ctx, W, H, state.tiles, state.tw, state.th, state.player, sprites);
+    Raycaster.render(ctx, W, H, state.tiles, state.tw, state.th, state.player, sprites, activeSky, state.theme);
     if (settings.minimap) drawMinimap();
     drawHUD();
   }
@@ -514,16 +684,23 @@
 
     for (let y = 0; y < th; y++) {
       for (let x = 0; x < tw; x++) {
+        if (settings.fogOfWar && !(state.visited && state.visited[y][x])) {
+          mctx.fillStyle = '#050507';
+          mctx.fillRect(x * scale, y * scale, scale, scale);
+          continue;
+        }
         mctx.fillStyle = tiles[y][x] === 1 ? '#333844' : '#8a8f9c';
         mctx.fillRect(x * scale, y * scale, scale, scale);
       }
     }
 
+    const isRevealed = (wx, wy) => !settings.fogOfWar || (state.visited && state.visited[Math.floor(wy)] && state.visited[Math.floor(wy)][Math.floor(wx)]);
+
     if (settings.paths) {
       mctx.strokeStyle = '#ff5050';
       mctx.lineWidth = 1;
       for (const e of state.enemies) {
-        if (!e.alive || !e.path) continue;
+        if (!e.alive || !e.path || !isRevealed(e.x, e.y)) continue;
         mctx.beginPath();
         mctx.moveTo(e.x * scale, e.y * scale);
         for (let i = e.pathIndex; i < e.path.length; i++) {
@@ -534,23 +711,57 @@
     }
 
     for (const e of state.enemies) {
-      if (!e.alive) continue;
-      mctx.fillStyle = '#e33333';
+      if (!e.alive || !isRevealed(e.x, e.y)) continue;
+      mctx.fillStyle = e.ranged ? '#c98bff' : '#e33333';
       mctx.beginPath();
       mctx.arc(e.x * scale, e.y * scale, 2.5, 0, Math.PI * 2);
       mctx.fill();
     }
-    for (const pk of state.pickups) {
-      if (pk.taken) continue;
-      mctx.fillStyle = pk.type === 'key' ? '#ffd23f' : '#3fbf5f';
+    for (const proj of state.projectiles) {
+      if (!isRevealed(proj.x, proj.y)) continue;
+      mctx.fillStyle = '#ff5fd6';
       mctx.beginPath();
-      mctx.arc(pk.x * scale, pk.y * scale, 2, 0, Math.PI * 2);
+      mctx.arc(proj.x * scale, proj.y * scale, 1.4, 0, Math.PI * 2);
       mctx.fill();
     }
-    mctx.fillStyle = '#39c8ff';
-    mctx.beginPath();
-    mctx.arc(state.exit.x * scale, state.exit.y * scale, 3, 0, Math.PI * 2);
-    mctx.fill();
+    for (const pk of state.pickups) {
+      if (pk.taken || !isRevealed(pk.x, pk.y)) continue;
+      const px = pk.x * scale, py = pk.y * scale;
+      if (pk.type === 'key') {
+        // Tiny key icon: a ring with a short stem.
+        mctx.strokeStyle = '#ffd23f';
+        mctx.lineWidth = 1;
+        mctx.beginPath();
+        mctx.arc(px, py - 1, 1.6, 0, Math.PI * 2);
+        mctx.stroke();
+        mctx.strokeStyle = '#ffd23f';
+        mctx.beginPath();
+        mctx.moveTo(px, py + 0.5);
+        mctx.lineTo(px, py + 2.6);
+        mctx.stroke();
+      } else {
+        // Tiny health-pack icon: a small green square with a white cross.
+        mctx.fillStyle = '#3fbf5f';
+        mctx.fillRect(px - 2.5, py - 2.5, 5, 5);
+        mctx.strokeStyle = '#1d3a24';
+        mctx.lineWidth = 0.6;
+        mctx.strokeRect(px - 2.5, py - 2.5, 5, 5);
+        mctx.fillStyle = '#f4f4f0';
+        mctx.fillRect(px - 0.5, py - 1.8, 1, 3.6);
+        mctx.fillRect(px - 1.8, py - 0.5, 3.6, 1);
+      }
+    }
+    // Exit door icon: a small bordered rectangle with a knob dot.
+    const ex = state.exit.x * scale, ey = state.exit.y * scale;
+    if (isRevealed(state.exit.x, state.exit.y)) {
+      mctx.fillStyle = '#39c8ff';
+      mctx.fillRect(ex - 3, ey - 4, 6, 8);
+      mctx.strokeStyle = '#12262e';
+      mctx.lineWidth = 1;
+      mctx.strokeRect(ex - 3, ey - 4, 6, 8);
+      mctx.fillStyle = '#ffe27a';
+      mctx.fillRect(ex + 0.8, ey - 0.5, 1, 1);
+    }
 
     const p = state.player;
     mctx.fillStyle = '#fff';
