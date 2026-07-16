@@ -2,7 +2,7 @@
 
 A tiny **DOOM-style** 3D dungeon crawler that runs entirely in the browser with
 plain HTML/CSS/JavaScript (no build step, no dependencies).
-
+https://xbmm1.github.io/2048/Project_Root/doom-crawler/doom2/index.html
 Open `index.html` in any modern browser and play.
 
 ## Highlights
