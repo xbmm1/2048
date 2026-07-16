@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>Void Runner</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <canvas id="game-canvas"></canvas>
+
+  <!-- ---------- Start Menu ---------- -->
+  <div id="menu-screen" class="overlay">
+    <div class="panel">
+      <h1 class="title">VOID RUNNER</h1>
+      <p class="subtitle">Escape the collapsing tunnel</p>
+      <button id="start-btn" class="btn primary">PRESS ENTER TO START</button>
+      <div class="controls-summary">
+        <div><kbd>A</kbd>/<kbd>D</kbd> or <kbd>&larr;</kbd><kbd>&rarr;</kbd> &mdash; Move</div>
+        <div><kbd>W</kbd> / <kbd>Space</kbd> / <kbd>&uarr;</kbd> &mdash; Jump</div>
+        <div><kbd>Q</kbd> / <kbd>E</kbd> &mdash; Rotate Gravity</div>
+        <div><kbd>P</kbd> / <kbd>Esc</kbd> &mdash; Pause &nbsp; <kbd>M</kbd> &mdash; Sound</div>
+      </div>
+      <div class="high-score-row">Best Score: <span id="menu-high-score">0</span></div>
+      <button id="sound-toggle-btn" class="btn small">SOUND: ON</button>
+    </div>
+  </div>
+
+  <!-- ---------- In-Game HUD ---------- -->
+  <div id="hud" class="hidden">
+    <div class="hud-top-left">
+      <div class="hud-label">SCORE</div>
+      <div id="hud-score" class="hud-value">0</div>
+    </div>
+    <div class="hud-top-center">
+      <div class="hud-label">DISTANCE</div>
+      <div id="hud-distance" class="hud-value">0 m</div>
+    </div>
+    <div class="hud-top-right">
+      <div class="hud-label">ENERGY <span id="hud-energy">0</span></div>
+      <div class="hud-label">SPEED <span id="hud-speed">1.0x</span></div>
+    </div>
+    <div id="hud-hint" class="hud-hint">A/D move &middot; W jump &middot; Q/E rotate</div>
+  </div>
+
+  <!-- ---------- Pause Overlay ---------- -->
+  <div id="pause-screen" class="overlay hidden">
+    <div class="panel">
+      <h2 class="title small">PAUSED</h2>
+      <p class="subtitle">Press P or Esc to resume</p>
+      <button id="resume-btn" class="btn primary">RESUME</button>
+      <button id="restart-from-pause-btn" class="btn">RESTART</button>
+      <button id="sound-toggle-btn-2" class="btn small">SOUND: ON</button>
+    </div>
+  </div>
+
+  <!-- ---------- Game Over Overlay ---------- -->
+  <div id="gameover-screen" class="overlay hidden">
+    <div class="panel">
+      <h2 class="title small danger">RUN ENDED</h2>
+      <div class="stats-grid">
+        <div><span class="stat-label">Score</span><span id="final-score" class="stat-value">0</span></div>
+        <div><span class="stat-label">Distance</span><span id="final-distance" class="stat-value">0 m</span></div>
+        <div><span class="stat-label">Energy</span><span id="final-energy" class="stat-value">0</span></div>
+        <div><span class="stat-label">Best</span><span id="final-best" class="stat-value">0</span></div>
+      </div>
+      <button id="restart-btn" class="btn primary">PRESS R TO RESTART</button>
+    </div>
+  </div>
+
+  <!-- ---------- Mobile Controls ---------- -->
+  <div id="mobile-controls" class="hidden">
+    <button id="mc-left" class="mc-btn" aria-label="Move left">&#9664;</button>
+    <button id="mc-rotate-l" class="mc-btn small" aria-label="Rotate left">&#8634;</button>
+    <button id="mc-jump" class="mc-btn big" aria-label="Jump">&#9650;</button>
+    <button id="mc-rotate-r" class="mc-btn small" aria-label="Rotate right">&#8635;</button>
+    <button id="mc-right" class="mc-btn" aria-label="Move right">&#9654;</button>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>
