@@ -42,13 +42,13 @@
     }
     sctx.globalAlpha = 1;
 
-    sctx.fillStyle = '#0c0d14';
+    sctx.fillStyle = '#024202';
     sctx.beginPath();
     sctx.moveTo(0, h);
     let py = h * 0.78;
     for (let x = 0; x <= w; x += 24) {
       py += (rand() - 0.5) * 18;
-      py = Math.max(h * 0.65, Math.min(h * 0.88, py));
+      py = Math.max(h * 0.80, Math.min(h * 0.88, py));
       sctx.lineTo(x, py);
     }
     sctx.lineTo(w, h);
