@@ -1,3 +1,4 @@
+[Link to programs](https://xbmm1.github.io/2048/Project_Root/HTML_Projects/index.html)
 # 2048 Game with AI Strategy Solver
 
 A fully-featured implementation of the classic 2048 puzzle game, complete with multiple AI strategies, a 1000-game simulator for benchmarking, and comprehensive strategy documentation.
