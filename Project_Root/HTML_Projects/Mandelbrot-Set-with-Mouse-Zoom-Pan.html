@@ -54,6 +54,54 @@
       font-size: 13px;
       color: #ccc;
     }
+    .explain-wrap {
+      max-width: 1100px;
+      margin: 24px auto;
+      text-align: left;
+      color: #ddd;
+    }
+    .explain-wrap details {
+      background: #1a1a1a;
+      border: 1px solid #333;
+      border-radius: 8px;
+      padding: 12px 14px;
+    }
+    .explain-wrap summary {
+      cursor: pointer;
+      font-size: 18px;
+      font-weight: 700;
+      color: #f0f0f0;
+    }
+    .explain-wrap h2 {
+      margin-top: 20px;
+      color: #7fd67f;
+      font-size: 19px;
+    }
+    .explain-wrap h3 {
+      margin-top: 16px;
+      color: #9cc7ff;
+      font-size: 16px;
+    }
+    .explain-wrap p,
+    .explain-wrap li {
+      line-height: 1.5;
+      color: #d8d8d8;
+    }
+    .explain-wrap code,
+    .explain-wrap pre {
+      font-family: Consolas, monospace;
+      background: #0d0d0d;
+      border: 1px solid #2f2f2f;
+      border-radius: 6px;
+    }
+    .explain-wrap code {
+      padding: 1px 5px;
+    }
+    .explain-wrap pre {
+      padding: 10px;
+      overflow-x: auto;
+      color: #f1f1f1;
+    }
   </style>
 </head>
 <body>
@@ -77,6 +125,117 @@
     Use tile-based Web Workers (parallel rendering)
   </label>
   <div id="renderStatus"></div>
+</div>
+
+<div class="explain-wrap">
+  <details>
+    <summary>Detailed Explanation: What This Program Is Doing, The Math Behind It, and Why Fractals Are Infinite</summary>
+
+    <h2>1) What This Renderer Does</h2>
+    <p>
+      This program draws the Mandelbrot set on a 2D canvas. Every pixel on the screen is mapped to a complex number
+      <code>c = a + bi</code>. For each pixel, the code runs an iterative test and determines whether that point appears
+      to stay bounded or escape to infinity. The escape speed controls color.
+    </p>
+    <ul>
+      <li><strong>Pan:</strong> updates offsets (<code>offsetX</code>, <code>offsetY</code>), shifting the complex-plane window.</li>
+      <li><strong>Zoom:</strong> changes <code>zoom</code> while keeping the mouse point fixed in the complex plane.</li>
+      <li><strong>Max Iterations:</strong> increases/decreases detail at boundaries.</li>
+      <li><strong>Palette Shift:</strong> rotates colors without changing the underlying set membership.</li>
+      <li><strong>Worker Mode:</strong> splits work into tiles and computes many tiles in parallel on multiple CPU cores.</li>
+    </ul>
+
+    <h2>2) Pixel-to-Complex Mapping</h2>
+    <p>
+      The canvas is a viewport into the complex plane. With view width <code>Wv</code> and view height <code>Hv</code>:
+    </p>
+    <pre><code>Wv = (xmax - xmin) / zoom
+Hv = (ymax - ymin) / zoom
+
+cReal = xmin + offsetX + (x / width) * Wv
+cImag = ymin + offsetY + (y / height) * Hv</code></pre>
+    <p>
+      So each pixel coordinate <code>(x, y)</code> becomes one complex point <code>c</code>.
+    </p>
+
+    <h2>3) Core Mandelbrot Iteration Math</h2>
+    <p>
+      For each pixel's complex number <code>c</code>, we iterate:
+    </p>
+    <pre><code>z0 = 0
+z(n+1) = z(n)^2 + c</code></pre>
+    <p>
+      Writing <code>z = zr + zi*i</code>, the update becomes:
+    </p>
+    <pre><code>zr_next = zr^2 - zi^2 + cReal
+zi_next = 2 * zr * zi + cImag</code></pre>
+    <p>
+      If <code>zr^2 + zi^2 &gt; 4</code> (equivalently <code>|z| &gt; 2</code>), the point has escaped.
+      If it does not escape by <code>maxIterations</code>, we treat it as in-set for rendering.
+    </p>
+
+    <h2>4) Coloring Logic (Escape-Time Coloring)</h2>
+    <p>
+      Points that never escaped by the max iteration cutoff are colored black. Others are colored based on how fast they escaped:
+    </p>
+    <pre><code>t = (iter / maxIter + paletteShift) % 1
+r = floor(9 * (1 - t) * t^3 * 255)
+g = floor(15 * (1 - t)^2 * t^2 * 255)
+b = floor(8.5 * (1 - t)^3 * t * 255)</code></pre>
+    <p>
+      This creates smooth bands around the Mandelbrot boundary where dynamics change rapidly.
+    </p>
+
+    <h2>5) Why Tile-Based Web Workers Help</h2>
+    <p>
+      Mandelbrot cost is non-uniform: some regions escape quickly, while boundary regions require many more iterations.
+      Tile-based scheduling handles this better than simple row-splitting.
+    </p>
+    <h3>How parallel rendering works here</h3>
+    <ol>
+      <li>The canvas is split into tiles (for example 64x64 pixel blocks).</li>
+      <li>A worker pool is created (usually one worker per logical core).</li>
+      <li>Idle workers request/receive the next tile from a shared queue.</li>
+      <li>Workers compute RGBA for their tile and send back a transferable buffer.</li>
+      <li>Main thread paints tile images as they arrive.</li>
+      <li>A render generation counter discards stale tiles from older zoom/pan states.</li>
+    </ol>
+    <p>
+      Result: much better CPU utilization and reduced wall-clock render time on multi-core machines.
+    </p>
+
+    <h2>6) Why Fractals Are Infinite</h2>
+    <h3>Infinite detail</h3>
+    <p>
+      The Mandelbrot boundary contains structure at every scale. No matter how far you zoom, new detail appears.
+      There is no "last" feature or smallest geometric unit in the mathematical object.
+    </p>
+    <h3>Self-similarity and quasi-self-similarity</h3>
+    <p>
+      Fractals often show repeating motifs under magnification. In Mandelbrot, miniature shapes and spirals recur with variations.
+      This repeat-across-scales behavior is why zoom videos can continue indefinitely.
+    </p>
+    <h3>Iteration never runs out in theory</h3>
+    <p>
+      Mathematically, set membership is defined by behavior under infinitely many iterations.
+      Computers only approximate this with finite iteration limits and finite precision arithmetic.
+    </p>
+    <h3>Important practical note</h3>
+    <p>
+      Your computer eventually hits precision limits (floating-point rounding) and performance limits.
+      So visual zoom is finite in practice, but the underlying fractal definition is unbounded.
+    </p>
+
+    <h2>7) Program Limits and Approximation</h2>
+    <ul>
+      <li><strong>Finite iterations:</strong> points near the boundary can be misclassified at low <code>maxIterations</code>.</li>
+      <li><strong>Finite precision:</strong> JavaScript numbers are IEEE-754 doubles, so extreme zoom loses exactness.</li>
+      <li><strong>Display discretization:</strong> continuous math is sampled on a finite pixel grid.</li>
+    </ul>
+    <p>
+      Even with these limits, the renderer captures the key behavior of complex dynamics and shows why fractals are mathematically deep.
+    </p>
+  </details>
 </div>
 
 <script>
