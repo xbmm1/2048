@@ -122,7 +122,7 @@
 </div>
 <button
   style="padding: 10px 20px; font-size: 16px; cursor: pointer; border-radius: 5px; background-color: #8f7a66; color: white; border: none;"
-  onclick="window.open('2048-strategies.html', '_blank')"
+  onclick="window.open('2048-explained.html', '_blank')"
 >
   Open 2048 Explanation
 </button>
@@ -808,6 +808,155 @@ function computeStats(values) {
   return { count, min, max, mean, median, stddev, p10, p25, p50, p75, p90 };
 }
 
+// ============ WEB WORKER PARALLEL SIMULATION ============
+// The worker source is built by serializing the *real* pure functions above
+// (via .toString()) so there is a single source of truth - no hand-copied
+// duplicate to keep in sync. These functions must not reference anything
+// outside themselves other than `size` (re-declared below) and each other.
+
+// Defined only so its source can be extracted via .toString() - never called
+// directly on the main thread.
+function workerOnMessage(e) {
+  const { policyName, gamesToRun, workerId } = e.data;
+  let policyFactory;
+  if (policyName === 'pattern') policyFactory = createPatternPolicy;
+  else if (policyName === 'cornerStack') policyFactory = createCornerStackPolicy;
+  else if (policyName === 'advancedCorner') policyFactory = createAdvancedCornerPolicy;
+  else if (policyName === 'expectimax') policyFactory = createExpectimaxPolicy;
+  else policyFactory = () => randomPolicy;
+
+  const scores = [];
+  const maxTiles = [];
+  const durations = [];
+
+  for (let i = 0; i < gamesToRun; i++) {
+    const policy = policyFactory();
+    const result = runSingleSimulation(policy);
+    scores.push(result.score);
+    maxTiles.push(result.maxTile);
+    durations.push(result.durationMs);
+
+    if ((i + 1) % 5 === 0 || i === gamesToRun - 1) {
+      self.postMessage({ type: 'progress', workerId, completed: i + 1 });
+    }
+  }
+
+  self.postMessage({ type: 'done', workerId, scores, maxTiles, durations });
+}
+
+const WORKER_SOURCE = [
+  'const size = 4;',
+  cloneBoard.toString(),
+  simulateMove.toString(),
+  createEmptyBoard.toString(),
+  addRandomTileTo.toString(),
+  applyMove.toString(),
+  isGameOverBoard.toString(),
+  getMaxTile.toString(),
+  randomPolicy.toString(),
+  createPatternPolicy.toString(),
+  createCornerStackPolicy.toString(),
+  createAdvancedCornerPolicy.toString(),
+  createExpectimaxPolicy.toString(),
+  runSingleSimulation.toString(),
+  'self.onmessage = ' + workerOnMessage.toString() + ';'
+].join('\n\n');
+
+let workerBlobUrl = null;
+function getWorkerBlobUrl() {
+  if (!workerBlobUrl) {
+    const blob = new Blob([WORKER_SOURCE], { type: 'application/javascript' });
+    workerBlobUrl = URL.createObjectURL(blob);
+  }
+  return workerBlobUrl;
+}
+
+// Runs `count` games split across multiple Web Workers (one per logical CPU
+// core) so multi-depth policies like Expectimax use all available cores.
+// Falls back to the single-threaded simulateNGames() if Workers aren't
+// available in the current environment.
+async function simulateNGamesParallel(count, policyName) {
+  if (typeof Worker === 'undefined') {
+    return simulateNGames(count, policyName);
+  }
+
+  const numWorkers = Math.max(1, Math.min(count, navigator.hardwareConcurrency || 4));
+  const workerUrl = getWorkerBlobUrl();
+
+  // Split games into per-worker chunks; remainder goes to the first workers.
+  const baseChunk = Math.floor(count / numWorkers);
+  let remainder = count % numWorkers;
+  const chunkSizes = [];
+  for (let i = 0; i < numWorkers; i++) {
+    const chunk = baseChunk + (remainder > 0 ? 1 : 0);
+    if (remainder > 0) remainder--;
+    chunkSizes.push(chunk);
+  }
+
+  const progressPerWorker = new Array(numWorkers).fill(0);
+  const progressEl = document.getElementById('simProgress');
+  const updateProgress = () => {
+    const completed = progressPerWorker.reduce((a, b) => a + b, 0);
+    if (progressEl) progressEl.textContent = `Progress: ${completed}/${count} (${numWorkers} workers)`;
+  };
+
+  const totalStartTime = performance.now();
+
+  const workerPromises = chunkSizes.map((gamesToRun, workerId) => {
+    if (gamesToRun === 0) return Promise.resolve({ scores: [], maxTiles: [], durations: [] });
+
+    return new Promise((resolve, reject) => {
+      const worker = new Worker(workerUrl);
+
+      worker.onmessage = (e) => {
+        const msg = e.data;
+        if (msg.type === 'progress') {
+          progressPerWorker[workerId] = msg.completed;
+          updateProgress();
+        } else if (msg.type === 'done') {
+          worker.terminate();
+          resolve({ scores: msg.scores, maxTiles: msg.maxTiles, durations: msg.durations });
+        }
+      };
+
+      worker.onerror = (err) => {
+        worker.terminate();
+        reject(err);
+      };
+
+      worker.postMessage({ policyName, gamesToRun, workerId });
+    });
+  });
+
+  const chunkResults = await Promise.all(workerPromises);
+  const totalDurationMs = performance.now() - totalStartTime;
+
+  const scores = [];
+  const maxTiles = [];
+  const durations = [];
+  for (const r of chunkResults) {
+    scores.push(...r.scores);
+    maxTiles.push(...r.maxTiles);
+    durations.push(...r.durations);
+  }
+
+  const scoreStats = computeStats(scores);
+
+  const maxTileDist = {};
+  maxTiles.forEach(tile => {
+    maxTileDist[tile] = (maxTileDist[tile] || 0) + 1;
+  });
+
+  return {
+    scores,
+    maxTiles,
+    durations,
+    scoreStats,
+    maxTileDist,
+    totalDurationMs
+  };
+}
+
 // Async batch runner for N games with progress updates
 async function simulateNGames(count, policyName) {
   const scores = [];
@@ -871,7 +1020,7 @@ async function displaySimulationResults(policyName) {
   simResults.style.display = 'none';
   
   try {
-    const results = await simulateNGames(1000, policyName);
+    const results = await simulateNGamesParallel(1000, policyName);
     
     const stats = results.scoreStats;
     const maxTileDist = results.maxTileDist;

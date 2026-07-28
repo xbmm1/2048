@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Understanding the 2048 Game Code</title>
+<title>Understanding the Advanced 2048 Game Code</title>
 <style>
   body {
     font-family: Arial, sans-serif;
@@ -62,8 +62,24 @@
 </head>
 <body>
 
-<h1>Understanding the Simple 2048 Game</h1>
-<p>Explore the main parts of a simple 2048 game implemented in JavaScript. Click each section to expand and see explanation and code snippets.</p>
+<h1>Understanding the Advanced 2048 Game</h1>
+<p>This page explains the full-featured 2048 implementation in this project, including solver strategies, score analytics, undo history, and high-throughput simulation with Web Workers. Click each section to expand and see explanations and code snippets.</p>
+
+<details open>
+  <summary>0. What the Updated Program Can Do (Full Capability Overview)</summary>
+  <p>The current 2048 app is more than a playable game. It is also an algorithm lab and simulation platform.</p>
+  <ul>
+    <li><strong>Playable 2048 with keyboard controls:</strong> Arrow keys for movement, restart support, and game-over detection.</li>
+    <li><strong>Undo system:</strong> Bounded history stack lets you step backward through previous game states.</li>
+    <li><strong>High score persistence:</strong> Best score is stored in browser localStorage.</li>
+    <li><strong>Run-history analytics:</strong> Previous scores are saved and visualized over time with Chart.js.</li>
+    <li><strong>Average score tracking:</strong> Rolling average updates as games are added to history.</li>
+    <li><strong>Multiple solver strategies:</strong> Pattern, Corner Stack, Advanced Corner heuristic, and Expectimax.</li>
+    <li><strong>Live auto-solver:</strong> Start/stop automated play with selectable strategy and configurable move cadence.</li>
+    <li><strong>Batch simulation mode:</strong> Runs 1000-game experiments and prints statistical summaries.</li>
+    <li><strong>Parallel simulation engine:</strong> Uses Web Workers to split simulation across CPU cores for major speedups on heavy policies like Expectimax.</li>
+  </ul>
+</details>
 
 <details open>
   <summary>1. Initializing the Board</summary>
@@ -555,10 +571,59 @@ function patternSolverStep(state) {
   </script>
 </details>
 
+<details>
+  <summary>13. Solver Strategies and Decision Quality</summary>
+  <p>The updated project contains several AI policies with different speed/quality trade-offs:</p>
+  <ul>
+    <li><strong>Pattern Solver:</strong> Fast deterministic movement preference designed to keep the board stable.</li>
+    <li><strong>Corner Stack:</strong> Prioritizes stacking into a corner to preserve merge structure.</li>
+    <li><strong>Advanced Corner:</strong> Uses a weighted heuristic (empties, merge potential, smoothness, monotonicity, corner distance).</li>
+    <li><strong>Expectimax:</strong> Looks ahead through move nodes and random spawn nodes; strongest but most expensive policy.</li>
+  </ul>
+  <p>This gives the app two identities: an interactive game for play and a controlled environment for comparing algorithmic strategies.</p>
+</details>
+
+<details>
+  <summary>14. Parallel Web Worker Simulator (Multi-Core Execution)</summary>
+  <p>The simulator now supports true parallel execution in the browser by using Web Workers.</p>
+  <ul>
+    <li>The total game count (for example, 1000 games) is partitioned into chunks.</li>
+    <li>Each worker runs an isolated simulation loop and returns score arrays and tile outcomes.</li>
+    <li>The main thread aggregates worker results into one combined statistics report.</li>
+    <li>Progress text is updated continuously with total completed games across workers.</li>
+    <li>If Workers are unavailable, the code falls back to the original single-thread batch runner.</li>
+  </ul>
+  <p>Practical effect: expensive policies such as Expectimax can use many CPU cores simultaneously, reducing wall-clock time substantially while keeping the UI responsive.</p>
+</details>
+
+<details>
+  <summary>15. Simulation Output and Statistical Analysis</summary>
+  <p>Each simulation run computes descriptive statistics for robust comparison between strategies:</p>
+  <ul>
+    <li><strong>Count, Min, Max, Mean, Median, Stddev</strong></li>
+    <li><strong>Percentiles:</strong> P10, P25, P50, P75, P90</li>
+    <li><strong>Max tile distribution:</strong> Frequency table of final max tiles (for example 512, 1024, 2048, 4096)</li>
+    <li><strong>Total duration and average per game</strong></li>
+  </ul>
+  <p>These metrics let you evaluate not only best-case scores, but consistency and tail performance.</p>
+</details>
+
+<details>
+  <summary>16. Persistence and Reproducible Experiment Tracking</summary>
+  <p>The app persists both gameplay history and simulation sessions in localStorage.</p>
+  <ul>
+    <li><strong>Gameplay scores:</strong> Stored with timestamp and charted as a time series.</li>
+    <li><strong>Simulation sessions:</strong> Saved with policy name, run count, full score list, aggregate stats, and max-tile histogram.</li>
+    <li><strong>High score:</strong> Kept separately and survives page reloads.</li>
+  </ul>
+  <p>This enables repeated experiments, side-by-side policy comparison, and historical performance tracking directly in the browser.</p>
+</details>
+
 
 
 <hr />
 <h2>Full Source Code</h2>
+<p>This embedded code block is a compact reference version focused on core mechanics. The active project file includes additional systems such as undo history, multiple AI policies, simulation analytics, and parallel Web Worker execution.</p>
 <div id="fullCode">
 <pre><code>&lt;!DOCTYPE html&gt;
 &lt;html lang="en"&gt;
@@ -831,7 +896,7 @@ function patternSolverStep(state) {
 </div>
 
 <footer>
-  &copy; 2025 Simple 2048 Explanation — Created by Brian (and ai)
+  &copy; 2026 2048 Explanation — Created by Brian (and ai)
 </footer>
 
 </body>

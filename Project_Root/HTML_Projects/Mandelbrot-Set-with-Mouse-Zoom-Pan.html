@@ -15,9 +15,11 @@
       display: block;
       margin: 20px auto;
       background: black;
+      max-width: 100%;
+      height: auto;
     }
     .controls {
-      max-width: 600px;
+      max-width: 900px;
       margin: 0 auto 20px;
       text-align: left;
     }
@@ -39,13 +41,26 @@
       font-size: 13px;
       color: #aaa;
     }
+    #renderStatus {
+      margin-top: 10px;
+      font-size: 13px;
+      color: #7fd67f;
+      min-height: 18px;
+    }
+    .controls label.checkbox-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      color: #ccc;
+    }
   </style>
 </head>
 <body>
 
 <h1>Mandelbrot Set Visualization</h1>
 
-<canvas id="mandelbrotCanvas" width="600" height="600"></canvas>
+<canvas id="mandelbrotCanvas" width="1280" height="720"></canvas>
 
 <div class="controls">
   <label for="iterationRange">Max Iterations: <span id="iterationValue">100</span></label><br/>
@@ -56,6 +71,12 @@
   <br/>
   <button id="randomJumpBtn">Random Jump</button>
   <div id="jumpLabel"></div>
+  <br/>
+  <label class="checkbox-label">
+    <input type="checkbox" id="useWorkersCheckbox" checked />
+    Use tile-based Web Workers (parallel rendering)
+  </label>
+  <div id="renderStatus"></div>
 </div>
 
 <script>
@@ -64,9 +85,11 @@
   const width = canvas.width;
   const height = canvas.height;
 
+  // Bounds widened horizontally (vs. the original 600x600 square) to match
+  // the 1920x1080 (16:9) canvas aspect ratio without stretching the fractal.
   const originalBounds = {
-    xmin: -2.5,
-    xmax: 1,
+    xmin: -3.41667,
+    xmax: 1.91667,
     ymin: -1.5,
     ymax: 1.5
   };
@@ -85,17 +108,23 @@
   const iterationValue = document.getElementById('iterationValue');
   const paletteShiftRange = document.getElementById('paletteShiftRange');
   const paletteShiftValue = document.getElementById('paletteShiftValue');
+  const useWorkersCheckbox = document.getElementById('useWorkersCheckbox');
+  const renderStatus = document.getElementById('renderStatus');
 
   iterationRange.addEventListener('input', () => {
     maxIterations = parseInt(iterationRange.value, 10);
     iterationValue.textContent = maxIterations;
-    drawMandelbrot();
+    requestRender();
   });
 
   paletteShiftRange.addEventListener('input', () => {
     paletteShift = parseFloat(paletteShiftRange.value);
     paletteShiftValue.textContent = paletteShift.toFixed(2);
-    drawMandelbrot();
+    requestRender();
+  });
+
+  useWorkersCheckbox.addEventListener('change', () => {
+    requestRender();
   });
 
   function pixelToComplex(x, y) {
@@ -128,7 +157,7 @@
     return n;
   }
 
-  function getColor(iter, maxIter) {
+  function getColor(iter, maxIter, paletteShift) {
     if (iter === maxIter) {
       return [0, 0, 0];
     }
@@ -139,7 +168,10 @@
     return [r, g, b];
   }
 
-  function drawMandelbrot() {
+  // ============ SINGLE-THREAD RENDER PATH (fallback / comparison) ============
+  function drawMandelbrotSingleThread() {
+    const startTime = performance.now();
+
     const imageData = ctx.createImageData(width, height);
     const data = imageData.data;
 
@@ -152,7 +184,7 @@
         const cImag = originalBounds.ymin + offsetY + (y / height) * viewHeight;
 
         const iter = mandelbrotIterations(cReal, cImag, maxIterations);
-        const [r, g, b] = getColor(iter, maxIterations);
+        const [r, g, b] = getColor(iter, maxIterations, paletteShift);
 
         const idx = (y * width + x) * 4;
         data[idx] = r;
@@ -163,6 +195,186 @@
     }
 
     ctx.putImageData(imageData, 0, 0);
+
+    const elapsed = performance.now() - startTime;
+    renderStatus.textContent = `Rendered in ${elapsed.toFixed(1)}ms (single-threaded, 1 core)`;
+  }
+
+  // ============ TILE-BASED WEB WORKER PARALLEL RENDER PATH ============
+  const TILE_SIZE = 64;
+  const numWorkers = Math.max(1, navigator.hardwareConcurrency || 4);
+
+  // Defined only so its source can be extracted via .toString() - never called
+  // directly on the main thread.
+  function workerTileHandler(e) {
+    const { tileId, generation, x0, y0, tileWidth, tileHeight, params } = e.data;
+    const { width, height, xmin, ymin, viewWidth, viewHeight, offsetX, offsetY, maxIterations, paletteShift } = params;
+
+    const pixels = new Uint8ClampedArray(tileWidth * tileHeight * 4);
+
+    for (let ty = 0; ty < tileHeight; ty++) {
+      const y = y0 + ty;
+      const cImag = ymin + offsetY + (y / height) * viewHeight;
+      for (let tx = 0; tx < tileWidth; tx++) {
+        const x = x0 + tx;
+        const cReal = xmin + offsetX + (x / width) * viewWidth;
+
+        const iter = mandelbrotIterations(cReal, cImag, maxIterations);
+        const [r, g, b] = getColor(iter, maxIterations, paletteShift);
+
+        const idx = (ty * tileWidth + tx) * 4;
+        pixels[idx] = r;
+        pixels[idx + 1] = g;
+        pixels[idx + 2] = b;
+        pixels[idx + 3] = 255;
+      }
+    }
+
+    self.postMessage(
+      { type: 'tileDone', tileId, generation, x0, y0, tileWidth, tileHeight, buffer: pixels.buffer },
+      [pixels.buffer]
+    );
+  }
+
+  const MANDELBROT_WORKER_SOURCE = [
+    mandelbrotIterations.toString(),
+    getColor.toString(),
+    'self.onmessage = ' + workerTileHandler.toString() + ';'
+  ].join('\n\n');
+
+  let mandelbrotWorkerUrl = null;
+  function getMandelbrotWorkerUrl() {
+    if (!mandelbrotWorkerUrl) {
+      const blob = new Blob([MANDELBROT_WORKER_SOURCE], { type: 'application/javascript' });
+      mandelbrotWorkerUrl = URL.createObjectURL(blob);
+    }
+    return mandelbrotWorkerUrl;
+  }
+
+  let workerPool = [];
+  let workerBusy = [];
+  let renderGeneration = 0;
+  let tileQueue = [];
+  let tilesRemaining = 0;
+  let totalTileCount = 0;
+  let parallelRenderStartTime = 0;
+
+  function initWorkerPool() {
+    if (workerPool.length > 0 || typeof Worker === 'undefined') return;
+
+    const workerUrl = getMandelbrotWorkerUrl();
+    for (let i = 0; i < numWorkers; i++) {
+      const worker = new Worker(workerUrl);
+      worker.onmessage = (e) => handleWorkerMessage(i, e);
+      workerPool.push(worker);
+      workerBusy.push(false);
+    }
+  }
+
+  function buildTileQueue() {
+    const queue = [];
+    let tileId = 0;
+    for (let y0 = 0; y0 < height; y0 += TILE_SIZE) {
+      const tileHeight = Math.min(TILE_SIZE, height - y0);
+      for (let x0 = 0; x0 < width; x0 += TILE_SIZE) {
+        const tileWidth = Math.min(TILE_SIZE, width - x0);
+        queue.push({ tileId: tileId++, x0, y0, tileWidth, tileHeight });
+      }
+    }
+    return queue;
+  }
+
+  function dispatchNextTile(workerIndex) {
+    if (tileQueue.length === 0) {
+      workerBusy[workerIndex] = false;
+      return;
+    }
+
+    const tile = tileQueue.shift();
+    workerBusy[workerIndex] = true;
+
+    const viewWidth = (originalBounds.xmax - originalBounds.xmin) / zoom;
+    const viewHeight = (originalBounds.ymax - originalBounds.ymin) / zoom;
+
+    workerPool[workerIndex].postMessage({
+      tileId: tile.tileId,
+      generation: renderGeneration,
+      x0: tile.x0,
+      y0: tile.y0,
+      tileWidth: tile.tileWidth,
+      tileHeight: tile.tileHeight,
+      params: {
+        width,
+        height,
+        xmin: originalBounds.xmin,
+        ymin: originalBounds.ymin,
+        viewWidth,
+        viewHeight,
+        offsetX,
+        offsetY,
+        maxIterations,
+        paletteShift
+      }
+    });
+  }
+
+  function handleWorkerMessage(workerIndex, e) {
+    const msg = e.data;
+    if (msg.type !== 'tileDone') return;
+
+    // Ignore results from a render that has since been superseded.
+    if (msg.generation === renderGeneration) {
+      const pixels = new Uint8ClampedArray(msg.buffer);
+      const tileImageData = new ImageData(pixels, msg.tileWidth, msg.tileHeight);
+      ctx.putImageData(tileImageData, msg.x0, msg.y0);
+
+      tilesRemaining--;
+      if (tilesRemaining === 0) {
+        const elapsed = performance.now() - parallelRenderStartTime;
+        renderStatus.textContent = `Rendered in ${elapsed.toFixed(1)}ms using ${numWorkers} workers (${totalTileCount} tiles)`;
+      }
+    }
+
+    dispatchNextTile(workerIndex);
+  }
+
+  function drawMandelbrotParallel() {
+    initWorkerPool();
+
+    renderGeneration++;
+    tileQueue = buildTileQueue();
+    totalTileCount = tileQueue.length;
+    tilesRemaining = totalTileCount;
+    parallelRenderStartTime = performance.now();
+
+    for (let i = 0; i < workerPool.length; i++) {
+      if (!workerBusy[i]) {
+        dispatchNextTile(i);
+      }
+    }
+  }
+
+  // Dispatcher: picks the parallel tile-based path or the single-threaded
+  // fallback based on the checkbox and Worker support.
+  function drawMandelbrot() {
+    if (useWorkersCheckbox.checked && typeof Worker !== 'undefined') {
+      drawMandelbrotParallel();
+    } else {
+      renderGeneration++; // invalidate any in-flight parallel tiles
+      drawMandelbrotSingleThread();
+    }
+  }
+
+  // Coalesces multiple rapid render triggers (e.g. mousemove during drag)
+  // into a single render per animation frame.
+  let renderRequested = false;
+  function requestRender() {
+    if (renderRequested) return;
+    renderRequested = true;
+    requestAnimationFrame(() => {
+      renderRequested = false;
+      drawMandelbrot();
+    });
   }
 
   canvas.addEventListener('wheel', (e) => {
@@ -183,7 +395,7 @@
     offsetX += mouseReBefore - mouseReAfter;
     offsetY += mouseImBefore - mouseImAfter;
 
-    drawMandelbrot();
+    requestRender();
   });
 
   canvas.addEventListener('mousedown', (e) => {
@@ -215,7 +427,7 @@
     offsetX = dragStartOffset.x - dx / width * viewWidth;
     offsetY = dragStartOffset.y - dy / height * viewHeight;
 
-    drawMandelbrot();
+    requestRender();
   });
 
   const randomJumpBtn = document.getElementById('randomJumpBtn');
@@ -241,12 +453,12 @@
     offsetX = spot.cx - originalBounds.xmin - (viewWidth  / zoom) / 2;
     offsetY = spot.cy - originalBounds.ymin - (viewHeight / zoom) / 2;
     jumpLabel.textContent = 'Jumped to: ' + spot.name;
-    drawMandelbrot();
+    requestRender();
   }
 
   randomJumpBtn.addEventListener('click', jumpToRandom);
 
-  drawMandelbrot();
+  requestRender();
 </script>
 
 </body>
