@@ -259,7 +259,7 @@
   // ---- Power-ups ----
   const POWERUP_DURATIONS = { speed: 8, damage: 10, invincible: 10 };
   const POWERUP_TYPES = ['speed', 'damage', 'invincible'];
-  const POWERUP_COLORS = { speed: '#4dd0ff', damage: '#ff7043', invincible: '#95ff4f' };
+  const POWERUP_COLORS = { speed: '#4dd0ff', damage: '#ff7043', invincible: '#e952f7' };
   const POWERUP_LABELS = { speed: 'SPEED', damage: 'DAMAGE', invincible: 'INVINCIBLE' };
 
   // ---- Game state ----
