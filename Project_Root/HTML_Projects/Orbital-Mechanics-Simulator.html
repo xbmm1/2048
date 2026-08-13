@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Orbital Mechanics Simulator — Earth, Moon &amp; Mars</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; height: 100%; overflow: hidden;
+    background: #05060c;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    color: #e8ecf5;
+    user-select: none;
+  }
+  #sim { display: block; width: 100vw; height: 100vh; cursor: crosshair; }
+
+  .panel {
+    position: absolute;
+    background: rgba(10, 12, 22, 0.72);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 14px;
+    padding: 14px 16px;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  }
+
+  #controls { top: 14px; left: 14px; width: 250px; }
+  #controls h1 { font-size: 15px; margin: 0 0 10px; letter-spacing: 0.03em; color: #8fd3ff; }
+  #controls .row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; font-size: 12.5px; color: #b7bfd4; }
+  #controls .row label { flex: 1; }
+  #controls input[type="range"] { width: 120px; }
+  #controls button {
+    width: 100%;
+    margin-top: 6px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.15);
+    background: linear-gradient(135deg, #1c2a44, #101828);
+    color: #e8ecf5;
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.15s ease, background 0.15s ease;
+  }
+  #controls button:hover { background: linear-gradient(135deg, #24365a, #172236); transform: translateY(-1px); }
+  #controls button.active { border-color: #6fd3ff; color: #6fd3ff; }
+  .hint { font-size: 11px; color: #7d879c; margin-top: 8px; line-height: 1.5; }
+
+  #info { top: 14px; right: 14px; width: 240px; font-size: 12.5px; }
+  #info h2 { font-size: 13px; margin: 0 0 8px; color: #8fd3ff; }
+  #info .stat { display: flex; justify-content: space-between; margin-bottom: 5px; color: #b7bfd4; }
+  #info .stat b { color: #e8ecf5; font-weight: 600; }
+  #info .empty { color: #7d879c; font-style: italic; }
+
+  #log {
+    bottom: 14px; left: 14px; width: 340px; max-height: 160px;
+    overflow-y: auto; font-size: 11.5px;
+  }
+  #log h2 { font-size: 13px; margin: 0 0 8px; color: #8fd3ff; }
+  #log .entry { padding: 4px 0; border-top: 1px solid rgba(255,255,255,0.06); color: #c3cadd; }
+  #log .entry:first-child { border-top: none; }
+  #log .entry.assist { color: #ffd76a; }
+  #log .entry.escape { color: #6fffb0; }
+  #log .entry.crash { color: #ff7a7a; }
+
+  #legend {
+    bottom: 14px; right: 14px; font-size: 11.5px; color: #b7bfd4;
+  }
+  #legend .row { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
+  #legend .swatch { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+</style>
+</head>
+<body>
+<canvas id="sim"></canvas>
+
+<div class="panel" id="controls">
+  <h1>ORBITAL MECHANICS SIMULATOR</h1>
+  <div class="row">
+    <label for="timeScale">Time Scale</label>
+    <input id="timeScale" type="range" min="0.1" max="6" step="0.1" value="1" />
+  </div>
+  <div class="row">
+    <label for="launchPower">Launch Power</label>
+    <input id="launchPower" type="range" min="0.3" max="3" step="0.1" value="1" />
+  </div>
+  <button id="pauseBtn">Pause</button>
+  <button id="trailsBtn" class="active">Hide Trails</button>
+  <button id="clearProbesBtn">Clear Probes</button>
+  <button id="resetBtn">Reset Simulation</button>
+  <div class="hint">
+    Click-drag away from Earth to aim a launch (a dashed preview trajectory appears), release to fire a probe.
+    Try slingshotting it past Mars or the Moon to gain speed — or escape the solar system entirely.
+  </div>
+</div>
+
+<div class="panel" id="info">
+  <h2>PROBE STATUS</h2>
+  <div id="infoBody"><div class="empty">No probe launched yet.</div></div>
+</div>
+
+<div class="panel" id="log">
+  <h2>MISSION LOG</h2>
+  <div id="logBody"><div class="entry">Awaiting launch…</div></div>
+</div>
+
+<div class="panel" id="legend">
+  <div class="row"><span class="swatch" style="background:#ffd54f;box-shadow:0 0 8px #ffd54f;"></span> Sun</div>
+  <div class="row"><span class="swatch" style="background:#4fa8ff;"></span> Earth</div>
+  <div class="row"><span class="swatch" style="background:#b7bfd4;"></span> Moon</div>
+  <div class="row"><span class="swatch" style="background:#e0703f;"></span> Mars</div>
+  <div class="row"><span class="swatch" style="background:#6fffe8;"></span> Probe</div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  const canvas = document.getElementById('sim');
+  const ctx = canvas.getContext('2d');
+  let W, H, DPR;
+
+  function resize() {
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    W = window.innerWidth;
+    H = window.innerHeight;
+    canvas.width = W * DPR;
+    canvas.height = H * DPR;
+    canvas.style.width = W + 'px';
+    canvas.style.height = H + 'px';
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  // ---------------------------------------------------------------------
+  // Physics constants (internal simulation units -- not literal km/kg/s,
+  // but internally consistent Newtonian gravity: F = G*m1*m2/r^2. Real
+  // relationships hold: v_circular = sqrt(G*M/r), so farther planets
+  // orbit slower than closer ones, exactly like the real solar system.
+  // ---------------------------------------------------------------------
+  const G = 50;
+  const SOFTENING = 6 * 6; // Plummer softening to avoid singularities on close flybys
+  const BASE_DT = 0.05;
+  const MAX_PROBES = 6;
+  const ENCOUNTER_RADIUS = 46; // distance at which a flyby counts as a "close encounter"
+
+  let timeScale = 1;
+  let running = true;
+  let showTrails = true;
+
+  // ---------------------------------------------------------------------
+  // Celestial bodies. Sun sits near the origin but is also gravitationally
+  // affected by every planet (true N-body, nothing is artificially fixed)
+  // -- its mass is simply large enough that it barely drifts.
+  // ---------------------------------------------------------------------
+  function makeBody(opts) { return Object.assign({ trail: [], x: 0, y: 0, vx: 0, vy: 0 }, opts); }
+
+  let bodies = [];
+  let probes = [];
+  let messages = [];
+
+  function circularVelocity(centralMass, r) {
+    return Math.sqrt((G * centralMass) / r);
+  }
+
+  function initSystem() {
+    bodies = [];
+    probes = [];
+    messages = [];
+    logMessage('Simulation initialized. Awaiting launch…', 'info');
+
+    const sun = makeBody({ id: 'sun', name: 'Sun', mass: 2650, radius: 22, color: '#ffd54f', glow: true });
+    bodies.push(sun);
+
+    const earthR = 260, earthAngle = 0;
+    const vEarth = circularVelocity(sun.mass, earthR);
+    const earth = makeBody({
+      id: 'earth', name: 'Earth', mass: 135, radius: 11, color: '#4fa8ff',
+      x: sun.x + earthR * Math.cos(earthAngle), y: sun.y + earthR * Math.sin(earthAngle),
+      vx: sun.vx - vEarth * Math.sin(earthAngle), vy: sun.vy + vEarth * Math.cos(earthAngle),
+    });
+    bodies.push(earth);
+
+    const moonR = 28, moonAngle = 0.7;
+    const vMoon = circularVelocity(earth.mass, moonR);
+    const moon = makeBody({
+      id: 'moon', name: 'Moon', mass: 5, radius: 3.5, color: '#b7bfd4',
+      x: earth.x + moonR * Math.cos(moonAngle), y: earth.y + moonR * Math.sin(moonAngle),
+      vx: earth.vx - vMoon * Math.sin(moonAngle), vy: earth.vy + vMoon * Math.cos(moonAngle),
+    });
+    bodies.push(moon);
+
+    const marsR = 380, marsAngle = 2.2;
+    const vMars = circularVelocity(sun.mass, marsR);
+    const mars = makeBody({
+      id: 'mars', name: 'Mars', mass: 112, radius: 7.5, color: '#e0703f',
+      x: sun.x + marsR * Math.cos(marsAngle), y: sun.y + marsR * Math.sin(marsAngle),
+      vx: sun.vx - vMars * Math.sin(marsAngle), vy: sun.vy + vMars * Math.cos(marsAngle),
+    });
+    bodies.push(mars);
+  }
+
+  // ---------------------------------------------------------------------
+  // N-body gravity integration (symplectic/semi-implicit Euler, several
+  // substeps per frame for stability during close, fast flybys).
+  // ---------------------------------------------------------------------
+  function accelerationAt(px, py, exclude) {
+    let ax = 0, ay = 0;
+    for (const b of bodies) {
+      if (b === exclude) continue;
+      const dx = b.x - px, dy = b.y - py;
+      const distSq = dx * dx + dy * dy + SOFTENING;
+      const dist = Math.sqrt(distSq);
+      const f = (G * b.mass) / (distSq * dist);
+      ax += f * dx; ay += f * dy;
+    }
+    return { ax, ay };
+  }
+
+  function stepPhysics(dt) {
+    // Planets/moon/sun: full mutual N-body gravity.
+    const accs = bodies.map((b) => accelerationAt(b.x, b.y, b));
+    bodies.forEach((b, i) => { b.vx += accs[i].ax * dt; b.vy += accs[i].ay * dt; });
+    bodies.forEach((b) => { b.x += b.vx * dt; b.y += b.vy * dt; });
+
+    // Probes: massless test particles pulled by every body, but exert no
+    // gravity of their own (negligible mass in reality, and keeps planet
+    // orbits perfectly stable regardless of how many probes are flying).
+    for (const p of probes) {
+      if (p.crashed) continue;
+      const { ax, ay } = accelerationAt(p.x, p.y, null);
+      p.vx += ax * dt; p.vy += ay * dt;
+      p.x += p.vx * dt; p.y += p.vy * dt;
+
+      for (const b of bodies) {
+        const dx = b.x - p.x, dy = b.y - p.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist < b.radius + 3) {
+          p.crashed = true;
+          logMessage('Probe crashed into ' + b.name + '.', 'crash');
+        }
+      }
+      updateEncounterTracking(p);
+      updateEscapeTracking(p);
+    }
+  }
+
+  function sunRelativeSpeed(p) {
+    const sun = bodies[0];
+    return Math.hypot(p.vx - sun.vx, p.vy - sun.vy);
+  }
+
+  function updateEncounterTracking(p) {
+    for (const b of bodies) {
+      if (b.id === 'sun') continue;
+      const dist = Math.hypot(b.x - p.x, b.y - p.y);
+      const key = b.id;
+      const inZone = dist < ENCOUNTER_RADIUS;
+      if (inZone && !p.encounters[key]) {
+        p.encounters[key] = { entrySpeed: sunRelativeSpeed(p) };
+      } else if (!inZone && p.encounters[key]) {
+        const entry = p.encounters[key].entrySpeed;
+        const exit = sunRelativeSpeed(p);
+        const delta = exit - entry;
+        if (Math.abs(delta) > 0.4) {
+          const sign = delta > 0 ? '+' : '';
+          logMessage(
+            'Slingshot past ' + b.name + '! Speed vs. Sun: ' + entry.toFixed(1) + ' \u2192 ' + exit.toFixed(1) +
+            ' (' + sign + delta.toFixed(1) + ')', 'assist'
+          );
+        }
+        delete p.encounters[key];
+      }
+    }
+  }
+
+  function updateEscapeTracking(p) {
+    if (p.escaped) return;
+    const sun = bodies[0];
+    const dx = p.x - sun.x, dy = p.y - sun.y;
+    const distToSun = Math.hypot(dx, dy);
+    const speed = sunRelativeSpeed(p);
+    const escapeV = Math.sqrt((2 * G * sun.mass) / Math.max(distToSun, 1));
+    const radialOutward = ((p.vx - sun.vx) * dx + (p.vy - sun.vy) * dy) / Math.max(distToSun, 1);
+    if (distToSun > 420 && speed > escapeV && radialOutward > 0) {
+      p.escaped = true;
+      logMessage('Probe reached solar escape velocity! It is leaving the system.', 'escape');
+    }
+  }
+
+  // ---------------------------------------------------------------------
+  // Trajectory preview: clone current state and fast-forward a ghost
+  // probe under the same physics, without touching the live simulation.
+  // ---------------------------------------------------------------------
+  function predictTrajectory(startX, startY, vx, vy, steps) {
+    const cloneBodies = bodies.map((b) => ({ x: b.x, y: b.y, vx: b.vx, vy: b.vy, mass: b.mass }));
+    let px = startX, py = startY, pvx = vx, pvy = vy;
+    const path = [];
+    const dt = BASE_DT;
+    for (let s = 0; s < steps; s++) {
+      const accs = cloneBodies.map((b) => ({ x: b.x, y: b.y, vx: b.vx, vy: b.vy }));
+      cloneBodies.forEach((b, i) => {
+        let ax = 0, ay = 0;
+        cloneBodies.forEach((other, j) => {
+          if (i === j) return;
+          const dx = other.x - b.x, dy = other.y - b.y;
+          const distSq = dx * dx + dy * dy + SOFTENING;
+          const dist = Math.sqrt(distSq);
+          const f = (G * other.mass) / (distSq * dist);
+          ax += f * dx; ay += f * dy;
+        });
+        b.vx += ax * dt; b.vy += ay * dt;
+      });
+      cloneBodies.forEach((b) => { b.x += b.vx * dt; b.y += b.vy * dt; });
+
+      const { ax, ay } = (function () {
+        let aax = 0, aay = 0;
+        for (const b of cloneBodies) {
+          const dx = b.x - px, dy = b.y - py;
+          const distSq = dx * dx + dy * dy + SOFTENING;
+          const dist = Math.sqrt(distSq);
+          const f = (G * b.mass) / (distSq * dist);
+          aax += f * dx; aay += f * dy;
+        }
+        return { ax: aax, ay: aay };
+      })();
+      pvx += ax * dt; pvy += ay * dt;
+      px += pvx * dt; py += pvy * dt;
+      path.push({ x: px, y: py });
+
+      for (const b of cloneBodies) {
+        if (Math.hypot(b.x - px, b.y - py) < 10) return path; // stop preview on predicted collision
+      }
+    }
+    return path;
+  }
+
+  // ---------------------------------------------------------------------
+  // Launch aiming (drag from Earth)
+  // ---------------------------------------------------------------------
+  let aiming = false;
+  let aimStart = { x: 0, y: 0 };
+  let aimCurrent = { x: 0, y: 0 };
+  let previewPath = [];
+  let launchPower = 1;
+
+  function toSimCoords(clientX, clientY) {
+    const sun = bodies[0];
+    return { x: clientX - W / 2 + sun.x, y: clientY - H / 2 + sun.y };
+  }
+
+  canvas.addEventListener('mousedown', (e) => {
+    const earth = bodies.find((b) => b.id === 'earth');
+    const sim = toSimCoords(e.clientX, e.clientY);
+    const dist = Math.hypot(sim.x - earth.x, sim.y - earth.y);
+    if (dist < 60) {
+      aiming = true;
+      aimStart = { x: sim.x, y: sim.y };
+      aimCurrent = { x: sim.x, y: sim.y };
+    }
+  });
+
+  window.addEventListener('mousemove', (e) => {
+    if (!aiming) return;
+    aimCurrent = toSimCoords(e.clientX, e.clientY);
+    const earth = bodies.find((b) => b.id === 'earth');
+    const dx = aimCurrent.x - aimStart.x, dy = aimCurrent.y - aimStart.y;
+    const vx = earth.vx + dx * 0.08 * launchPower;
+    const vy = earth.vy + dy * 0.08 * launchPower;
+    const dirLen = Math.hypot(dx, dy) || 1;
+    const launchX = aimStart.x + (dx / dirLen) * (earth.radius + 4);
+    const launchY = aimStart.y + (dy / dirLen) * (earth.radius + 4);
+    previewPath = predictTrajectory(launchX, launchY, vx, vy, 900);
+  });
+
+  window.addEventListener('mouseup', (e) => {
+    if (!aiming) return;
+    aiming = false;
+    const earth = bodies.find((b) => b.id === 'earth');
+    const dx = aimCurrent.x - aimStart.x, dy = aimCurrent.y - aimStart.y;
+    if (Math.hypot(dx, dy) < 8) { previewPath = []; return; } // ignore accidental clicks
+
+    const vx = earth.vx + dx * 0.08 * launchPower;
+    const vy = earth.vy + dy * 0.08 * launchPower;
+    const dirLen = Math.hypot(dx, dy) || 1;
+    const launchX = aimStart.x + (dx / dirLen) * (earth.radius + 4);
+    const launchY = aimStart.y + (dy / dirLen) * (earth.radius + 4);
+
+    probes.push({
+      id: 'probe-' + Date.now(),
+      x: launchX, y: launchY, vx, vy,
+      trail: [], crashed: false, escaped: false, encounters: {},
+    });
+    if (probes.length > MAX_PROBES) probes.shift();
+    logMessage('Probe launched from Earth.', 'info');
+    previewPath = [];
+  });
+
+  // ---------------------------------------------------------------------
+  // UI wiring
+  // ---------------------------------------------------------------------
+  const timeScaleInput = document.getElementById('timeScale');
+  const launchPowerInput = document.getElementById('launchPower');
+  const pauseBtn = document.getElementById('pauseBtn');
+  const trailsBtn = document.getElementById('trailsBtn');
+  const clearProbesBtn = document.getElementById('clearProbesBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const infoBody = document.getElementById('infoBody');
+  const logBody = document.getElementById('logBody');
+
+  timeScaleInput.addEventListener('input', () => { timeScale = parseFloat(timeScaleInput.value); });
+  launchPowerInput.addEventListener('input', () => { launchPower = parseFloat(launchPowerInput.value); });
+  pauseBtn.addEventListener('click', () => {
+    running = !running;
+    pauseBtn.textContent = running ? 'Pause' : 'Resume';
+    pauseBtn.classList.toggle('active', !running);
+  });
+  trailsBtn.addEventListener('click', () => {
+    showTrails = !showTrails;
+    trailsBtn.textContent = showTrails ? 'Hide Trails' : 'Show Trails';
+    trailsBtn.classList.toggle('active', showTrails);
+    if (!showTrails) { bodies.forEach((b) => (b.trail.length = 0)); probes.forEach((p) => (p.trail.length = 0)); }
+  });
+  clearProbesBtn.addEventListener('click', () => { probes = []; logMessage('All probes cleared.', 'info'); });
+  resetBtn.addEventListener('click', () => { initSystem(); });
+
+  function logMessage(text, type) {
+    messages.unshift({ text, type: type || 'info' });
+    if (messages.length > 30) messages.length = 30;
+    logBody.innerHTML = messages.map((m) => '<div class="entry ' + m.type + '">' + m.text + '</div>').join('');
+  }
+
+  function updateInfoPanel() {
+    if (!probes.length) { infoBody.innerHTML = '<div class="empty">No probe launched yet.</div>'; return; }
+    const p = probes[probes.length - 1];
+    const speed = sunRelativeSpeed(p).toFixed(1);
+    let closest = null, closestDist = Infinity;
+    for (const b of bodies) {
+      if (b.id === 'sun') continue;
+      const d = Math.hypot(b.x - p.x, b.y - p.y);
+      if (d < closestDist) { closestDist = d; closest = b; }
+    }
+    const status = p.crashed ? 'Crashed' : p.escaped ? 'Escaping system' : 'In flight';
+    infoBody.innerHTML =
+      '<div class="stat"><span>Status</span><b>' + status + '</b></div>' +
+      '<div class="stat"><span>Speed vs. Sun</span><b>' + speed + '</b></div>' +
+      '<div class="stat"><span>Nearest body</span><b>' + (closest ? closest.name : '—') + '</b></div>' +
+      '<div class="stat"><span>Distance</span><b>' + closestDist.toFixed(0) + '</b></div>' +
+      '<div class="stat"><span>Active probes</span><b>' + probes.filter((pr) => !pr.crashed).length + '</b></div>';
+  }
+
+  // ---------------------------------------------------------------------
+  // Starfield background (drawn once to an offscreen canvas)
+  // ---------------------------------------------------------------------
+  let starCanvas = null;
+  function buildStars() {
+    starCanvas = document.createElement('canvas');
+    starCanvas.width = W; starCanvas.height = H;
+    const sctx = starCanvas.getContext('2d');
+    sctx.fillStyle = '#05060c';
+    sctx.fillRect(0, 0, W, H);
+    let seed = 42;
+    function rand() { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return (seed % 10000) / 10000; }
+    for (let i = 0; i < 420; i++) {
+      const x = rand() * W, y = rand() * H, r = rand() * 1.3 + 0.2;
+      sctx.globalAlpha = 0.3 + rand() * 0.7;
+      sctx.fillStyle = '#fff';
+      sctx.beginPath(); sctx.arc(x, y, r, 0, Math.PI * 2); sctx.fill();
+    }
+    sctx.globalAlpha = 1;
+  }
+  buildStars();
+  window.addEventListener('resize', () => { buildStars(); });
+
+  // ---------------------------------------------------------------------
+  // Rendering
+  // ---------------------------------------------------------------------
+  function worldToScreen(x, y) {
+    const sun = bodies[0];
+    return { x: W / 2 + (x - sun.x), y: H / 2 + (y - sun.y) };
+  }
+
+  function drawTrail(trail, color) {
+    if (trail.length < 2) return;
+    ctx.beginPath();
+    for (let i = 0; i < trail.length; i++) {
+      const s = worldToScreen(trail[i].x, trail[i].y);
+      if (i === 0) ctx.moveTo(s.x, s.y); else ctx.lineTo(s.x, s.y);
+    }
+    ctx.strokeStyle = color;
+    ctx.globalAlpha = 0.45;
+    ctx.lineWidth = 1.4;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+
+  function draw() {
+    if (starCanvas) ctx.drawImage(starCanvas, 0, 0, W, H);
+
+    if (showTrails) {
+      for (const b of bodies) drawTrail(b.trail, b.color);
+      for (const p of probes) drawTrail(p.trail, p.crashed ? '#ff5a5a' : '#6fffe8');
+    }
+
+    // Aiming line + predicted trajectory
+    if (aiming) {
+      const earth = bodies.find((b) => b.id === 'earth');
+      const s0 = worldToScreen(earth.x, earth.y);
+      const s1 = worldToScreen(aimCurrent.x, aimCurrent.y);
+      ctx.strokeStyle = '#6fffe8';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([5, 5]);
+      ctx.beginPath(); ctx.moveTo(s0.x, s0.y); ctx.lineTo(s1.x, s1.y); ctx.stroke();
+      ctx.setLineDash([]);
+
+      if (previewPath.length > 1) {
+        ctx.beginPath();
+        for (let i = 0; i < previewPath.length; i++) {
+          const s = worldToScreen(previewPath[i].x, previewPath[i].y);
+          if (i === 0) ctx.moveTo(s.x, s.y); else ctx.lineTo(s.x, s.y);
+        }
+        ctx.strokeStyle = 'rgba(111, 255, 232, 0.55)';
+        ctx.setLineDash([2, 4]);
+        ctx.lineWidth = 1.2;
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    }
+
+    // Bodies
+    for (const b of bodies) {
+      const s = worldToScreen(b.x, b.y);
+      if (b.glow) {
+        const grad = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, b.radius * 3.2);
+        grad.addColorStop(0, 'rgba(255,213,79,0.55)');
+        grad.addColorStop(1, 'rgba(255,213,79,0)');
+        ctx.fillStyle = grad;
+        ctx.beginPath(); ctx.arc(s.x, s.y, b.radius * 3.2, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.beginPath();
+      ctx.fillStyle = b.color;
+      ctx.arc(s.x, s.y, b.radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.85)';
+      ctx.font = '11px Segoe UI, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(b.name, s.x, s.y - b.radius - 8);
+    }
+
+    // Probes
+    for (const p of probes) {
+      const s = worldToScreen(p.x, p.y);
+      ctx.beginPath();
+      ctx.fillStyle = p.crashed ? '#ff5a5a' : p.escaped ? '#6fffb0' : '#6fffe8';
+      ctx.arc(s.x, s.y, 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  // ---------------------------------------------------------------------
+  // Main loop
+  // ---------------------------------------------------------------------
+  let frameCount = 0;
+  function tick() {
+    if (running) {
+      const totalDt = BASE_DT * timeScale;
+      const substeps = Math.min(24, Math.max(1, Math.round(timeScale * 4)));
+      const subDt = totalDt / substeps;
+      for (let i = 0; i < substeps; i++) stepPhysics(subDt);
+
+      frameCount++;
+      if (frameCount % 2 === 0) {
+        for (const b of bodies) { b.trail.push({ x: b.x, y: b.y }); if (b.trail.length > 500) b.trail.shift(); }
+        for (const p of probes) { p.trail.push({ x: p.x, y: p.y }); if (p.trail.length > 800) p.trail.shift(); }
+      }
+      updateInfoPanel();
+    }
+    draw();
+    requestAnimationFrame(tick);
+  }
+
+  initSystem();
+  requestAnimationFrame(tick);
+})();
+</script>
+</body>
+</html>
