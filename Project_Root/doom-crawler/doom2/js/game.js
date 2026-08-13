@@ -25,7 +25,7 @@
     const grad = sctx.createLinearGradient(0, 0, 0, h);
     grad.addColorStop(0, '#05060c');
     grad.addColorStop(0.55, '#141827');
-    grad.addColorStop(1, '#2a2233');
+    grad.addColorStop(1, '#486379');
     sctx.fillStyle = grad;
     sctx.fillRect(0, 0, w, h);
 
@@ -62,6 +62,17 @@
     if (customSky.naturalWidth > 0) activeSky = customSky;
   };
   customSky.src = 'assets/sky.jpg';
+
+  // ---- Wall textures ----
+  // Each wall tile gets a stable-but-random pick from this set (based on its
+  // grid coordinates), so the maze walls read as a varied stone/brick mix
+  // instead of a single repeating pattern.
+  const WALL_TEXTURE_FILES = ['tile065.png', 'tile066.png', 'tile067.png', 'tile068.png', 'tile069.png', 'tile070.png'];
+  const wallTextures = WALL_TEXTURE_FILES.map((name) => {
+    const img = new Image();
+    img.src = `assets/${name}`;
+    return img;
+  });
 
   // ---- Per-floor themes ----
   // Walls/floor/ceiling/sky gradually shift from warm brick to cold, icy
@@ -248,7 +259,7 @@
   // ---- Power-ups ----
   const POWERUP_DURATIONS = { speed: 8, damage: 10, invincible: 10 };
   const POWERUP_TYPES = ['speed', 'damage', 'invincible'];
-  const POWERUP_COLORS = { speed: '#4dd0ff', damage: '#ff7043', invincible: '#ffd54f' };
+  const POWERUP_COLORS = { speed: '#4dd0ff', damage: '#ff7043', invincible: '#95ff4f' };
   const POWERUP_LABELS = { speed: 'SPEED', damage: 'DAMAGE', invincible: 'INVINCIBLE' };
 
   // ---- Game state ----
@@ -363,6 +374,7 @@
         alive: true,
         ranged,
         shootCooldown: Math.random() * 1.2,
+        hitFlash: 0,
       });
     }
   }
@@ -545,6 +557,7 @@
     }
     if (bestEnemy) {
       bestEnemy.health -= 20 * dmgMult;
+      bestEnemy.hitFlash = 1;
       if (bestEnemy.health <= 0) {
         bestEnemy.alive = false;
         state.kills++;
@@ -595,6 +608,7 @@
 
     const now = performance.now();
     for (const e of state.enemies) {
+      if (e.hitFlash > 0) e.hitFlash = Math.max(0, e.hitFlash - dt / 0.25);
       if (!e.alive) continue;
       if (now >= e.repathAt || !e.path) {
         e.path = AStar.find(state.tiles, Math.floor(e.x), Math.floor(e.y), Math.floor(p.x), Math.floor(p.y));
@@ -685,7 +699,7 @@
 
     const sprites = [];
     for (const e of state.enemies) {
-      if (e.alive) sprites.push({ x: e.x, y: e.y, color: e.ranged ? '#d9b3ff' : '#eaf3ff', scale: 1, ghost: true });
+      if (e.alive) sprites.push({ x: e.x, y: e.y, color: e.ranged ? '#d9b3ff' : '#eaf3ff', scale: 1, ghost: true, flash: e.hitFlash });
     }
     for (const proj of state.projectiles) {
       sprites.push({ x: proj.x, y: proj.y, color: '#ff5fd6', scale: 0.22, bolt: true });
@@ -705,7 +719,7 @@
     }
     sprites.push({ x: state.exit.x, y: state.exit.y, color: '#39c8ff', scale: 1.3, door: true });
 
-    Raycaster.render(ctx, W, H, state.tiles, state.tw, state.th, state.player, sprites, activeSky, state.theme);
+    Raycaster.render(ctx, W, H, state.tiles, state.tw, state.th, state.player, sprites, activeSky, state.theme, wallTextures);
     if (settings.minimap) drawMinimap();
     drawHUD();
   }

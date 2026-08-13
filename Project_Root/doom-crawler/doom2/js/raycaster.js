@@ -15,11 +15,23 @@ const Raycaster = (() => {
     skyTint: null,
   };
 
-  function render(ctx, W, H, tiles, tw, th, player, sprites, sky, theme) {
+  // Deterministic per-cell hash (not Math.random) so a wall tile always
+  // picks the same texture index across frames without needing extra
+  // per-tile state.
+  function hashTile(x, y) {
+    let h = (x * 374761393) ^ (y * 668265263);
+    h = Math.imul(h ^ (h >>> 13), 1274126177);
+    h ^= h >>> 16;
+    return h >>> 0;
+  }
+
+  function render(ctx, W, H, tiles, tw, th, player, sprites, sky, theme, textures) {
     const t = theme || DEFAULT_THEME;
     const zbuffer = new Float32Array(W);
     const planeLen = Math.tan(FOV / 2);
+    const texturesReady = !!(textures && textures.length && textures.every((img) => img.complete && img.naturalWidth > 0));
 
+    ctx.imageSmoothingEnabled = false;
     ctx.clearRect(0, 0, W, H);
     if (!sky || !drawSky(ctx, W, H, player, sky)) {
       ctx.fillStyle = t.ceilingFallback;
@@ -81,16 +93,42 @@ const Raycaster = (() => {
       const perpDist = side === 0 ? sideDistX - deltaDistX : sideDistY - deltaDistY;
       zbuffer[x] = perpDist;
 
-      const lineHeight = Math.min(H * 4, H / Math.max(perpDist, 0.0001));
+      const lineHeight = Math.min(H * 1.1, H / Math.max(perpDist, 0.0001));
       const drawStart = Math.max(0, (H - lineHeight) / 2);
       const drawEnd = Math.min(H, (H + lineHeight) / 2);
 
       let shade = Math.max(0.12, 1 - perpDist / 16);
       if (side === 1) shade *= 0.68;
-      const checker = ((mapX % 2) + (mapY % 2) + 2) % 2;
-      const base = checker === 0 ? t.wallA : t.wallB;
-      ctx.fillStyle = `rgb(${(base[0] * shade) | 0},${(base[1] * shade) | 0},${(base[2] * shade) | 0})`;
-      ctx.fillRect(x, drawStart, 1, drawEnd - drawStart);
+
+      if (texturesReady) {
+        // Stable-but-random texture pick per wall grid cell (not per ray),
+        // so a given wall segment doesn't flicker between textures frame
+        // to frame or column to column.
+        const texIdx = hashTile(mapX, mapY) % textures.length;
+        const tex = textures[texIdx];
+        const texW = tex.naturalWidth, texH = tex.naturalHeight;
+
+        // Fractional hit position along the wall face -> texture U coord.
+        let wallX = side === 0 ? player.y + perpDist * rayDirY : player.x + perpDist * rayDirX;
+        wallX -= Math.floor(wallX);
+        let texX = Math.floor(wallX * texW);
+        if (side === 0 && rayDirX > 0) texX = texW - texX - 1;
+        if (side === 1 && rayDirY < 0) texX = texW - texX - 1;
+        texX = Math.max(0, Math.min(texW - 1, texX));
+
+        ctx.drawImage(tex, texX, 0, 1, texH, x, drawStart, 1, drawEnd - drawStart);
+
+        const darken = 1 - shade;
+        if (darken > 0.02) {
+          ctx.fillStyle = `rgba(0,0,0,${Math.min(0.92, darken).toFixed(3)})`;
+          ctx.fillRect(x, drawStart, 1, drawEnd - drawStart);
+        }
+      } else {
+        const checker = ((mapX % 2) + (mapY % 2) + 2) % 2;
+        const base = checker === 0 ? t.wallA : t.wallB;
+        ctx.fillStyle = `rgb(${(base[0] * shade) | 0},${(base[1] * shade) | 0},${(base[2] * shade) | 0})`;
+        ctx.fillRect(x, drawStart, 1, drawEnd - drawStart);
+      }
     }
 
     drawSprites(ctx, W, H, player, sprites, zbuffer, planeLen);
@@ -380,6 +418,13 @@ const Raycaster = (() => {
           ctx.globalAlpha = shade * Math.max(0.5, edge) * 0.82;
           ctx.fillStyle = s.color || '#eaf3ff';
           ctx.fillRect(x, cTop, 1, cBottom - cTop);
+
+          // Brief red flash overlay when the ghost has just been shot.
+          if (s.flash > 0) {
+            ctx.globalAlpha = shade * s.flash * 0.85;
+            ctx.fillStyle = '#ff2222';
+            ctx.fillRect(x, cTop, 1, cBottom - cTop);
+          }
 
           // Two small dark eyes near the top of the head.
           const eyeTop = colTop + spriteSize * 0.22;
