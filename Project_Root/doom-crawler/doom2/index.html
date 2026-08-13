@@ -18,6 +18,9 @@
       <div class="hud-item">KEYS <span id="keys">0</span></div>
     </div>
 
+    <!-- Active power-up badges -->
+    <div id="powerup-status"></div>
+
     <!-- Minimap -->
     <canvas id="minimap" width="180" height="180"></canvas>
 
@@ -32,37 +35,44 @@
       <div class="overlay-card">
         <h1>DUNGEON CRAWLER</h1>
         <p class="subtitle">A tiny DOOM-style raycaster</p>
-        <ul class="features">
-          <li>Levels carved by <b>Wilson's algorithm</b> (loop-erased random walk)</li>
-          <li>Enemies hunt you with <b>A* pathfinding</b></li>
-          <li>Find the <b>exit</b> to descend deeper</li>
-        </ul>
-        <div class="legend">
-          <div class="legend-row">
-            <span class="legend-icon key"></span>
-            <span><b>Key</b> — pick up glowing keys scattered around the level</span>
-          </div>
-          <div class="legend-row">
-            <span class="legend-icon door"></span>
-            <span><b>Door</b> — the glowing exit; opens once you have enough keys</span>
-          </div>
-          <div class="legend-row">
-            <span class="legend-icon health"></span>
-            <span><b>Health Pack</b> — restores HP when picked up</span>
-          </div>
-          <div class="legend-row">
-            <span class="legend-icon ghost-ranged"></span>
-            <span><b>Pale Ghost</b> — melee only; <b>Violet Ghost</b> — shoots bolts from range</span>
-          </div>
-        </div>
-        <div class="controls">
-          <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Move</div>
-          <div><kbd>←</kbd><kbd>→</kbd> / Mouse — Turn</div>
-          <div><kbd>Space</kbd> / Click — Shoot</div>
-          <div><kbd>M</kbd> — Toggle minimap paths</div>
-          <div><kbd>P</kbd> — Pause & settings</div>
-        </div>
         <button id="start-btn">ENTER THE DUNGEON</button>
+        <div class="overlay-details">
+          <ul class="features">
+            <li>Levels carved by <b>Wilson's algorithm</b> (loop-erased random walk)</li>
+            <li>Enemies hunt you with <b>A* pathfinding</b></li>
+            <li>Find the <b>exit</b> to descend deeper</li>
+            <li>Grab <b>power-ups</b> for speed, damage, or invincibility</li>
+          </ul>
+          <div class="legend">
+            <div class="legend-row">
+              <span class="legend-icon key"></span>
+              <span><b>Key</b> — pick up glowing keys scattered around the level</span>
+            </div>
+            <div class="legend-row">
+              <span class="legend-icon door"></span>
+              <span><b>Door</b> — the glowing exit; opens once you have enough keys</span>
+            </div>
+            <div class="legend-row">
+              <span class="legend-icon health"></span>
+              <span><b>Health Pack</b> — restores HP when picked up</span>
+            </div>
+            <div class="legend-row">
+              <span class="legend-icon ghost-ranged"></span>
+              <span><b>Pale Ghost</b> — melee only; <b>Violet Ghost</b> — shoots bolts from range</span>
+            </div>
+            <div class="legend-row">
+              <span class="legend-icon powerup"></span>
+              <span><b>Power-Up</b> — temporary Speed, Damage, or Invincibility boost</span>
+            </div>
+          </div>
+          <div class="controls">
+            <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Move</div>
+            <div><kbd>←</kbd><kbd>→</kbd> / Mouse — Turn</div>
+            <div><kbd>Space</kbd> / Click — Shoot</div>
+            <div><kbd>M</kbd> — Toggle minimap paths</div>
+            <div><kbd>P</kbd> — Pause & settings</div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -121,9 +131,7 @@
     </div>
 
     <!-- Weapon -->
-    <div id="weapon">
-      <div id="muzzle"></div>
-    </div>
+    <div id="weapon"></div>
   </div>
 
   <footer id="credit">Made by <span>Brian McHorney</span></footer>

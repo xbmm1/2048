@@ -104,7 +104,7 @@
   const crosshairEl = document.getElementById('crosshair');
   const damageFlashEl = document.getElementById('damage-flash');
   const weaponEl = document.getElementById('weapon');
-  const muzzleEl = document.getElementById('muzzle');
+  const powerupStatusEl = document.getElementById('powerup-status');
 
   const overlay = document.getElementById('overlay');
   const overlayTitle = overlay.querySelector('h1');
@@ -245,6 +245,12 @@
     saveSettings();
   });
 
+  // ---- Power-ups ----
+  const POWERUP_DURATIONS = { speed: 8, damage: 10, invincible: 10 };
+  const POWERUP_TYPES = ['speed', 'damage', 'invincible'];
+  const POWERUP_COLORS = { speed: '#4dd0ff', damage: '#ff7043', invincible: '#ffd54f' };
+  const POWERUP_LABELS = { speed: 'SPEED', damage: 'DAMAGE', invincible: 'INVINCIBLE' };
+
   // ---- Game state ----
   const state = {
     started: false,
@@ -255,7 +261,10 @@
     tiles: null,
     tw: 0,
     th: 0,
-    player: { x: 1.5, y: 1.5, angle: 0, health: 100, keys: 0, requiredKeys: 1 },
+    player: {
+      x: 1.5, y: 1.5, angle: 0, health: 100, keys: 0, requiredKeys: 1,
+      effects: { speed: 0, damage: 0, invincible: 0 },
+    },
     enemies: [],
     pickups: [],
     exit: null,
@@ -330,6 +339,13 @@
       state.pickups.push({ type: 'health', x: c.x + 0.5, y: c.y + 0.5, taken: false });
     }
 
+    const powerupCount = 1 + Math.floor(floorNum / 3);
+    for (let i = 0; i < powerupCount; i++) {
+      const c = randomFloorCell(tiles, w, h);
+      const sub = POWERUP_TYPES[Math.floor(Math.random() * POWERUP_TYPES.length)];
+      state.pickups.push({ type: 'powerup', sub, x: c.x + 0.5, y: c.y + 0.5, taken: false });
+    }
+
     state.enemies = [];
     const enemyCount = Math.max(1, Math.round((2 + floorNum) * settings.enemyCountMult));
     for (let i = 0; i < enemyCount; i++) {
@@ -378,6 +394,7 @@
     state.floor = 1;
     state.kills = 0;
     state.player.health = 100;
+    state.player.effects = { speed: 0, damage: 0, invincible: 0 };
     state.gameOver = false;
     buildLevel(1);
     state.started = true;
@@ -502,13 +519,14 @@
 
   function fireWeaponFx() {
     pulse(weaponEl, 'recoil', 90);
-    pulse(muzzleEl, 'flash', 90);
+    pulse(weaponEl, 'firing', 300);
   }
 
   function shoot() {
     if (!state.started || state.paused || state.gameOver) return;
     fireWeaponFx();
     const p = state.player;
+    const dmgMult = p.effects.damage > 0 ? 2 : 1;
     let bestEnemy = null;
     let bestDist = Infinity;
     for (const e of state.enemies) {
@@ -526,7 +544,7 @@
       }
     }
     if (bestEnemy) {
-      bestEnemy.health -= 20;
+      bestEnemy.health -= 20 * dmgMult;
       if (bestEnemy.health <= 0) {
         bestEnemy.alive = false;
         state.kills++;
@@ -534,13 +552,22 @@
     }
   }
 
+  function applyPowerup(sub) {
+    state.player.effects[sub] = POWERUP_DURATIONS[sub];
+  }
+
   function update(dt) {
     const p = state.player;
+
+    for (const k in p.effects) {
+      if (p.effects[k] > 0) p.effects[k] = Math.max(0, p.effects[k] - dt);
+    }
 
     if (state.keysHeld['arrowleft']) p.angle -= settings.turnSpeed * dt;
     if (state.keysHeld['arrowright']) p.angle += settings.turnSpeed * dt;
 
-    const moveSpeed = 2.6 * dt;
+    const speedMult = p.effects.speed > 0 ? 1.5 : 1;
+    const moveSpeed = 2.6 * speedMult * dt;
     let dx = 0, dy = 0;
     if (state.keysHeld['w']) { dx += Math.cos(p.angle) * moveSpeed; dy += Math.sin(p.angle) * moveSpeed; }
     if (state.keysHeld['s']) { dx -= Math.cos(p.angle) * moveSpeed; dy -= Math.sin(p.angle) * moveSpeed; }
@@ -553,7 +580,10 @@
       if (dist2(pk, p) < 0.3) {
         pk.taken = true;
         if (pk.type === 'key') p.keys++;
-        else p.health = Math.min(100, p.health + 30);
+        else if (pk.type === 'health') p.health = Math.min(100, p.health + 30);
+        else if (pk.type === 'powerup') {
+          applyPowerup(pk.sub);
+        }
       }
     }
 
@@ -601,9 +631,11 @@
           e.shootCooldown = 1.6 + Math.random() * 0.6;
         }
       } else if (dist2(e, p) < 0.55 && e.cooldown <= 0) {
-        p.health -= 8;
         e.cooldown = 1.0;
-        flashDamage();
+        if (p.effects.invincible <= 0) {
+          p.health -= 8;
+          flashDamage();
+        }
       }
     }
 
@@ -616,8 +648,10 @@
       if (proj.life <= 0 || !tileFree(state.tiles, Math.floor(proj.x), Math.floor(proj.y))) {
         hit = true;
       } else if (dist2(proj, p) < 0.2) {
-        p.health -= proj.damage;
-        flashDamage();
+        if (p.effects.invincible <= 0) {
+          p.health -= proj.damage;
+          flashDamage();
+        }
         hit = true;
       }
       if (hit) state.projectiles.splice(i, 1);
@@ -660,8 +694,10 @@
       if (!pk.taken) {
         sprites.push({
           x: pk.x, y: pk.y,
-          color: pk.type === 'key' ? '#ffd23f' : '#3fbf5f',
-          scale: 0.5,
+          color: pk.type === 'key' ? '#ffd23f'
+            : pk.type === 'health' ? '#3fbf5f'
+            : POWERUP_COLORS[pk.sub] || '#ffffff',
+          scale: pk.type === 'powerup' ? 0.6 : 0.5,
           key: pk.type === 'key',
           health: pk.type === 'health',
         });
@@ -739,7 +775,7 @@
         mctx.moveTo(px, py + 0.5);
         mctx.lineTo(px, py + 2.6);
         mctx.stroke();
-      } else {
+      } else if (pk.type === 'health') {
         // Tiny health-pack icon: a small green square with a white cross.
         mctx.fillStyle = '#3fbf5f';
         mctx.fillRect(px - 2.5, py - 2.5, 5, 5);
@@ -749,6 +785,16 @@
         mctx.fillStyle = '#f4f4f0';
         mctx.fillRect(px - 0.5, py - 1.8, 1, 3.6);
         mctx.fillRect(px - 1.8, py - 0.5, 3.6, 1);
+      } else if (pk.type === 'powerup') {
+        // Tiny power-up icon: a small colored diamond.
+        mctx.fillStyle = POWERUP_COLORS[pk.sub] || '#ffffff';
+        mctx.beginPath();
+        mctx.moveTo(px, py - 3);
+        mctx.lineTo(px + 3, py);
+        mctx.lineTo(px, py + 3);
+        mctx.lineTo(px - 3, py);
+        mctx.closePath();
+        mctx.fill();
       }
     }
     // Exit door icon: a small bordered rectangle with a knob dot.
@@ -780,6 +826,13 @@
     hudHp.textContent = Math.max(0, Math.round(state.player.health));
     hudKills.textContent = state.kills;
     hudKeys.textContent = `${state.player.keys}/${state.player.requiredKeys}`;
+
+    const badges = [];
+    for (const sub of ['speed', 'damage', 'invincible']) {
+      const t = state.player.effects[sub];
+      if (t > 0) badges.push(`<div class="powerup-badge ${sub}">${POWERUP_LABELS[sub]} ${t.toFixed(1)}s</div>`);
+    }
+    powerupStatusEl.innerHTML = badges.join('');
   }
 
   let lastTime = performance.now();

@@ -40,11 +40,35 @@ html, body {
   letter-spacing: 2px;
   pointer-events: none;
   text-shadow: 0 0 6px #000;
+  z-index: 2;
 }
 .hud-item { color: #9a9a9a; }
 .hud-item span { color: #ff5252; font-weight: bold; }
 #hp { color: #4caf50 !important; }
 #keys { color: #ffd54f !important; }
+
+/* ---------- Power-up status badges ---------- */
+#powerup-status {
+  position: absolute;
+  top: 10px; left: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  pointer-events: none;
+  z-index: 5;
+}
+.powerup-badge {
+  font-size: 12px;
+  letter-spacing: 1px;
+  padding: 4px 10px;
+  border-radius: 3px;
+  background: rgba(0,0,0,0.6);
+  text-shadow: 0 0 6px #000;
+  border-left: 3px solid #fff;
+}
+.powerup-badge.speed { color: #4dd0ff; border-left-color: #4dd0ff; }
+.powerup-badge.damage { color: #ff7043; border-left-color: #ff7043; }
+.powerup-badge.invincible { color: #ffd54f; border-left-color: #ffd54f; }
 
 /* ---------- Minimap ---------- */
 #minimap {
@@ -78,31 +102,30 @@ html, body {
 #damage-flash.hit { opacity: 1; }
 
 /* ---------- Weapon ---------- */
+/* Sprite sheet: 5 frames (idle, flash-1, flash-2, idle, idle) at 123x128 px
+   each = 615x128 total. Displayed at 2x scale (246x256 per frame). */
 #weapon {
   position: absolute;
-  bottom: 26px; left: 50%;
-  width: 220px; height: 180px;
+  bottom: -20px; left: calc(50% + 110px);
+  width: 246px; height: 256px;
   transform: translateX(-50%);
   pointer-events: none;
-  background:
-    linear-gradient(160deg, #3a3a42 0%, #1c1c22 60%) ;
-  clip-path: polygon(38% 100%, 62% 100%, 58% 30%, 53% 0%, 47% 0%, 42% 30%);
+  background-image: url('../assets/pistol-fire.png');
+  background-repeat: no-repeat;
+  background-size: 1230px 256px;
+  background-position: 0 0;
+  image-rendering: pixelated;
   filter: drop-shadow(0 -4px 6px rgba(0,0,0,0.6));
   transition: transform 0.05s;
+  z-index: 1;
 }
-#weapon.recoil { transform: translateX(-50%) translateY(14px); }
-#muzzle {
-  position: absolute;
-  top: -34px; left: 50%;
-  width: 70px; height: 70px;
-  transform: translateX(-50%) scale(0);
-  background: radial-gradient(circle, #fff 0%, #ffd54f 30%, #ff6f00 60%, transparent 70%);
-  border-radius: 50%;
+#weapon.recoil { transform: translateX(-50%) translateY(10px); }
+#weapon.firing {
+  animation: pistol-fire 0.3s steps(4) 1;
 }
-#muzzle.flash { animation: flash 0.08s ease-out; }
-@keyframes flash {
-  0% { transform: translateX(-50%) scale(0.2); opacity: 1; }
-  100% { transform: translateX(-50%) scale(1.3); opacity: 0; }
+@keyframes pistol-fire {
+  from { background-position: 0 0; }
+  to   { background-position: -984px 0; }
 }
 
 /* ---------- Overlay ---------- */
@@ -121,9 +144,13 @@ html, body {
 .hidden { display: none !important; }
 
 .overlay-card {
+  display: flex;
+  flex-direction: column;
   text-align: center;
   max-width: 560px;
-  padding: 30px 40px;
+  max-height: 100%;
+  padding: 24px 40px;
+  margin: 0 auto;
 }
 .overlay-card h1 {
   font-size: 46px;
@@ -131,7 +158,12 @@ html, body {
   color: #ff5252;
   text-shadow: 0 0 18px rgba(255,82,82,0.6);
 }
-.subtitle { color: #888; margin: 6px 0 22px; letter-spacing: 2px; }
+.subtitle { color: #888; margin: 6px 0 20px; letter-spacing: 2px; }
+.overlay-details {
+  overflow-y: auto;
+  margin-top: 20px;
+  padding-right: 4px;
+}
 .features {
   list-style: none;
   text-align: left;
@@ -244,6 +276,13 @@ html, body {
   background: linear-gradient(90deg, #eaf3ff 50%, #d9b3ff 50%);
   box-shadow: 0 0 6px rgba(217, 179, 255, 0.6);
 }
+.legend-icon.powerup {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  background: linear-gradient(135deg, #4dd0ff, #ff7043, #ffd54f);
+  box-shadow: 0 0 8px rgba(255, 213, 79, 0.7);
+}
 .controls {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -274,6 +313,7 @@ kbd {
   cursor: pointer;
   border-radius: 4px;
   transition: transform 0.1s, box-shadow 0.2s;
+  flex-shrink: 0;
 }
 #start-btn:hover {
   transform: scale(1.05);
