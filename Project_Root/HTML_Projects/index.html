@@ -1,154 +1,843 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>HTML Programs</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      background-color: #222;
-      color: #eee;
-      padding: 2rem;
-      max-width: 900px;
-      margin: auto;
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>HTML Programs — Interactive Project Portfolio</title>
+<meta name="description" content="A collection of interactive HTML, Canvas, and JavaScript projects: games, physics engines, algorithms, cryptography demos, fractals, and utilities." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg-0: #060814;
+    --bg-1: #0b0f1e;
+    --glass-bg: rgba(255, 255, 255, 0.05);
+    --glass-bg-hover: rgba(255, 255, 255, 0.08);
+    --glass-border: rgba(255, 255, 255, 0.09);
+    --glass-border-hover: rgba(255, 255, 255, 0.18);
+    --text-primary: #f2f4f8;
+    --text-secondary: #9aa4b8;
+    --text-muted: #6b7488;
+    --cyan: #22d3ee;
+    --purple: #a78bfa;
+    --blue: #60a5fa;
+    --radius-lg: 24px;
+    --radius-md: 18px;
+    --radius-sm: 12px;
+    --shadow-soft: 0 10px 30px rgba(0, 0, 0, 0.35);
+    --shadow-lift: 0 22px 55px rgba(34, 211, 238, 0.16), 0 8px 24px rgba(0, 0, 0, 0.45);
+    --nav-h: 72px;
+    --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  * { box-sizing: border-box; }
+
+  html {
+    scroll-behavior: smooth;
+    scroll-padding-top: calc(var(--nav-h) + 16px);
+  }
+
+  body {
+    margin: 0;
+    font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    color: var(--text-primary);
+    background: var(--bg-0);
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+
+  /* ---------- Animated gradient backdrop ---------- */
+  .bg-gradient {
+    position: fixed;
+    inset: 0;
+    z-index: -2;
+    background:
+      radial-gradient(38% 45% at 15% 12%, rgba(34, 211, 238, 0.16), transparent 60%),
+      radial-gradient(45% 50% at 85% 8%, rgba(167, 139, 250, 0.16), transparent 60%),
+      radial-gradient(50% 55% at 50% 100%, rgba(96, 165, 250, 0.14), transparent 60%),
+      linear-gradient(180deg, var(--bg-0), var(--bg-1) 45%, var(--bg-0));
+    background-size: 200% 200%, 200% 200%, 200% 200%, 100% 100%;
+    animation: gradientDrift 22s ease-in-out infinite alternate;
+  }
+  @keyframes gradientDrift {
+    0% { background-position: 0% 0%, 100% 0%, 50% 100%, 0 0; }
+    100% { background-position: 20% 30%, 80% 20%, 40% 80%, 0 0; }
+  }
+
+  #particles {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+  }
+
+  a { color: inherit; }
+
+  .skip-link {
+    position: absolute;
+    left: 12px;
+    top: -60px;
+    background: var(--cyan);
+    color: #04141a;
+    font-weight: 700;
+    padding: 10px 16px;
+    border-radius: var(--radius-sm);
+    z-index: 999;
+    transition: top 0.2s var(--ease);
+  }
+  .skip-link:focus { top: 12px; }
+
+  :focus-visible {
+    outline: 2px solid var(--cyan);
+    outline-offset: 3px;
+    border-radius: 6px;
+  }
+
+  /* ---------- Sticky nav ---------- */
+  .site-nav {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    height: var(--nav-h);
+    display: flex;
+    align-items: center;
+    padding: 0 clamp(16px, 4vw, 40px);
+    background: rgba(9, 12, 22, 0.6);
+    backdrop-filter: blur(18px) saturate(140%);
+    -webkit-backdrop-filter: blur(18px) saturate(140%);
+    border-bottom: 1px solid var(--glass-border);
+  }
+  .nav-inner {
+    width: 100%;
+    max-width: 1320px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 800;
+    font-size: 1.05rem;
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+    text-decoration: none;
+  }
+  .brand-mark {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    display: grid;
+    place-items: center;
+    font-size: 1.05rem;
+    background: linear-gradient(135deg, var(--cyan), var(--purple));
+    box-shadow: 0 6px 18px rgba(96, 165, 250, 0.35);
+  }
+  .nav-links {
+    list-style: none;
+    display: flex;
+    gap: 4px;
+    margin: 0;
+    padding: 0;
+  }
+  .nav-links a {
+    display: inline-block;
+    padding: 9px 14px;
+    border-radius: 999px;
+    font-size: 0.92rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    text-decoration: none;
+    transition: color 0.2s var(--ease), background 0.2s var(--ease);
+  }
+  .nav-links a:hover { color: var(--text-primary); background: var(--glass-bg); }
+  .nav-links a.active { color: #04141a; background: linear-gradient(135deg, var(--cyan), var(--blue)); font-weight: 600; }
+
+  .nav-search {
+    margin-left: auto;
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+  .nav-search svg { position: absolute; left: 12px; width: 16px; height: 16px; color: var(--text-muted); pointer-events: none; }
+  .nav-search input {
+    width: clamp(140px, 22vw, 240px);
+    padding: 9px 14px 9px 34px;
+    border-radius: 999px;
+    border: 1px solid var(--glass-border);
+    background: var(--glass-bg);
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 0.88rem;
+    transition: border-color 0.2s var(--ease), background 0.2s var(--ease), width 0.2s var(--ease);
+  }
+  .nav-search input::placeholder { color: var(--text-muted); }
+  .nav-search input:focus { border-color: var(--cyan); background: var(--glass-bg-hover); outline: none; }
+
+  .nav-toggle {
+    display: none;
+    margin-left: 6px;
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    border: 1px solid var(--glass-border);
+    background: var(--glass-bg);
+    color: var(--text-primary);
+    cursor: pointer;
+    align-items: center;
+    justify-content: center;
+  }
+
+  main { max-width: 1320px; margin: 0 auto; padding: 0 clamp(16px, 4vw, 40px); }
+
+  /* ---------- Hero ---------- */
+  .hero {
+    padding: clamp(56px, 10vw, 108px) 0 clamp(40px, 6vw, 64px);
+    text-align: center;
+  }
+  .hero-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 16px;
+    border-radius: 999px;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    font-size: 0.82rem;
+    color: var(--cyan);
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+  }
+  .hero-eyebrow .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--cyan); box-shadow: 0 0 10px var(--cyan); }
+  .hero h1 {
+    margin: 22px 0 14px;
+    font-size: clamp(2.4rem, 6vw, 4.2rem);
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    line-height: 1.05;
+    background: linear-gradient(120deg, #fdfefe 10%, var(--cyan) 45%, var(--purple) 70%, var(--blue) 95%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .hero .subtitle {
+    font-size: clamp(1.05rem, 2vw, 1.35rem);
+    color: var(--text-secondary);
+    font-weight: 500;
+    max-width: 640px;
+    margin: 0 auto 14px;
+  }
+  .hero .lede {
+    font-size: 1rem;
+    color: var(--text-muted);
+    max-width: 620px;
+    margin: 0 auto 34px;
+    line-height: 1.6;
+  }
+  .hero-stats {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 12px;
+  }
+  .stat-pill {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 22px;
+    border-radius: var(--radius-md);
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    backdrop-filter: blur(10px);
+  }
+  .stat-pill strong {
+    font-size: 1.4rem;
+    font-weight: 800;
+    background: linear-gradient(120deg, var(--cyan), var(--blue));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .stat-pill span { font-size: 0.82rem; color: var(--text-secondary); }
+
+  /* ---------- Scroll-reveal ---------- */
+  .reveal { opacity: 0; transform: translateY(22px); transition: opacity 0.7s var(--ease), transform 0.7s var(--ease); }
+  .reveal.in-view { opacity: 1; transform: translateY(0); }
+
+  /* ---------- Category sections ---------- */
+  .category { padding: 42px 0; scroll-margin-top: calc(var(--nav-h) + 12px); }
+  .category.no-match { display: none; }
+  .category-head {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 26px;
+  }
+  .category-icon {
+    flex-shrink: 0;
+    width: 52px;
+    height: 52px;
+    border-radius: var(--radius-sm);
+    display: grid;
+    place-items: center;
+    font-size: 1.4rem;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+  }
+  .category-title-row { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .category-head h2 { margin: 0; font-size: clamp(1.3rem, 2.4vw, 1.7rem); font-weight: 700; letter-spacing: -0.01em; }
+  .category-count { font-size: 0.78rem; color: var(--text-muted); background: var(--glass-bg); border: 1px solid var(--glass-border); padding: 3px 10px; border-radius: 999px; }
+  .category-head p { margin: 4px 0 0; color: var(--text-secondary); font-size: 0.95rem; max-width: 640px; }
+
+  /* ---------- Grid ---------- */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+  }
+  @media (min-width: 640px) { .grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (min-width: 1024px) { .grid { grid-template-columns: repeat(3, 1fr); } }
+  @media (min-width: 1400px) { .grid { grid-template-columns: repeat(4, 1fr); } }
+  @media (max-width: 639px) { .grid { grid-template-columns: 1fr; } }
+
+  /* ---------- Project card ---------- */
+  .card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 22px;
+    border-radius: var(--radius-lg);
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    backdrop-filter: blur(14px);
+    box-shadow: var(--shadow-soft);
+    transition: transform 0.35s var(--ease), box-shadow 0.35s var(--ease), border-color 0.35s var(--ease), background 0.35s var(--ease);
+  }
+  .card.hidden-card { display: none; }
+  .card:hover, .card:focus-within {
+    transform: translateY(-7px) scale(1.015);
+    border-color: var(--glass-border-hover);
+    background: var(--glass-bg-hover);
+    box-shadow: var(--shadow-lift);
+  }
+  .card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+  .card-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    display: grid;
+    place-items: center;
+    font-size: 1.15rem;
+    background: linear-gradient(135deg, rgba(34, 211, 238, 0.18), rgba(167, 139, 250, 0.18));
+    border: 1px solid var(--glass-border);
+  }
+  .featured-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    padding: 5px 10px;
+    border-radius: 999px;
+    color: #06121a;
+    background: linear-gradient(120deg, var(--cyan), var(--purple));
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.25) inset, 0 0 18px rgba(34, 211, 238, 0.55);
+    animation: badgeGlow 2.4s ease-in-out infinite;
+  }
+  @keyframes badgeGlow {
+    0%, 100% { box-shadow: 0 0 0 1px rgba(255,255,255,0.25) inset, 0 0 12px rgba(34, 211, 238, 0.4); }
+    50% { box-shadow: 0 0 0 1px rgba(255,255,255,0.3) inset, 0 0 22px rgba(167, 139, 250, 0.7); }
+  }
+  .card h3 { margin: 0; font-size: 1.05rem; font-weight: 700; letter-spacing: -0.01em; line-height: 1.3; }
+  .card p.desc { margin: 0; font-size: 0.88rem; color: var(--text-secondary); line-height: 1.55; flex-grow: 1; }
+  .tags { display: flex; flex-wrap: wrap; gap: 6px; }
+  .tag {
+    font-size: 0.72rem;
+    font-weight: 500;
+    padding: 4px 10px;
+    border-radius: 999px;
+    color: var(--text-secondary);
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--glass-border);
+  }
+  .tag.popular { color: var(--purple); border-color: rgba(167, 139, 250, 0.35); }
+  .tag.fast { color: var(--cyan); border-color: rgba(34, 211, 238, 0.35); }
+
+  .card-cta {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 4px;
+    padding: 10px 16px;
+    border-radius: var(--radius-sm);
+    font-size: 0.88rem;
+    font-weight: 600;
+    text-decoration: none;
+    color: #04121a;
+    background: linear-gradient(120deg, var(--cyan), var(--blue));
+    transition: transform 0.2s var(--ease), box-shadow 0.2s var(--ease), filter 0.2s var(--ease);
+  }
+  .card-cta:hover { transform: translateY(-2px); box-shadow: 0 10px 26px rgba(96, 165, 250, 0.35); filter: brightness(1.05); }
+  .card-cta svg { width: 14px; height: 14px; }
+
+  /* ---------- No-results state ---------- */
+  #no-results {
+    display: none;
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text-secondary);
+  }
+  #no-results.show { display: block; }
+  #no-results strong { display: block; font-size: 1.15rem; color: var(--text-primary); margin-bottom: 6px; }
+
+  footer {
+    text-align: center;
+    padding: 40px 20px 60px;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+  }
+
+  @media (max-width: 860px) {
+    .nav-links { display: none; }
+    .nav-toggle { display: inline-flex; }
+    .nav-search input { width: clamp(120px, 40vw, 200px); }
+    .site-nav.menu-open { height: auto; padding-bottom: 14px; }
+    .site-nav.menu-open .nav-inner { flex-wrap: wrap; }
+    .site-nav.menu-open .nav-links {
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+      order: 3;
+      gap: 2px;
+      margin-top: 8px;
     }
-    h1 {
-      margin-bottom: 2rem;
-      text-align: center;
-    }
-    h2 {
-      color: #4fc3f7;
-      border-bottom: 2px solid #4fc3f7;
-      padding-bottom: 0.3rem;
-      margin-top: 2rem;
-    }
-    p.description {
-      font-size: 1rem;
-      color: #bbb;
-      margin-top: 0.2rem;
-      margin-bottom: 1rem;
-      max-width: 700px;
-    }
-    ul {
-      list-style: none;
-      padding-left: 0;
-    }
-    li {
-      margin-bottom: 0.5rem;
-    }
-    a {
-      color: #81d4fa;
-      text-decoration: none;
-      font-size: 1.1rem;
-    }
-    a:hover {
-      text-decoration: underline;
-    }
-  </style>
+    .site-nav.menu-open .nav-links a { width: 100%; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    .bg-gradient { animation: none; }
+    .reveal { transition: none; opacity: 1; transform: none; }
+    .featured-badge { animation: none; }
+    .card { transition: none; }
+  }
+</style>
 </head>
 <body>
-  <h1>My HTML Programs</h1>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="bg-gradient" aria-hidden="true"></div>
+  <canvas id="particles" aria-hidden="true"></canvas>
 
-  <section>
-    <h2>Games and Interactive Projects</h2>
-    <p class="description">
-      Playable projects and interactive demos with game-like mechanics, controls, and real-time logic.
-    </p>
-    <ul>
-      <li><a href="Simple_Side_Scrolling_Platformer.html" target="_blank">Side_Scrolling_Platformer</a></li>
-      <li><a href="2048.html" target="_blank">2048🏆🌟</a></li>
-      <li><a href="2048-with-scores.html" target="_blank">2048-with-scores.html</a></li>
-      <li><a href="2048-explained.html" target="_blank">2048-explained.html</a></li>
-      <li><a href="Simple-Sudoku-Game.html" target="_blank">Sudoku-Game</a></li>
-      <li><a href="https://xbmm1.github.io/2048/Project_Root/doom-crawler/doom2/index.html" target="_blank">Doom Crawler (3D Raycaster)🏆🌟</a></li>
-    </ul>
-  </section>
+  <header class="site-nav" id="site-nav">
+    <div class="nav-inner">
+      <a class="brand" href="#top">
+        <span class="brand-mark">⌘</span>
+        <span>Brian's HTML Programs</span>
+      </a>
+      <ul class="nav-links" id="nav-links">
+        <li><a href="#top" data-nav="home">Home</a></li>
+        <li><a href="#featured" data-nav="featured">Featured</a></li>
+        <li><a href="#games" data-nav="games">Games</a></li>
+        <li><a href="#physics" data-nav="physics">Physics</a></li>
+        <li><a href="#algorithms" data-nav="algorithms">Algorithms</a></li>
+        <li><a href="#crypto" data-nav="crypto">Cryptography</a></li>
+        <li><a href="#graphics" data-nav="graphics">Graphics</a></li>
+        <li><a href="#utilities" data-nav="utilities">Utilities</a></li>
+      </ul>
+      <div class="nav-search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <label class="visually-hidden" for="search-input" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);">Search projects</label>
+        <input id="search-input" type="search" placeholder="Search projects…" autocomplete="off" />
+      </div>
+      <button class="nav-toggle" id="nav-toggle" aria-label="Toggle navigation menu" aria-expanded="false">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+    </div>
+  </header>
 
-  <section>
-    <h2>Physics and Engine Demos</h2>
-    <p class="description">
-      Simulations and engine-focused experiments for motion, dynamics, and 2D rendering systems.
-    </p>
-    <ul>
-      <li><a href="2d-physics-engine-guide.html" target="_blank">2d-physics-engine-guide</a></li>
-      <li><a href="2dEngine.html" target="_blank">2dEngine.html</a></li>
-      <li><a href="Double-Pendulum-Simulation.html" target="_blank">Double-Pendulum-Simulation.html</a></li>
-      <li><a href="Double-Pendulum-Golf.html" target="_blank">Double-Pendulum-Golf.html</a></li>
-    </ul>
-  </section>
+  <main id="main">
+    <section class="hero" id="top">
+      <div class="hero-eyebrow"><span class="dot"></span> Personal project archive</div>
+      <h1>Interactive Web Experiments,<br />All in One Place</h1>
+      <p class="subtitle">Games, engines, algorithms, cryptography, and graphics — built with nothing but HTML, Canvas, and JavaScript.</p>
+      <p class="lede">This is a growing collection of self-contained interactive demos: playable games, physics simulations, pathfinding and sorting visualizers, cryptography walkthroughs, fractal renderers, and small utilities — each one a single, dependency-free HTML file.</p>
+      <div class="hero-stats">
+        <div class="stat-pill"><strong id="stat-total">0</strong><span>Total projects</span></div>
+        <div class="stat-pill"><strong id="stat-categories">0</strong><span>Categories</span></div>
+        <div class="stat-pill"><strong id="stat-featured">0</strong><span>Featured builds</span></div>
+      </div>
+    </section>
 
-  <section>
-    <h2>Algorithms, Search, and Computation</h2>
-    <p class="description">
-      Interactive algorithm demos focused on pathfinding, sorting, procedural generation, and fast math techniques.
-    </p>
-    <ul>
-      <li><a href="sortAlgo.html" target="_blank">Sorting Algorithm🏆</a></li>
-      <li><a href="A_star.html" target="_blank">A_star.html🏆</a></li>
-      <li><a href="Wilson's%20Algorithm%20+%20AVisualization.html" target="_blank">Wilson's Algorithm + A* Visualization.html🏆</a></li>       
-      <li><a href="Wilsons-Algorithm-Step-by-Step-Explanation-with-Visualization.HTML" target="_blank">Wilsons Algorithm Step-by-Step Explanation with Visualization.HTML</a></li>
-      <li><a href="Wilsons-Algorithm-Step-by-Step-Explanation-with-Visualization2.HTML" target="_blank">Wilsons Algorithm Step-by-Step Explanation with Visualization2.HTML</a></li>
-      <li><a href="fastSquaredemo.html" target="_blank">fastSquaredemo.html</a></li>
-      <li><a href="Fast Inverse Square Root Step-by-Step.html" target="_blank">Fast Inverse Square Root Step-by-Step.html</a></li>
-    </ul>
-  </section>
+    <div id="categories"></div>
+    <p id="no-results"><strong>No projects found</strong>Try a different search term.</p>
+  </main>
 
-  <section>
-    <h2>Cryptography and Number Theory</h2>
-    <p class="description">
-      RSA, elliptic curve, factorization, modular arithmetic, and related number-theory visualizations.
-    </p>
-    <ul>
-      <li><a href="FULL-RSA-DYNAMIC.html" target="_blank">FULL-RSA-DYNAMIC.html</a></li>
-      <li><a href="FULL_RSA_DEMO.html" target="_blank">FULL_RSA_DEMO.html</a></li>
-      <li><a href="OLD-FULL_RSA_DEMO.html" target="_blank">OLD-FULL_RSA_DEMO.html</a></li>
-      <li><a href="rsa_demo.html" target="_blank">rsa_demo.html</a></li>
-      <li><a href="RSA_HELLO_DEMO.html" target="_blank">RSA_HELLO_DEMO.html</a></li>
-      <li><a href="RSA_NOTES.html" target="_blank">RSA_NOTES.html</a></li>
-      <li><a href="rsa_test.html" target="_blank">rsa_test.html</a></li>
-      <li><a href="test_rsa_for_e.html" target="_blank">test_rsa_for_e.html</a></li>
-      <li><a href="fast_modular_exponentiation.html" target="_blank">fast_modular_exponentiation.html</a></li>
-      <li><a href="square_and_multiply2.html" target="_blank">square_and_multiply2.html</a></li>
-      <li><a href="mod_calc.html" target="_blank">mod_calc.html</a></li>
-      <li><a href="GNFS_demo.html" target="_blank">GNFS_demo.html</a></li>
-      <li><a href="Pollard_solve_demo.html" target="_blank">Pollard_solve_demo.html</a></li>
-      <li><a href="ECC-demo.html" target="_blank">ECC-demo.html</a></li>
-      <li><a href="real_world_demo.html" target="_blank">real_world_demo.html</a></li>
-      <li><a href="blockchain.html" target="_blank">blockchain.html</a></li>
-    </ul>
-  </section>
+  <footer>
+    Built with plain HTML, CSS &amp; JavaScript — no frameworks, no build step.
+  </footer>
 
-  <section>
-    <h2>Fractals and Graphics</h2>
-    <p class="description">
-      Visualizations and demos of fractals, shaders, and graphical computations using WebGL and other technologies.
-    </p>
-    <ul>
-      <li><a href="Mandelbrot-Set-with-Mouse-Zoom-Pan.html" target="_blank">Mandelbrot-Set-with-Mouse-Zoom-Pan🏆🌟⚡</a></li>
-      <li><a href="Fractal Example.html" target="_blank">Fractal Example.html</a></li>
-      <li><a href="Mandelbrot(Smooth).html" target="_blank">Mandelbrot(Smooth).html</a></li>
-      <li><a href="Mandelbrot_Set_Visualization.html" target="_blank">Mandelbrot_Set_Visualization.html</a></li>
-      <li><a href="mandelbrot_webgl.html" target="_blank">mandelbrot_webgl.html</a></li>
-      <li><a href="GPU Shader Fast Math.html" target="_blank">GPU Shader Fast Math.html</a></li>
-      <li><a href="Rotating Square Shader Example.html" target="_blank">Rotating Square Shader Example.html</a></li>
-      <li><a href="Simple WebGL Sine Shader.html" target="_blank">Simple WebGL Sine Shader.html</a></li>
-      <li><a href="WebGL Many Smooth Balls Example.html" target="_blank">WebGL Many Smooth Balls Example.html</a></li>
-    </ul>
-  </section>
+<script>
+(function () {
+  'use strict';
 
-  <section>
-    <h2>Data Visualization and Utility Demos</h2>
-    <p class="description">
-      Smaller demos for plotting, UI-focused explanations, and one-off utilities.
-    </p>
-    <ul>
-      <li><a href="Line-Graph.html" target="_blank">Line-Graph.html</a></li>
-      <li><a href="SQUARE-root-1.0_Graph.html" target="_blank">SQUARE-root-1.0_Graph.html</a></li>
-      <li><a href="Full-Adder-Visual-Demo.html" target="_blank">Full-Adder-Visual-Demo.html</a></li>
-      <li><a href="Decoding _requests.py" target="_blank">Decoding _requests.py</a></li>
-      <li><a href="AWS-demo.html" target="_blank">AWS-demo.html</a></li>
-    </ul>
-  </section>
+  // ---------------------------------------------------------------------
+  // Project data — every href/filename below is preserved verbatim from
+  // the original project list. Only presentation (titles, descriptions,
+  // tags, badges) is new.
+  // ---------------------------------------------------------------------
+  var CATEGORIES = [
+    {
+      id: 'games',
+      icon: '🎮',
+      title: 'Games &amp; Interactive Projects',
+      description: 'Playable projects and interactive demos with game-like mechanics, controls, and real-time logic.',
+      projects: [
+        { title: 'Side-Scrolling Platformer', href: 'Simple_Side_Scrolling_Platformer.html', desc: 'A classic 2D platformer with gravity, jumping, and scrolling level design.', tags: ['Canvas', 'Game Physics'] },
+        { title: '2048', href: '2048.html', desc: 'The original sliding-tile puzzle game, built from scratch in JavaScript.', tags: ['Game Logic', 'Grid'], featured: true, popular: true },
+        { title: '2048 (With Scores)', href: '2048-with-scores.html', desc: 'An enhanced 2048 build with live scoring and high-score tracking.', tags: ['Game Logic', 'LocalStorage'] },
+        { title: '2048 (Explained)', href: '2048-explained.html', desc: 'A heavily annotated version of 2048 that walks through the core game logic.', tags: ['Education', 'Game Logic'] },
+        { title: 'Sudoku Game', href: 'Simple-Sudoku-Game.html', desc: 'A playable Sudoku board with validation and puzzle generation.', tags: ['Puzzle', 'Validation'] },
+        { title: 'Doom Crawler (3D Raycaster)', href: 'https://xbmm1.github.io/2048/Project_Root/doom-crawler/doom2/index.html', desc: 'A DOOM-style first-person raycasting dungeon crawler with A* enemy AI and procedural mazes.', tags: ['Raycasting', 'AI', 'Canvas'], featured: true, popular: true }
+      ]
+    },
+    {
+      id: 'physics',
+      icon: '⚙️',
+      title: 'Physics &amp; Engine Demos',
+      description: 'Simulations and engine-focused experiments for motion, dynamics, and 2D rendering systems.',
+      projects: [
+        { title: '2D Physics Engine Guide', href: '2d-physics-engine-guide.html', desc: 'A step-by-step walkthrough of building a simple 2D physics engine.', tags: ['Physics', 'Education'] },
+        { title: '2D Engine', href: '2dEngine.html', desc: 'A lightweight 2D rendering and simulation engine built from scratch.', tags: ['Engine', 'Canvas'] },
+        { title: 'Double Pendulum Simulation', href: 'Double-Pendulum-Simulation.html', desc: 'A chaotic double-pendulum simulation demonstrating sensitive dependence on initial conditions.', tags: ['Chaos Theory', 'Simulation'] },
+        { title: 'Double Pendulum Golf', href: 'Double-Pendulum-Golf.html', desc: 'A playful golf game controlled by the physics of a double pendulum.', tags: ['Simulation', 'Game'] }
+      ]
+    },
+    {
+      id: 'algorithms',
+      icon: '🧠',
+      title: 'Algorithms, Search &amp; Computation',
+      description: 'Interactive algorithm demos focused on pathfinding, sorting, procedural generation, and fast math techniques.',
+      projects: [
+        { title: 'Sorting Algorithms Visualizer', href: 'sortAlgo.html', desc: 'A visual, side-by-side comparison of classic sorting algorithms in action.', tags: ['Sorting', 'Visualization'], featured: true },
+        { title: 'A* Pathfinding', href: 'A_star.html', desc: 'An interactive A* search visualization for grid-based pathfinding.', tags: ['Pathfinding', 'Search'], featured: true },
+        { title: "Wilson's Algorithm + A* Visualization", href: "Wilson's%20Algorithm%20+%20AVisualization.html", desc: 'Maze generation via loop-erased random walks, paired with A* pathfinding.', tags: ['Maze Generation', 'Pathfinding'], featured: false },
+        { title: "Wilson's Algorithm Step-by-Step", href: 'Wilsons-Algorithm-Step-by-Step-Explanation-with-Visualization.HTML', desc: "A guided, step-by-step explanation of loop-erased random walk maze generation.", tags: ['Education', 'Maze Generation'] },
+        { title: "Wilson's Algorithm Step-by-Step (v2)", href: 'Wilsons-Algorithm-Step-by-Step-Explanation-with-Visualization2.HTML', desc: "An alternate walkthrough of Wilson's maze-generation algorithm.", tags: ['Education', 'Maze Generation'] },
+        { title: 'Fast Square Demo', href: 'fastSquaredemo.html', desc: 'A demonstration of fast squaring techniques used in numerical computing.', tags: ['Fast Math'] },
+        { title: 'Fast Inverse Square Root', href: 'Fast Inverse Square Root Step-by-Step.html', desc: 'A step-by-step breakdown of the famous Quake III fast inverse square root trick.', tags: ['Fast Math', 'Bit Hacks'] }
+      ]
+    },
+    {
+      id: 'crypto',
+      icon: '🔐',
+      title: 'Cryptography &amp; Number Theory',
+      description: 'RSA, elliptic curve, factorization, modular arithmetic, and related number-theory visualizations.',
+      projects: [
+        { title: 'RSA Dynamic Demo', href: 'FULL-RSA-DYNAMIC.html', desc: 'An interactive, fully dynamic walkthrough of RSA key generation and encryption.', tags: ['RSA', 'Cryptography'] },
+        { title: 'Full RSA Demo', href: 'FULL_RSA_DEMO.html', desc: 'A complete demonstration of the RSA cryptosystem, from key generation to decryption.', tags: ['RSA', 'Cryptography'] },
+        { title: 'Full RSA Demo (Legacy)', href: 'OLD-FULL_RSA_DEMO.html', desc: 'An earlier version of the full RSA demonstration.', tags: ['RSA', 'Cryptography'] },
+        { title: 'RSA Demo', href: 'rsa_demo.html', desc: 'A simplified RSA encryption and decryption demo.', tags: ['RSA'] },
+        { title: 'RSA Hello Demo', href: 'RSA_HELLO_DEMO.html', desc: 'A minimal "hello world" style introduction to RSA encryption.', tags: ['RSA', 'Education'] },
+        { title: 'RSA Notes', href: 'RSA_NOTES.html', desc: 'Written notes and explanations covering the fundamentals of RSA.', tags: ['Notes', 'RSA'] },
+        { title: 'RSA Test', href: 'rsa_test.html', desc: 'A scratch test page for experimenting with RSA parameters.', tags: ['RSA', 'Testing'] },
+        { title: 'Test RSA for e', href: 'test_rsa_for_e.html', desc: 'Experiments exploring valid choices of the RSA public exponent e.', tags: ['RSA', 'Testing'] },
+        { title: 'Fast Modular Exponentiation', href: 'fast_modular_exponentiation.html', desc: 'A visualization of fast modular exponentiation via square-and-multiply.', tags: ['Modular Arithmetic'] },
+        { title: 'Square and Multiply', href: 'square_and_multiply2.html', desc: 'A step-by-step demo of the square-and-multiply exponentiation algorithm.', tags: ['Modular Arithmetic'] },
+        { title: 'Modular Calculator', href: 'mod_calc.html', desc: 'A simple calculator for modular arithmetic operations.', tags: ['Modular Arithmetic', 'Tool'] },
+        { title: 'GNFS Demo', href: 'GNFS_demo.html', desc: 'An exploration of the General Number Field Sieve factorization algorithm.', tags: ['Factorization'] },
+        { title: "Pollard's Rho Demo", href: 'Pollard_solve_demo.html', desc: "An interactive demo of Pollard's rho algorithm for integer factorization.", tags: ['Factorization'] },
+        { title: 'Elliptic Curve Cryptography Demo', href: 'ECC-demo.html', desc: 'A visual introduction to elliptic curve cryptography and point arithmetic.', tags: ['ECC', 'Cryptography'] },
+        { title: 'Real World Crypto Demo', href: 'real_world_demo.html', desc: 'A practical demonstration connecting cryptography theory to real-world use.', tags: ['Cryptography'] },
+        { title: 'Blockchain Demo', href: 'blockchain.html', desc: 'A minimal blockchain simulation showing blocks, hashing, and chain validation.', tags: ['Blockchain', 'Hashing'] }
+      ]
+    },
+    {
+      id: 'graphics',
+      icon: '✨',
+      title: 'Fractals &amp; Graphics',
+      description: 'Visualizations and demos of fractals, shaders, and graphical computations using WebGL and other technologies.',
+      projects: [
+        { title: 'Mandelbrot Set (Zoom &amp; Pan)', href: 'Mandelbrot-Set-with-Mouse-Zoom-Pan.html', desc: 'An interactive Mandelbrot Set explorer with smooth mouse-driven zoom and pan.', tags: ['Fractal', 'Canvas'], featured: true, popular: true, fast: true },
+        { title: 'Fractal Example', href: 'Fractal Example.html', desc: 'A general-purpose fractal rendering example.', tags: ['Fractal'] },
+        { title: 'Mandelbrot (Smooth Coloring)', href: 'Mandelbrot(Smooth).html', desc: 'A Mandelbrot Set renderer using smooth iteration coloring for gradient bands.', tags: ['Fractal', 'Canvas'] },
+        { title: 'Mandelbrot Set Visualization', href: 'Mandelbrot_Set_Visualization.html', desc: 'A classic Mandelbrot Set visualization rendered on canvas.', tags: ['Fractal'] },
+        { title: 'Mandelbrot (WebGL)', href: 'mandelbrot_webgl.html', desc: 'A GPU-accelerated Mandelbrot Set renderer built with WebGL shaders.', tags: ['WebGL', 'Shader'] },
+        { title: 'GPU Shader Fast Math', href: 'GPU Shader Fast Math.html', desc: 'Experiments with fast math approximations running directly on the GPU.', tags: ['WebGL', 'Shader'] },
+        { title: 'Rotating Square (Shader)', href: 'Rotating Square Shader Example.html', desc: 'A simple rotating square rendered entirely with a custom shader.', tags: ['WebGL', 'Shader'] },
+        { title: 'Simple WebGL Sine Shader', href: 'Simple WebGL Sine Shader.html', desc: 'A minimal WebGL fragment shader animating a scrolling sine wave.', tags: ['WebGL', 'Shader'] },
+        { title: 'WebGL Many Smooth Balls', href: 'WebGL Many Smooth Balls Example.html', desc: 'A GPU-rendered field of smoothly blended metaball-style spheres.', tags: ['WebGL', 'Metaballs'] }
+      ]
+    },
+    {
+      id: 'utilities',
+      icon: '🧰',
+      title: 'Data Visualization &amp; Utilities',
+      description: 'Smaller demos for plotting, UI-focused explanations, and one-off utilities.',
+      projects: [
+        { title: 'Line Graph', href: 'Line-Graph.html', desc: 'A simple interactive line graph plotting utility.', tags: ['Visualization'] },
+        { title: 'Square Root Graph', href: 'SQUARE-root-1.0_Graph.html', desc: 'A graphing tool for visualizing the square root function.', tags: ['Visualization', 'Math'] },
+        { title: 'Full Adder Visual Demo', href: 'Full-Adder-Visual-Demo.html', desc: 'A visual, interactive explanation of digital full-adder circuits.', tags: ['Digital Logic'] },
+        { title: 'Decoding Requests (Python)', href: 'Decoding _requests.py', desc: 'A Python script exploring how to decode and inspect HTTP requests.', tags: ['Python'] },
+        { title: 'AWS Demo', href: 'AWS-demo.html', desc: 'A demo page exploring concepts related to AWS services.', tags: ['Cloud'] }
+      ]
+    }
+  ];
 
-</body>
-</html>
+  // Controls the on-page section order (independent of how CATEGORIES is
+  // authored above). Update this list to reorder sections/nav without
+  // touching the project data blocks.
+  var CATEGORY_ORDER = ['games', 'physics', 'algorithms', 'crypto', 'graphics', 'utilities'];
+
+  var reducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  var externalIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg>';
+
+  function escapeHtml(str) {
+    return String(str).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  function buildTagsHtml(tags, project) {
+    var extra = [];
+    if (project.popular) extra.push('<span class="tag popular">Popular</span>');
+    if (project.fast) extra.push('<span class="tag fast">Optimized</span>');
+    var base = (tags || []).map(function (t) { return '<span class="tag">' + escapeHtml(t) + '</span>'; });
+    return extra.concat(base).join('');
+  }
+
+  function buildCard(project, categoryIcon) {
+    var card = document.createElement('article');
+    card.className = 'card reveal';
+    card.dataset.search = (project.title + ' ' + project.desc + ' ' + (project.tags || []).join(' ')).toLowerCase();
+
+    card.innerHTML =
+      '<div class="card-top">' +
+        '<div class="card-icon" aria-hidden="true">' + categoryIcon + '</div>' +
+        (project.featured ? '<span class="featured-badge">★ Featured</span>' : '') +
+      '</div>' +
+      '<h3>' + escapeHtml(project.title) + '</h3>' +
+      '<p class="desc">' + escapeHtml(project.desc) + '</p>' +
+      '<div class="tags">' + buildTagsHtml(project.tags, project) + '</div>' +
+      '<a class="card-cta" href="' + project.href.replace(/"/g, '&quot;') + '" target="_blank" rel="noopener">' +
+        'Open Project ' + externalIcon +
+      '</a>';
+    return card;
+  }
+
+  function buildCategory(category) {
+    var section = document.createElement('section');
+    section.className = 'category';
+    section.id = category.id;
+
+    var head = document.createElement('div');
+    head.className = 'category-head reveal';
+    head.innerHTML =
+      '<div class="category-icon" aria-hidden="true">' + category.icon + '</div>' +
+      '<div>' +
+        '<div class="category-title-row">' +
+          '<h2>' + category.title + '</h2>' +
+          '<span class="category-count">' + category.projects.length + ' project' + (category.projects.length === 1 ? '' : 's') + '</span>' +
+        '</div>' +
+        '<p>' + category.description + '</p>' +
+      '</div>';
+    section.appendChild(head);
+
+    var grid = document.createElement('div');
+    grid.className = 'grid';
+    category.projects.forEach(function (project) {
+      grid.appendChild(buildCard(project, category.icon));
+    });
+    section.appendChild(grid);
+
+    return section;
+  }
+
+  function render() {
+    var container = document.getElementById('categories');
+    var total = 0, featuredCount = 0;
+    var featuredProjects = [];
+    CATEGORIES.forEach(function (category) {
+      total += category.projects.length;
+      category.projects.forEach(function (p) { if (p.featured) { featuredCount++; featuredProjects.push(p); } });
+    });
+
+    if (featuredProjects.length) {
+      container.appendChild(buildCategory({
+        id: 'featured',
+        icon: '⭐',
+        title: 'Featured Projects',
+        description: 'Hand-picked highlights from across every category below.',
+        projects: featuredProjects
+      }));
+    }
+
+    CATEGORY_ORDER.forEach(function (id) {
+      var category = CATEGORIES.filter(function (c) { return c.id === id; })[0];
+      if (category) container.appendChild(buildCategory(category));
+    });
+
+    document.getElementById('stat-total').textContent = total;
+    document.getElementById('stat-categories').textContent = CATEGORIES.length;
+    document.getElementById('stat-featured').textContent = featuredCount;
+  }
+
+  // ---------------------------------------------------------------------
+  // Scroll-reveal animations
+  // ---------------------------------------------------------------------
+  function initReveal() {
+    var targets = document.querySelectorAll('.reveal');
+    if (reducedMotion || !('IntersectionObserver' in window)) {
+      targets.forEach(function (el) { el.classList.add('in-view'); });
+      return;
+    }
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('in-view');
+          io.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.08, rootMargin: '0px 0px -40px 0px' });
+    targets.forEach(function (el) { io.observe(el); });
+  }
+
+  // ---------------------------------------------------------------------
+  // Live search filter
+  // ---------------------------------------------------------------------
+  function initSearch() {
+    var input = document.getElementById('search-input');
+    var noResults = document.getElementById('no-results');
+    input.addEventListener('input', function () {
+      var q = input.value.trim().toLowerCase();
+      var visibleTotal = 0;
+      document.querySelectorAll('.category').forEach(function (section) {
+        var visibleInSection = 0;
+        section.querySelectorAll('.card').forEach(function (card) {
+          var match = !q || card.dataset.search.indexOf(q) !== -1;
+          card.classList.toggle('hidden-card', !match);
+          if (match) visibleInSection++;
+        });
+        section.classList.toggle('no-match', visibleInSection === 0);
+        visibleTotal += visibleInSection;
+      });
+      noResults.classList.toggle('show', visibleTotal === 0);
+    });
+  }
+
+  // ---------------------------------------------------------------------
+  // Nav: mobile toggle + scroll-spy active state
+  // ---------------------------------------------------------------------
+  function initNav() {
+    var nav = document.getElementById('site-nav');
+    var toggle = document.getElementById('nav-toggle');
+    toggle.addEventListener('click', function () {
+      var open = nav.classList.toggle('menu-open');
+      toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    });
+
+    var navLinks = document.querySelectorAll('.nav-links a');
+    navLinks.forEach(function (link) {
+      link.addEventListener('click', function () {
+        nav.classList.remove('menu-open');
+        toggle.setAttribute('aria-expanded', 'false');
+      });
+    });
+
+    var sectionIds = ['top', 'featured', 'games', 'physics', 'algorithms', 'crypto', 'graphics', 'utilities'];
+    var sections = sectionIds.map(function (id) { return document.getElementById(id); }).filter(Boolean);
+    if (!('IntersectionObserver' in window) || !sections.length) return;
+
+    var byId = {};
+    navLinks.forEach(function (l) { byId[l.dataset.nav] = l; });
+
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (!entry.isIntersecting) return;
+        navLinks.forEach(function (l) { l.classList.remove('active'); });
+        var id = entry.target.id === 'top' ? 'home' : entry.target.id;
+        if (byId[id]) byId[id].classList.add('active');
+      });
+    }, { rootMargin: '-40% 0px -55% 0px', threshold: 0 });
+
+    sections.forEach(function (s) { io.observe(s); });
+  }
+
+  // ---------------------------------------------------------------------
+  // Lightweight floating particle background
+  // ---------------------------------------------------------------------
+  function initParticles() {
+    var canvas = document.getElementById('particles');
+    if (!canvas || reducedMotion) return;
+    var ctx = canvas.getContext('2d');
+    var particles = [];
+    var count = 46;
+    var w, h, dpr;
+
+    function resize() {
+      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      w = window.innerWidth;
+      h = window.innerHeight;
+      canvas.width = w * dpr;
+      canvas.height = h * dpr;
+      canvas.style.width = w + 'px';
+      canvas.style.height = h + 'px';
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+
+    function makeParticle() {
+      return {
+        x: Math.random() * w,
+        y: Math.random() * h,
+        r: Math.random() * 1.6 + 0.4,
+        speed: Math.random() * 0.25 + 0.05,
+        drift: (Math.random() - 0.5) * 0.15,
+        alpha: Math.random() * 0.4 + 0.15,
+        hue: Math.random() < 0.5 ? '34,211,238' : '167,139,250'
+      };
+    }
+
+    resize();
+    for (var i = 0; i < count; i++) particles.push(makeParticle());
+
+    var lastFrame = 0;
+    function tick(ts) {
+      if (ts - lastFrame < 33) { requestAnimationFrame(tick); return; } // ~30fps cap for efficiency
+      lastFrame = ts;
+      ctx.clearRect(0, 0, w, h);
+      particles.forEach(function (p) {
+        p.y -= p.speed;
+        p.x += p.drift;
+        if (p.y < -5) { p.y = h + 5; p.x = Math.random() * w; }
+        if (p.x < -5) p.x = w + 5;
+        if (p.x > w + 5) p.x = -5;
+        ctx.beginPath();
+        ctx.fillStyle = 'rgba(' + p.hue + ',' + p.alpha + ')';
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+        ctx.fill();
+      });
+      requestAnimationFrame(tick);
+    }
+
+    window.addEventListener('resize', resize);
+    requestAnimationFrame(tick);
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    render();
+    initReveal();
+    initSearch();
+    initNav();
+    initParticles();
+  });
+})();
+</script>
