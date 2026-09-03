@@ -3,270 +3,676 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Orbital Mechanics Simulator — Earth, Moon &amp; Mars</title>
+<title>Orbital Mechanics Lab — Earth, Moon &amp; Mars</title>
 <style>
   * { box-sizing: border-box; }
   html, body {
     margin: 0; padding: 0; height: 100%; overflow: hidden;
-    background: #05060c;
+    background: #060714;
     font-family: 'Segoe UI', Arial, sans-serif;
     color: #e8ecf5;
     user-select: none;
   }
-  #sim { display: block; width: 100vw; height: 100vh; cursor: crosshair; }
+  button { font-family: inherit; }
+  #sim { display: block; width: 100vw; height: 100vh; cursor: grab; }
+  #sim.aiming { cursor: crosshair; }
+  #sim.panning { cursor: grabbing; }
 
-  .panel {
-    position: absolute;
-    background: rgba(10, 12, 22, 0.72);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 14px;
-    padding: 14px 16px;
+  :focus-visible { outline: 2px solid #6fd3ff; outline-offset: 2px; }
+
+  /* ---------------- Layout shell ---------------- */
+  #topbar {
+    position: absolute; top: 0; left: 0; right: 0; height: 46px;
+    display: flex; align-items: center; gap: 18px;
+    padding: 0 16px;
+    background: linear-gradient(180deg, rgba(10,12,24,0.9), rgba(10,12,24,0.65));
+    border-bottom: 1px solid rgba(255,255,255,0.08);
     backdrop-filter: blur(10px);
-    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    z-index: 20;
+    font-size: 12.5px;
   }
+  #topbar .title { font-weight: 700; letter-spacing: 0.04em; color: #8fd3ff; font-size: 13px; }
+  #topbar .stat { color: #9aa4bd; white-space: nowrap; }
+  #topbar .stat b { color: #e8ecf5; }
+  #topbar .spacer { flex: 1; }
+  #topbar button { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); color: #e8ecf5; border-radius: 8px; padding: 6px 10px; cursor: pointer; font-size: 12px; }
+  #topbar button:hover { background: rgba(255,255,255,0.12); }
 
-  #controls { top: 14px; left: 14px; width: 250px; }
-  #controls h1 { font-size: 15px; margin: 0 0 10px; letter-spacing: 0.03em; color: #8fd3ff; }
-  #controls .row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; font-size: 12.5px; color: #b7bfd4; }
-  #controls .row label { flex: 1; }
-  #controls input[type="range"] { width: 120px; }
-  #controls button {
-    width: 100%;
-    margin-top: 6px;
-    padding: 8px 10px;
-    border-radius: 8px;
+  .side-panel {
+    position: absolute; top: 46px; bottom: 190px;
+    width: 270px; overflow-y: auto; overflow-x: hidden;
+    background: rgba(10,12,22,0.68);
+    backdrop-filter: blur(10px);
+    padding: 10px 12px 20px;
+    z-index: 15;
+    transition: transform 0.25s ease;
+  }
+  #leftPanel { left: 0; border-right: 1px solid rgba(255,255,255,0.08); }
+  #rightPanel { right: 0; border-left: 1px solid rgba(255,255,255,0.08); }
+
+  .section { margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+  .section:last-child { border-bottom: none; }
+  .section h3 { font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.05em; color: #8fd3ff; margin: 0 0 8px; }
+  .row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 7px; font-size: 12px; color: #b7bfd4; }
+  .row label { flex: 1; }
+  .row input[type="range"] { flex: 1; max-width: 110px; }
+  .row input[type="number"] { width: 56px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); color: #e8ecf5; border-radius: 6px; padding: 3px 5px; font-size: 11.5px; }
+  .row select { flex: 1; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); color: #e8ecf5; border-radius: 6px; padding: 4px 6px; font-size: 11.5px; }
+  .check-row { display: flex; align-items: center; gap: 7px; margin-bottom: 6px; font-size: 12px; color: #b7bfd4; }
+
+  button.btn {
+    width: 100%; margin-top: 5px; padding: 8px 10px; border-radius: 8px;
     border: 1px solid rgba(255,255,255,0.15);
     background: linear-gradient(135deg, #1c2a44, #101828);
-    color: #e8ecf5;
-    font-size: 12.5px;
-    font-weight: 600;
-    cursor: pointer;
+    color: #e8ecf5; font-size: 12px; font-weight: 600; cursor: pointer;
     transition: transform 0.15s ease, background 0.15s ease;
   }
-  #controls button:hover { background: linear-gradient(135deg, #24365a, #172236); transform: translateY(-1px); }
-  #controls button.active { border-color: #6fd3ff; color: #6fd3ff; }
-  .hint { font-size: 11px; color: #7d879c; margin-top: 8px; line-height: 1.5; }
+  button.btn:hover { background: linear-gradient(135deg, #24365a, #172236); transform: translateY(-1px); }
+  button.btn.active { border-color: #6fd3ff; color: #6fd3ff; }
+  button.btn.accent { background: linear-gradient(135deg, #0b8f8f, #0a5f6e); border-color: #35d6d6; }
+  button.btn.warn { background: linear-gradient(135deg, #6e2020, #3d1010); border-color: #ff7a7a; }
+  .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .hint { font-size: 10.8px; color: #7d879c; margin-top: 6px; line-height: 1.5; }
 
-  #info { top: 14px; right: 14px; width: 240px; font-size: 12.5px; }
-  #info h2 { font-size: 13px; margin: 0 0 8px; color: #8fd3ff; }
-  #info .stat { display: flex; justify-content: space-between; margin-bottom: 5px; color: #b7bfd4; }
-  #info .stat b { color: #e8ecf5; font-weight: 600; }
-  #info .empty { color: #7d879c; font-style: italic; }
+  .stat-line { display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 12px; color: #b7bfd4; }
+  .stat-line b { color: #e8ecf5; font-weight: 600; }
+  .empty { color: #7d879c; font-style: italic; font-size: 12px; }
 
-  #log {
-    bottom: 14px; left: 14px; width: 340px; max-height: 160px;
-    overflow-y: auto; font-size: 11.5px;
+  /* ---------------- Bottom bar ---------------- */
+  #bottombar {
+    position: absolute; left: 0; right: 0; bottom: 0; height: 190px;
+    display: flex; gap: 0;
+    background: rgba(10,12,22,0.72);
+    border-top: 1px solid rgba(255,255,255,0.08);
+    backdrop-filter: blur(10px);
+    z-index: 15;
   }
-  #log h2 { font-size: 13px; margin: 0 0 8px; color: #8fd3ff; }
-  #log .entry { padding: 4px 0; border-top: 1px solid rgba(255,255,255,0.06); color: #c3cadd; }
-  #log .entry:first-child { border-top: none; }
-  #log .entry.assist { color: #ffd76a; }
-  #log .entry.escape { color: #6fffb0; }
-  #log .entry.crash { color: #ff7a7a; }
+  #timeControls { width: 300px; padding: 10px 14px; border-right: 1px solid rgba(255,255,255,0.08); overflow-y: auto; }
+  #timeControls h3 { font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.05em; color: #8fd3ff; margin: 0 0 8px; }
+  #timeControls .btn-grid { grid-template-columns: repeat(4, 1fr); }
+  #timeControls .btn-grid button { padding: 6px 2px; font-size: 11px; margin-top: 0; }
+  #clockDisplay { font-size: 20px; font-weight: 700; letter-spacing: 0.03em; color: #6fffe8; margin: 6px 0; }
 
-  #legend {
-    bottom: 14px; right: 14px; font-size: 11.5px; color: #b7bfd4;
+  #logPanel { flex: 1; padding: 10px 14px; overflow-y: auto; }
+  #logPanel h3 { font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.05em; color: #8fd3ff; margin: 0 0 8px; display: flex; justify-content: space-between; align-items: center; }
+  #logPanel h3 button { font-size: 10.5px; padding: 3px 8px; }
+  .log-entry { padding: 3px 0; border-top: 1px solid rgba(255,255,255,0.05); font-size: 11.5px; color: #c3cadd; }
+  .log-entry:first-child { border-top: none; }
+  .log-entry.assist { color: #ffd76a; }
+  .log-entry.escape { color: #6fffb0; }
+  .log-entry.crash, .log-entry.failure { color: #ff7a7a; }
+  .log-entry.success { color: #6fffb0; font-weight: 600; }
+
+  #scalePanel { width: 250px; padding: 10px 14px; border-left: 1px solid rgba(255,255,255,0.08); font-size: 11px; color: #8b95ac; overflow-y: auto; }
+  #scalePanel h3 { font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.05em; color: #8fd3ff; margin: 0 0 8px; }
+  #scalePanel .stat-line { font-size: 11px; }
+
+  /* ---------------- Minimap & tooltip ---------------- */
+  #minimap {
+    position: absolute; top: 54px; right: 282px; width: 150px; height: 150px;
+    background: rgba(6,7,20,0.75); border: 1px solid rgba(255,255,255,0.12); border-radius: 10px;
+    z-index: 16;
   }
-  #legend .row { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
-  #legend .swatch { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  #tooltip {
+    position: absolute; pointer-events: none; z-index: 40;
+    background: rgba(8,10,20,0.92); border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 8px; padding: 6px 10px; font-size: 11.5px; color: #e8ecf5;
+    display: none; white-space: nowrap;
+  }
+  #tooltip b { color: #8fd3ff; }
+
+  /* ---------------- Modals ---------------- */
+  .modal { position: absolute; inset: 0; background: rgba(4,5,10,0.82); z-index: 60; display: flex; align-items: center; justify-content: center; }
+  .modal.hidden { display: none; }
+  .modal-card {
+    max-width: 620px; max-height: 82vh; overflow-y: auto;
+    background: rgba(14,16,28,0.96); border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 16px; padding: 26px 30px; box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+  }
+  .modal-card h2 { color: #8fd3ff; margin-top: 0; }
+  .modal-card h4 { color: #6fd3ff; margin-bottom: 4px; }
+  .modal-card p { color: #b7bfd4; font-size: 13px; line-height: 1.6; margin-top: 0; }
+  .modal-card kbd { background: #1c2030; border: 1px solid #3a4058; border-radius: 4px; padding: 1px 7px; font-size: 11.5px; }
+  .modal-close { float: right; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); color: #e8ecf5; border-radius: 8px; padding: 5px 12px; cursor: pointer; }
+
+  #panelToggle { display: none; position: absolute; top: 52px; left: 8px; z-index: 25; }
+
+  @media (max-width: 900px) {
+    .side-panel { transform: translateX(-110%); }
+    #rightPanel { transform: translateX(110%); }
+    .side-panel.open { transform: translateX(0); }
+    #panelToggle { display: block; }
+    #bottombar { height: 150px; }
+    #scalePanel, #timeControls { width: 40%; }
+  }
 </style>
 </head>
 <body>
+
 <canvas id="sim"></canvas>
+<canvas id="minimap" aria-label="System overview minimap"></canvas>
+<div id="tooltip" role="tooltip"></div>
 
-<div class="panel" id="controls">
-  <h1>ORBITAL MECHANICS SIMULATOR</h1>
-  <div class="row">
-    <label for="timeScale">Time Scale</label>
-    <input id="timeScale" type="range" min="0.1" max="6" step="0.1" value="1" />
+<header id="topbar">
+  <span class="title">ORBITAL MECHANICS LAB</span>
+  <span class="stat">Status: <b id="statStatus">RUNNING</b></span>
+  <span class="stat">Mission: <b id="statMission">FREE SANDBOX</b></span>
+  <span class="stat">Sim Time: <b id="statSimTime">00:00:00</b></span>
+  <span class="stat">FPS: <b id="statFps">60</b></span>
+  <span class="spacer"></span>
+  <button id="eduBtn" type="button">Learn</button>
+  <button id="helpBtn" type="button">Help</button>
+  <button id="resetBtn" type="button">Reset</button>
+</header>
+
+<button id="panelToggle" class="btn" type="button">☰ Panels</button>
+
+<aside class="side-panel" id="leftPanel">
+  <div class="section">
+    <h3>Visualization</h3>
+    <div class="check-row"><input id="chkTrails" type="checkbox" checked /><label for="chkTrails">Trails</label></div>
+    <div class="check-row"><input id="chkVel" type="checkbox" /><label for="chkVel">Velocity vectors</label></div>
+    <div class="check-row"><input id="chkGrav" type="checkbox" /><label for="chkGrav">Gravity vectors</label></div>
+    <div class="check-row"><input id="chkSOI" type="checkbox" /><label for="chkSOI">Sphere of influence</label></div>
+    <div class="check-row"><input id="chkLagrange" type="checkbox" /><label for="chkLagrange">Lagrange points (Earth–Moon)</label></div>
+    <div class="check-row"><input id="chkField" type="checkbox" /><label for="chkField">Gravity field grid</label></div>
+    <div class="row">
+      <label for="predictLen">Prediction length</label>
+      <select id="predictLen">
+        <option value="300">Short</option>
+        <option value="900" selected>Medium</option>
+        <option value="2400">Long</option>
+        <option value="6000">Mission</option>
+      </select>
+    </div>
+    <div class="check-row"><input id="chkPredict" type="checkbox" checked /><label for="chkPredict">Show prediction while aiming</label></div>
   </div>
-  <div class="row">
-    <label for="launchPower">Launch Power</label>
-    <input id="launchPower" type="range" min="0.3" max="3" step="0.1" value="1" />
+
+  <div class="section">
+    <h3>Launch Control</h3>
+    <div class="row"><label for="originSel">Origin</label>
+      <select id="originSel">
+        <option value="earth">Earth</option>
+        <option value="moon">Moon</option>
+        <option value="mars">Mars</option>
+      </select>
+    </div>
+    <div class="row"><label for="dirRange">Direction (°)</label><input id="dirRange" type="range" min="0" max="359" value="90" /><input id="dirNum" type="number" min="0" max="359" value="90" /></div>
+    <div class="row"><label for="velRange">Velocity</label><input id="velRange" type="range" min="1" max="60" step="0.5" value="20" /><input id="velNum" type="number" min="1" max="60" step="0.5" value="20" /></div>
+    <div class="row"><label for="altRange">Altitude</label><input id="altRange" type="range" min="0" max="40" step="1" value="4" /><input id="altNum" type="number" min="0" max="40" value="4" /></div>
+    <div class="row"><label for="massRange">Probe mass</label><input id="massRange" type="range" min="0.5" max="10" step="0.5" value="1" /><input id="massNum" type="number" min="0.5" max="10" step="0.5" value="1" /></div>
+    <button class="btn" id="toggleLaunchModeBtn" type="button">Enable Launch Mode</button>
+    <button class="btn accent" id="launchBtn" type="button">LAUNCH PROBE</button>
+    <button class="btn" id="clearProbesBtn" type="button">Clear Probes</button>
+    <div class="hint">Toggle Launch Mode, then click-drag away from the origin body to aim visually — direction &amp; velocity update live. Or just set the sliders and press LAUNCH PROBE directly.</div>
   </div>
-  <button id="pauseBtn">Pause</button>
-  <button id="trailsBtn" class="active">Hide Trails</button>
-  <button id="clearProbesBtn">Clear Probes</button>
-  <button id="resetBtn">Reset Simulation</button>
-  <div class="hint">
-    Click-drag away from Earth to aim a launch (a dashed preview trajectory appears), release to fire a probe.
-    Try slingshotting it past Mars or the Moon to gain speed — or escape the solar system entirely.
+
+  <div class="section">
+    <h3>Hohmann Transfer</h3>
+    <div class="row"><label for="hohmannSel">Route</label>
+      <select id="hohmannSel">
+        <option value="earthMars">Earth → Mars</option>
+        <option value="earthMoon">Earth → Moon</option>
+        <option value="marsEarth">Mars → Earth</option>
+      </select>
+    </div>
+    <button class="btn" id="hohmannBtn" type="button">Show Hohmann Transfer</button>
+    <div id="hohmannInfo" class="hint"></div>
+  </div>
+
+  <div class="section">
+    <h3>Mission Presets</h3>
+    <div class="btn-grid">
+      <button class="btn" data-mission="earthOrbit" type="button">Earth Orbit</button>
+      <button class="btn" data-mission="moonTransfer" type="button">Moon Transfer</button>
+      <button class="btn" data-mission="moonFlyby" type="button">Moon Flyby</button>
+      <button class="btn" data-mission="marsTransfer" type="button">Mars Transfer</button>
+      <button class="btn" data-mission="marsFlyby" type="button">Mars Flyby</button>
+      <button class="btn" data-mission="solarEscape" type="button">Solar Escape</button>
+    </div>
+    <button class="btn" data-mission="freeSandbox" type="button">Free Sandbox</button>
+  </div>
+
+  <div class="section">
+    <h3>System Mode</h3>
+    <div class="btn-grid">
+      <button class="btn active" id="simplifiedBtn" type="button">Simplified</button>
+      <button class="btn" id="realisticBtn" type="button">Realistic</button>
+    </div>
+    <div class="row"><label for="cfgSunMass">Sun mass</label><input id="cfgSunMass" type="number" step="10" value="2650" /></div>
+    <div class="row"><label for="cfgEarthMass">Earth mass</label><input id="cfgEarthMass" type="number" step="5" value="135" /></div>
+    <div class="row"><label for="cfgEarthR">Earth radius (orbit)</label><input id="cfgEarthR" type="number" step="5" value="260" /></div>
+    <div class="row"><label for="cfgMarsR">Mars radius (orbit)</label><input id="cfgMarsR" type="number" step="5" value="380" /></div>
+    <div class="row"><label for="cfgMoonR">Moon distance</label><input id="cfgMoonR" type="number" step="1" value="28" /></div>
+    <div class="row"><label for="cfgVelMult">Velocity multiplier</label><input id="cfgVelMult" type="number" step="0.05" value="1" /></div>
+    <button class="btn warn" id="rebuildBtn" type="button">Rebuild System</button>
+  </div>
+
+  <div class="section">
+    <h3>Scenario</h3>
+    <button class="btn" id="exportBtn" type="button">Export Scenario</button>
+    <button class="btn" id="importBtn" type="button">Import Scenario</button>
+    <input id="importFile" type="file" accept="application/json" style="display:none" />
+  </div>
+</aside>
+
+<aside class="side-panel" id="rightPanel">
+  <div class="section">
+    <h3>Selected Object</h3>
+    <div id="selectionBody"><div class="empty">Click a body or probe to inspect it.</div></div>
+    <div class="btn-grid" id="selectionActions" style="display:none;">
+      <button class="btn" id="followBtn" type="button">Follow</button>
+      <button class="btn" id="centerBtn" type="button">Center</button>
+      <button class="btn" id="stopFollowBtn" type="button">Stop Follow</button>
+      <button class="btn" id="focusBtn" type="button">Focus (F)</button>
+    </div>
+  </div>
+
+  <div class="section" id="orbitalElementsSection" style="display:none;">
+    <h3>Orbital Elements <span style="font-weight:400; text-transform:none; color:#7d879c;">(vs. dominant body)</span></h3>
+    <div id="orbitalElementsBody"></div>
+  </div>
+
+  <div class="section" id="encounterSection" style="display:none;">
+    <h3>Gravity Assist</h3>
+    <div id="encounterBody"></div>
+  </div>
+
+  <div class="section" id="burnSection" style="display:none;">
+    <h3>Maneuver / Burn</h3>
+    <div class="row"><label for="dvRange">&Delta;v</label><input id="dvRange" type="range" min="0" max="10" step="0.1" value="2" /><input id="dvNum" type="number" min="0" max="10" step="0.1" value="2" /></div>
+    <div class="btn-grid">
+      <button class="btn" data-burn="prograde" type="button">+ Prograde</button>
+      <button class="btn" data-burn="retrograde" type="button">+ Retrograde</button>
+      <button class="btn" data-burn="radialOut" type="button">+ Radial Out</button>
+      <button class="btn" data-burn="radialIn" type="button">+ Radial In</button>
+    </div>
+  </div>
+</aside>
+
+<footer id="bottombar">
+  <div id="timeControls">
+    <h3>Time Controls</h3>
+    <div class="btn-grid">
+      <button class="btn" id="playPauseBtn" type="button">Pause</button>
+      <button class="btn" id="stepBtn" type="button">Step</button>
+      <button class="btn" id="resetBtn2" type="button">Reset</button>
+      <select id="speedSel" style="width:100%;">
+        <option value="0.25">0.25×</option>
+        <option value="0.5">0.5×</option>
+        <option value="1" selected>1×</option>
+        <option value="2">2×</option>
+        <option value="5">5×</option>
+        <option value="10">10×</option>
+        <option value="25">25×</option>
+        <option value="50">50×</option>
+      </select>
+    </div>
+    <div id="clockDisplay">00d 00h 00m</div>
+    <div class="hint">1 real second ≈ <span id="scaleRate">—</span> sim hours at current speed.</div>
+  </div>
+  <div id="logPanel">
+    <h3>Mission Log <button class="btn" id="clearLogBtn" type="button" style="width:auto;">Clear</button></h3>
+    <div id="logBody"></div>
+  </div>
+  <div id="scalePanel">
+    <h3>Simulation Scale</h3>
+    <div class="stat-line"><span>Distance</span><b>1 unit ≈ 1.35M km</b></div>
+    <div class="stat-line"><span>Velocity</span><b>1 unit/s ≈ scaled</b></div>
+    <div class="stat-line"><span>Mass</span><b>scaled (relative)</b></div>
+    <div class="stat-line"><span>Time</span><b>scaled clock</b></div>
+    <p style="font-size:10.5px; color:#7d879c; margin-top:8px; line-height:1.5;">
+      Planet radii are exaggerated for visibility. Orbital <i>relationships</i> (speed vs. distance, gravity assists,
+      escape velocity) are physically real within this scale.
+    </p>
+  </div>
+</footer>
+
+<div class="modal hidden" id="eduOverlay">
+  <div class="modal-card">
+    <button class="modal-close" id="eduClose" type="button">Close ✕</button>
+    <h2>Orbital Mechanics — Quick Reference</h2>
+    <h4>Gravity</h4>
+    <p>Every mass pulls every other mass toward it. The force weakens with the square of distance: F = G·m₁·m₂/r². This single rule drives everything below.</p>
+    <h4>Orbit</h4>
+    <p>An orbit is continuous free-fall: an object falls toward a planet, but it is moving sideways fast enough that it keeps missing the ground, tracing an ellipse (or circle) instead of crashing.</p>
+    <h4>Escape Velocity</h4>
+    <p>Orbital velocity keeps you falling around a body forever. Escape velocity (v = √(2GM/r)) is the speed at which an object has enough kinetic energy to coast away to infinity instead of falling back.</p>
+    <h4>Gravity Assist (Slingshot)</h4>
+    <p>A spacecraft passing close to a moving planet can trade momentum with it: in the planet's own reference frame the spacecraft's speed is unchanged, but relative to the Sun it can gain (or lose) real velocity — for free, without burning fuel.</p>
+    <h4>Hohmann Transfer</h4>
+    <p>The most fuel-efficient way to move between two circular orbits: one burn stretches your orbit into an ellipse that just touches the destination orbit; a second burn circularizes you there. Two small burns beat one huge one.</p>
   </div>
 </div>
 
-<div class="panel" id="info">
-  <h2>PROBE STATUS</h2>
-  <div id="infoBody"><div class="empty">No probe launched yet.</div></div>
-</div>
-
-<div class="panel" id="log">
-  <h2>MISSION LOG</h2>
-  <div id="logBody"><div class="entry">Awaiting launch…</div></div>
-</div>
-
-<div class="panel" id="legend">
-  <div class="row"><span class="swatch" style="background:#ffd54f;box-shadow:0 0 8px #ffd54f;"></span> Sun</div>
-  <div class="row"><span class="swatch" style="background:#4fa8ff;"></span> Earth</div>
-  <div class="row"><span class="swatch" style="background:#b7bfd4;"></span> Moon</div>
-  <div class="row"><span class="swatch" style="background:#e0703f;"></span> Mars</div>
-  <div class="row"><span class="swatch" style="background:#6fffe8;"></span> Probe</div>
+<div class="modal hidden" id="helpOverlay">
+  <div class="modal-card">
+    <button class="modal-close" id="helpClose" type="button">Close ✕</button>
+    <h2>Keyboard Shortcuts</h2>
+    <p><kbd>Space</kbd> Pause / Resume &nbsp; <kbd>R</kbd> Reset &nbsp; <kbd>F</kbd> Focus selected &nbsp; <kbd>T</kbd> Toggle trails</p>
+    <p><kbd>V</kbd> Velocity vectors &nbsp; <kbd>P</kbd> Toggle prediction &nbsp; <kbd>+</kbd> / <kbd>-</kbd> Simulation speed</p>
+    <p><kbd>W A S D</kbd> or Arrow keys — Pan camera &nbsp; <kbd>Esc</kbd> Cancel launch mode</p>
+    <p>Mouse: drag empty space to pan, scroll to zoom toward cursor, click a body/probe to select it, double-click to follow it.</p>
+  </div>
 </div>
 
 <script>
 (function () {
   'use strict';
 
-  const canvas = document.getElementById('sim');
-  const ctx = canvas.getContext('2d');
-  let W, H, DPR;
+  // =====================================================================
+  // 1. CONFIGURATION
+  // =====================================================================
+  // Two presets: SIMPLIFIED preserves the simulator's original tuned
+  // values; REALISTIC uses the same Sun/Earth baseline but scales Mars
+  // and the Moon toward their real relative mass/size ratios. Distances
+  // stay stylized in both (a literal-scale system would put Mars off
+  // screen and shrink the Moon to invisibility).
+  const CONFIG_SIMPLIFIED = {
+    sun: { mass: 2650, radius: 22 },
+    earth: { orbitalRadius: 260, orbitalAngle: 0, mass: 135, radius: 11 },
+    moon: { orbitalRadius: 28, orbitalAngle: 0.7, mass: 5, radius: 3.5 },
+    mars: { orbitalRadius: 380, orbitalAngle: 2.2, mass: 112, radius: 7.5 },
+    velocityMultiplier: 1,
+  };
+  const CONFIG_REALISTIC = {
+    sun: { mass: 2650, radius: 22 },
+    earth: { orbitalRadius: 260, orbitalAngle: 0, mass: 135, radius: 11 },
+    moon: { orbitalRadius: 28, orbitalAngle: 0.7, mass: 1.7, radius: 3.0 },
+    mars: { orbitalRadius: 396, orbitalAngle: 2.2, mass: 14.4, radius: 5.8 },
+    velocityMultiplier: 1,
+  };
 
-  function resize() {
-    DPR = Math.min(window.devicePixelRatio || 1, 2);
-    W = window.innerWidth;
-    H = window.innerHeight;
-    canvas.width = W * DPR;
-    canvas.height = H * DPR;
-    canvas.style.width = W + 'px';
-    canvas.style.height = H + 'px';
-    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-  }
-  window.addEventListener('resize', resize);
-  resize();
+  const PROBE_NAMES = ['Probe 1', 'Probe 2', 'Voyager', 'Explorer', 'Odyssey'];
 
-  // ---------------------------------------------------------------------
-  // Physics constants (internal simulation units -- not literal km/kg/s,
-  // but internally consistent Newtonian gravity: F = G*m1*m2/r^2. Real
-  // relationships hold: v_circular = sqrt(G*M/r), so farther planets
-  // orbit slower than closer ones, exactly like the real solar system.
-  // ---------------------------------------------------------------------
-  const G = 50;
-  const SOFTENING = 6 * 6; // Plummer softening to avoid singularities on close flybys
-  const BASE_DT = 0.05;
-  const MAX_PROBES = 6;
-  const ENCOUNTER_RADIUS = 46; // distance at which a flyby counts as a "close encounter"
+  // =====================================================================
+  // 2. GLOBAL SIMULATION STATE
+  // =====================================================================
+  const G = 50;                     // scaled gravitational constant
+  const SOFTENING = 6 * 6;          // Plummer softening, avoids singularities on close flybys
+  const BASE_DT = 0.05;             // physics timestep at 1x speed (scaled seconds)
+  const MAX_PROBES = 8;
+  const MAX_BODY_TRAIL = 500;
+  const MAX_PROBE_TRAIL = 900;
+  const ENCOUNTER_MULT = 4.2;       // sphere-of-influence multiplier of body radius for "close encounter" detection
+  const SECONDS_PER_DAY = 18;       // scaled clock: how many sim-seconds make up one displayed "day"
 
-  let timeScale = 1;
-  let running = true;
-  let showTrails = true;
-
-  // ---------------------------------------------------------------------
-  // Celestial bodies. Sun sits near the origin but is also gravitationally
-  // affected by every planet (true N-body, nothing is artificially fixed)
-  // -- its mass is simply large enough that it barely drifts.
-  // ---------------------------------------------------------------------
-  function makeBody(opts) { return Object.assign({ trail: [], x: 0, y: 0, vx: 0, vy: 0 }, opts); }
-
+  let activeConfig = CONFIG_SIMPLIFIED;
   let bodies = [];
   let probes = [];
   let messages = [];
+  let idCounter = 0;
+  let probeNameIndex = 0;
 
-  function circularVelocity(centralMass, r) {
-    return Math.sqrt((G * centralMass) / r);
+  let running = true;
+  let timeScale = 1;
+  let simulationTime = 0; // accumulated scaled seconds
+  let frameCount = 0;
+
+  let showTrails = true, showVel = false, showGrav = false, showSOI = false, showLagrange = false, showField = false;
+  let predictOn = true, predictSteps = 900;
+
+  let selected = null;      // { type: 'body'|'probe', ref }
+  let launchMode = false;
+  let launchOrigin = 'earth';
+  let launchDir = 90, launchVel = 20, launchAlt = 4, launchMass = 1;
+  let dvAmount = 2;
+
+  let activeMission = { id: 'freeSandbox', label: 'Free Sandbox' };
+  let hohmannPreview = null; // { route, points, info }
+
+  // =====================================================================
+  // 3. MATH HELPERS
+  // =====================================================================
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  const degToRad = (d) => (d * Math.PI) / 180;
+  const radToDeg = (r) => ((r * 180) / Math.PI + 360) % 360;
+  const vecLen = (x, y) => Math.hypot(x, y);
+
+  function seededRandom(seed) {
+    let s = seed;
+    return function () { s = (s * 1103515245 + 12345) & 0x7fffffff; return (s % 10000) / 10000; };
   }
 
-  function initSystem() {
-    bodies = [];
-    probes = [];
-    messages = [];
-    logMessage('Simulation initialized. Awaiting launch…', 'info');
+  // =====================================================================
+  // 4. BODY / PROBE CREATION
+  // =====================================================================
+  function nextId(prefix) { idCounter++; return prefix + idCounter; }
 
-    const sun = makeBody({ id: 'sun', name: 'Sun', mass: 2650, radius: 22, color: '#ffd54f', glow: true });
-    bodies.push(sun);
-
-    const earthR = 260, earthAngle = 0;
-    const vEarth = circularVelocity(sun.mass, earthR);
-    const earth = makeBody({
-      id: 'earth', name: 'Earth', mass: 135, radius: 11, color: '#4fa8ff',
-      x: sun.x + earthR * Math.cos(earthAngle), y: sun.y + earthR * Math.sin(earthAngle),
-      vx: sun.vx - vEarth * Math.sin(earthAngle), vy: sun.vy + vEarth * Math.cos(earthAngle),
-    });
-    bodies.push(earth);
-
-    const moonR = 28, moonAngle = 0.7;
-    const vMoon = circularVelocity(earth.mass, moonR);
-    const moon = makeBody({
-      id: 'moon', name: 'Moon', mass: 5, radius: 3.5, color: '#b7bfd4',
-      x: earth.x + moonR * Math.cos(moonAngle), y: earth.y + moonR * Math.sin(moonAngle),
-      vx: earth.vx - vMoon * Math.sin(moonAngle), vy: earth.vy + vMoon * Math.cos(moonAngle),
-    });
-    bodies.push(moon);
-
-    const marsR = 380, marsAngle = 2.2;
-    const vMars = circularVelocity(sun.mass, marsR);
-    const mars = makeBody({
-      id: 'mars', name: 'Mars', mass: 112, radius: 7.5, color: '#e0703f',
-      x: sun.x + marsR * Math.cos(marsAngle), y: sun.y + marsR * Math.sin(marsAngle),
-      vx: sun.vx - vMars * Math.sin(marsAngle), vy: sun.vy + vMars * Math.cos(marsAngle),
-    });
-    bodies.push(mars);
+  function makeBody(opts) {
+    return Object.assign({ trail: [], x: 0, y: 0, vx: 0, vy: 0 }, opts);
   }
 
-  // ---------------------------------------------------------------------
-  // N-body gravity integration (symplectic/semi-implicit Euler, several
-  // substeps per frame for stability during close, fast flybys).
-  // ---------------------------------------------------------------------
-  function accelerationAt(px, py, exclude) {
+  function nextProbeName() {
+    const name = PROBE_NAMES[probeNameIndex] || ('Probe ' + (probeNameIndex + 1));
+    probeNameIndex++;
+    return name;
+  }
+
+  // =====================================================================
+  // 5. PHYSICS ENGINE — Newtonian gravity, F = G*m1*m2/r^2
+  // =====================================================================
+  // Returns the net gravitational acceleration at (px,py) from every body
+  // except `exclude`. Softening (SOFTENING added to r^2) keeps the force
+  // finite even if a probe's predicted path passes through a body center.
+  function calculateGravity(px, py, exclude) {
     let ax = 0, ay = 0;
     for (const b of bodies) {
       if (b === exclude) continue;
       const dx = b.x - px, dy = b.y - py;
       const distSq = dx * dx + dy * dy + SOFTENING;
       const dist = Math.sqrt(distSq);
-      const f = (G * b.mass) / (distSq * dist);
+      const f = (G * b.mass) / (distSq * dist); // = G*m/r^3, times (dx,dy) gives the acceleration vector
       ax += f * dx; ay += f * dy;
     }
     return { ax, ay };
   }
 
-  function stepPhysics(dt) {
-    // Planets/moon/sun: full mutual N-body gravity.
-    const accs = bodies.map((b) => accelerationAt(b.x, b.y, b));
-    bodies.forEach((b, i) => { b.vx += accs[i].ax * dt; b.vy += accs[i].ay * dt; });
-    bodies.forEach((b) => { b.x += b.vx * dt; b.y += b.vy * dt; });
+  function circularVelocity(primaryMass, r) { return Math.sqrt((G * primaryMass) / Math.max(r, 0.001)); }
+  function escapeVelocity(primaryMass, r) { return Math.sqrt((2 * G * primaryMass) / Math.max(r, 0.001)); }
 
-    // Probes: massless test particles pulled by every body, but exert no
-    // gravity of their own (negligible mass in reality, and keeps planet
-    // orbits perfectly stable regardless of how many probes are flying).
+  // The body whose gravity currently dominates at (x,y) -- used as the
+  // "primary" for orbital-element and classification math, since a probe
+  // orbiting Earth is really in a heliocentric orbit too; we care about
+  // its motion *relative to Earth* while nearby.
+  function dominantBodyFor(x, y) {
+    let best = null, bestInfluence = -1;
+    for (const b of bodies) {
+      const d = Math.max(vecLen(b.x - x, b.y - y), 0.001);
+      const influence = b.mass / (d * d);
+      if (influence > bestInfluence) { bestInfluence = influence; best = b; }
+    }
+    return best;
+  }
+
+  // =====================================================================
+  // 6. NUMERICAL INTEGRATION — Velocity Verlet (leapfrog), conserves
+  // energy far better than plain Euler, especially during fast flybys.
+  //   1) acceleration at current positions
+  //   2) position update using velocity + half-step acceleration
+  //   3) acceleration at the new positions
+  //   4) velocity update using the average of old & new acceleration
+  // =====================================================================
+  function velocityVerletStep(dt) {
+    const acc0 = bodies.map((b) => calculateGravity(b.x, b.y, b));
+    bodies.forEach((b, i) => {
+      b.x += b.vx * dt + 0.5 * acc0[i].ax * dt * dt;
+      b.y += b.vy * dt + 0.5 * acc0[i].ay * dt * dt;
+    });
+    const acc1 = bodies.map((b) => calculateGravity(b.x, b.y, b));
+    bodies.forEach((b, i) => {
+      b.vx += 0.5 * (acc0[i].ax + acc1[i].ax) * dt;
+      b.vy += 0.5 * (acc0[i].ay + acc1[i].ay) * dt;
+    });
+
+    // Probes are treated as massless test particles: they feel gravity
+    // from every body but exert none themselves, so they never perturb
+    // the planets no matter how many are in flight.
+    const liveProbes = probes.filter((p) => !p.crashed);
+    const pAcc0 = liveProbes.map((p) => calculateGravity(p.x, p.y, null));
+    liveProbes.forEach((p, i) => {
+      p.x += p.vx * dt + 0.5 * pAcc0[i].ax * dt * dt;
+      p.y += p.vy * dt + 0.5 * pAcc0[i].ay * dt * dt;
+    });
+    const pAcc1 = liveProbes.map((p) => calculateGravity(p.x, p.y, null));
+    liveProbes.forEach((p, i) => {
+      p.vx += 0.5 * (pAcc0[i].ax + pAcc1[i].ax) * dt;
+      p.vy += 0.5 * (pAcc0[i].ay + pAcc1[i].ay) * dt;
+      p.ax = pAcc1[i].ax; p.ay = pAcc1[i].ay;
+      p.missionTime += dt;
+    });
+  }
+
+  function updatePhysics(dt) {
+    velocityVerletStep(dt);
+    checkCollisions();
     for (const p of probes) {
       if (p.crashed) continue;
-      const { ax, ay } = accelerationAt(p.x, p.y, null);
-      p.vx += ax * dt; p.vy += ay * dt;
-      p.x += p.vx * dt; p.y += p.vy * dt;
-
-      for (const b of bodies) {
-        const dx = b.x - p.x, dy = b.y - p.y;
-        const dist = Math.hypot(dx, dy);
-        if (dist < b.radius + 3) {
-          p.crashed = true;
-          logMessage('Probe crashed into ' + b.name + '.', 'crash');
-        }
-      }
       updateEncounterTracking(p);
       updateEscapeTracking(p);
     }
+    checkMissionObjectives();
+    simulationTime += dt;
+  }
+
+  // =====================================================================
+  // 7. ORBIT CALCULATIONS — classical two-body formulas applied relative
+  // to whichever body currently dominates a probe's local gravity.
+  // =====================================================================
+  function orbitalElements(relX, relY, relVx, relVy, primaryMass) {
+    const r = Math.max(vecLen(relX, relY), 0.001);
+    const v2 = relVx * relVx + relVy * relVy;
+    const mu = G * primaryMass;
+    const specificEnergy = v2 / 2 - mu / r;
+    const h = relX * relVy - relY * relVx; // specific angular momentum (z component)
+    let a = null, e = 0;
+    if (Math.abs(specificEnergy) > 1e-9) a = -mu / (2 * specificEnergy);
+    const eSqTerm = a ? 1 + (2 * specificEnergy * h * h) / (mu * mu) : 1;
+    e = Math.sqrt(Math.max(0, eSqTerm));
+    let periapsis = null, apoapsis = null, period = null;
+    if (a && a > 0 && e < 1) {
+      periapsis = a * (1 - e);
+      apoapsis = a * (1 + e);
+      period = 2 * Math.PI * Math.sqrt((a * a * a) / mu);
+    } else if (a) {
+      periapsis = (h * h / mu) / (1 + e); // valid for hyperbolic/parabolic too
+    }
+    return { a, e, periapsis, apoapsis, period, specificEnergy };
+  }
+
+  function classifyTrajectory(probe) {
+    if (probe.crashed) return 'COLLISION';
+    const dom = dominantBodyFor(probe.x, probe.y);
+    const relX = probe.x - dom.x, relY = probe.y - dom.y;
+    const relVx = probe.vx - dom.vx, relVy = probe.vy - dom.vy;
+    const r = vecLen(relX, relY);
+    const speed = vecLen(relVx, relVy);
+    const vEsc = escapeVelocity(dom.mass, r);
+    if (r < dom.radius * 1.15) return 'SUBORBITAL (' + dom.name.toUpperCase() + ')';
+    if (speed >= vEsc) return (dom.id === 'sun' ? 'SOLAR ESCAPE TRAJECTORY' : 'ESCAPE TRAJECTORY (' + dom.name.toUpperCase() + ')');
+    const el = orbitalElements(relX, relY, relVx, relVy, dom.mass);
+    if (el.periapsis !== null && el.periapsis < dom.radius) return 'COLLISION COURSE (' + dom.name.toUpperCase() + ')';
+    if (el.e !== null && el.e < 0.05) return 'CIRCULAR ORBIT (' + dom.name.toUpperCase() + ')';
+    return 'ELLIPTICAL ORBIT (' + dom.name.toUpperCase() + ')';
+  }
+
+  function sphereOfInfluence(body) {
+    // Simplified configurable influence radius (not a precise Hill sphere,
+    // but scales sensibly with mass, and stays generous enough for small
+    // bodies like the Moon to still produce detectable encounters).
+    return body.radius * ENCOUNTER_MULT + Math.sqrt(body.mass) * 3;
+  }
+
+  // =====================================================================
+  // 8. SPACECRAFT / PROBE SYSTEM
+  // =====================================================================
+  function launchProbe(origin, directionDeg, speed, altitude, mass) {
+    const rad = degToRad(directionDeg);
+    const dirX = Math.cos(rad), dirY = Math.sin(rad);
+    const launchX = origin.x + dirX * (origin.radius + altitude);
+    const launchY = origin.y + dirY * (origin.radius + altitude);
+
+    // The probe inherits the parent body's own velocity. Without this
+    // term, launching from Earth (which is itself orbiting the Sun at
+    // ~24 units/s) would incorrectly treat Earth as stationary.
+    const vx = origin.vx + dirX * speed;
+    const vy = origin.vy + dirY * speed;
+
+    const probe = {
+      id: nextId('probe-'), name: nextProbeName(),
+      x: launchX, y: launchY, vx, vy, ax: 0, ay: 0,
+      mass, fuel: 100, trail: [], missionTime: 0,
+      crashed: false, escaped: false, encounters: {}, lastEncounter: null,
+      color: '#6fffe8',
+    };
+    probes.push(probe);
+    if (probes.length > MAX_PROBES) probes.shift();
+    logMessage(probe.name + ' launched from ' + origin.name + '.', 'info');
+    selected = { type: 'probe', ref: probe };
+    return probe;
+  }
+
+  function applyBurn(probe, type, dv) {
+    if (probe.fuel <= 0) { logMessage(probe.name + ' has no fuel remaining.', 'warning'); return; }
+    const speed = Math.max(vecLen(probe.vx, probe.vy), 0.0001);
+    const progradeX = probe.vx / speed, progradeY = probe.vy / speed;
+    const dom = dominantBodyFor(probe.x, probe.y);
+    const rx = probe.x - dom.x, ry = probe.y - dom.y;
+    const rlen = Math.max(vecLen(rx, ry), 0.0001);
+    const radialOutX = rx / rlen, radialOutY = ry / rlen;
+
+    let dx = 0, dy = 0, label = type;
+    if (type === 'prograde') { dx = progradeX; dy = progradeY; label = 'Prograde'; }
+    else if (type === 'retrograde') { dx = -progradeX; dy = -progradeY; label = 'Retrograde'; }
+    else if (type === 'radialOut') { dx = radialOutX; dy = radialOutY; label = 'Radial-out'; }
+    else if (type === 'radialIn') { dx = -radialOutX; dy = -radialOutY; label = 'Radial-in'; }
+
+    probe.vx += dx * dv; probe.vy += dy * dv;
+    probe.fuel = Math.max(0, probe.fuel - Math.abs(dv) * 3);
+    logMessage(probe.name + ': ' + label + ' burn, \u0394v ' + dv.toFixed(1) + '.', 'info');
   }
 
   function sunRelativeSpeed(p) {
     const sun = bodies[0];
-    return Math.hypot(p.vx - sun.vx, p.vy - sun.vy);
+    return vecLen(p.vx - sun.vx, p.vy - sun.vy);
+  }
+
+  function checkCollisions() {
+    for (const p of probes) {
+      if (p.crashed) continue;
+      for (const b of bodies) {
+        const dist = vecLen(b.x - p.x, b.y - p.y);
+        if (dist < b.radius + 3) {
+          p.crashed = true;
+          const impactSpeed = vecLen(p.vx - b.vx, p.vy - b.vy);
+          logMessage('MISSION FAILURE — ' + p.name + ' impacted ' + b.name + '. Impact speed: ' + impactSpeed.toFixed(1) + '.', 'failure');
+          break;
+        }
+      }
+    }
   }
 
   function updateEncounterTracking(p) {
     for (const b of bodies) {
       if (b.id === 'sun') continue;
-      const dist = Math.hypot(b.x - p.x, b.y - p.y);
+      const dist = vecLen(b.x - p.x, b.y - p.y);
+      const soi = sphereOfInfluence(b);
       const key = b.id;
-      const inZone = dist < ENCOUNTER_RADIUS;
+      const inZone = dist < soi;
       if (inZone && !p.encounters[key]) {
-        p.encounters[key] = { entrySpeed: sunRelativeSpeed(p) };
+        p.encounters[key] = { entrySpeed: sunRelativeSpeed(p), closest: dist, bodyName: b.name };
+      } else if (inZone && p.encounters[key]) {
+        p.encounters[key].closest = Math.min(p.encounters[key].closest, dist);
       } else if (!inZone && p.encounters[key]) {
-        const entry = p.encounters[key].entrySpeed;
-        const exit = sunRelativeSpeed(p);
-        const delta = exit - entry;
-        if (Math.abs(delta) > 0.4) {
+        const rec = p.encounters[key];
+        const exitSpeed = sunRelativeSpeed(p);
+        const delta = exitSpeed - rec.entrySpeed;
+        p.lastEncounter = { body: b.name, closest: rec.closest, incoming: rec.entrySpeed, outgoing: exitSpeed, delta };
+        if (Math.abs(delta) > 0.3) {
           const sign = delta > 0 ? '+' : '';
           logMessage(
-            'Slingshot past ' + b.name + '! Speed vs. Sun: ' + entry.toFixed(1) + ' \u2192 ' + exit.toFixed(1) +
+            'Gravity assist past ' + b.name + ' — closest approach ' + rec.closest.toFixed(1) +
+            ', speed vs. Sun ' + rec.entrySpeed.toFixed(1) + ' \u2192 ' + exitSpeed.toFixed(1) +
             ' (' + sign + delta.toFixed(1) + ')', 'assist'
           );
         }
@@ -279,190 +685,633 @@
     if (p.escaped) return;
     const sun = bodies[0];
     const dx = p.x - sun.x, dy = p.y - sun.y;
-    const distToSun = Math.hypot(dx, dy);
+    const distToSun = vecLen(dx, dy);
     const speed = sunRelativeSpeed(p);
-    const escapeV = Math.sqrt((2 * G * sun.mass) / Math.max(distToSun, 1));
+    const vEsc = escapeVelocity(sun.mass, distToSun);
     const radialOutward = ((p.vx - sun.vx) * dx + (p.vy - sun.vy) * dy) / Math.max(distToSun, 1);
-    if (distToSun > 420 && speed > escapeV && radialOutward > 0) {
+    if (distToSun > 420 && speed > vEsc && radialOutward > 0) {
       p.escaped = true;
-      logMessage('Probe reached solar escape velocity! It is leaving the system.', 'escape');
+      logMessage(p.name + ' exceeded solar escape velocity and is leaving the system!', 'escape');
     }
   }
 
-  // ---------------------------------------------------------------------
-  // Trajectory preview: clone current state and fast-forward a ghost
-  // probe under the same physics, without touching the live simulation.
-  // ---------------------------------------------------------------------
+  // =====================================================================
+  // 9. TRAJECTORY PREDICTION — simulate a cloned copy of the system
+  // forward without touching live state, for the launch-aim preview.
+  // =====================================================================
   function predictTrajectory(startX, startY, vx, vy, steps) {
-    const cloneBodies = bodies.map((b) => ({ x: b.x, y: b.y, vx: b.vx, vy: b.vy, mass: b.mass }));
+    const clone = bodies.map((b) => ({ x: b.x, y: b.y, vx: b.vx, vy: b.vy, mass: b.mass }));
     let px = startX, py = startY, pvx = vx, pvy = vy;
     const path = [];
     const dt = BASE_DT;
-    for (let s = 0; s < steps; s++) {
-      const accs = cloneBodies.map((b) => ({ x: b.x, y: b.y, vx: b.vx, vy: b.vy }));
-      cloneBodies.forEach((b, i) => {
+    const cap = Math.min(steps, 6000); // hard cap regardless of caller, protects performance
+    for (let s = 0; s < cap; s++) {
+      const accs = clone.map((b) => {
         let ax = 0, ay = 0;
-        cloneBodies.forEach((other, j) => {
-          if (i === j) return;
-          const dx = other.x - b.x, dy = other.y - b.y;
+        for (const o of clone) {
+          if (o === b) continue;
+          const dx = o.x - b.x, dy = o.y - b.y;
           const distSq = dx * dx + dy * dy + SOFTENING;
           const dist = Math.sqrt(distSq);
-          const f = (G * other.mass) / (distSq * dist);
+          const f = (G * o.mass) / (distSq * dist);
           ax += f * dx; ay += f * dy;
-        });
-        b.vx += ax * dt; b.vy += ay * dt;
-      });
-      cloneBodies.forEach((b) => { b.x += b.vx * dt; b.y += b.vy * dt; });
-
-      const { ax, ay } = (function () {
-        let aax = 0, aay = 0;
-        for (const b of cloneBodies) {
-          const dx = b.x - px, dy = b.y - py;
-          const distSq = dx * dx + dy * dy + SOFTENING;
-          const dist = Math.sqrt(distSq);
-          const f = (G * b.mass) / (distSq * dist);
-          aax += f * dx; aay += f * dy;
         }
-        return { ax: aax, ay: aay };
-      })();
+        return { ax, ay };
+      });
+      clone.forEach((b, i) => { b.vx += accs[i].ax * dt; b.vy += accs[i].ay * dt; });
+      clone.forEach((b) => { b.x += b.vx * dt; b.y += b.vy * dt; });
+
+      let ax = 0, ay = 0;
+      for (const b of clone) {
+        const dx = b.x - px, dy = b.y - py;
+        const distSq = dx * dx + dy * dy + SOFTENING;
+        const dist = Math.sqrt(distSq);
+        const f = (G * b.mass) / (distSq * dist);
+        ax += f * dx; ay += f * dy;
+      }
       pvx += ax * dt; pvy += ay * dt;
       px += pvx * dt; py += pvy * dt;
       path.push({ x: px, y: py });
 
-      for (const b of cloneBodies) {
-        if (Math.hypot(b.x - px, b.y - py) < 10) return path; // stop preview on predicted collision
-      }
+      for (const b of clone) { if (vecLen(b.x - px, b.y - py) < 10) return path; }
     }
     return path;
   }
 
-  // ---------------------------------------------------------------------
-  // Launch aiming (drag from Earth)
-  // ---------------------------------------------------------------------
-  let aiming = false;
-  let aimStart = { x: 0, y: 0 };
-  let aimCurrent = { x: 0, y: 0 };
-  let previewPath = [];
-  let launchPower = 1;
+  // =====================================================================
+  // 10. MISSION SYSTEM
+  // =====================================================================
+  const MISSIONS = {
+    earthOrbit: {
+      label: 'Earth Orbit',
+      setup() {
+        const earth = bodyById('earth');
+        launchDir = 90; launchVel = circularVelocity(earth.mass, 30); launchAlt = 19; launchOrigin = 'earth';
+        syncLaunchInputs();
+        launchProbe(earth, launchDir, launchVel, launchAlt, launchMass);
+      },
+      check(p) { return classifyTrajectory(p).indexOf('ORBIT (EARTH)') !== -1; },
+      successMsg: 'Objective complete: stable Earth orbit achieved!',
+    },
+    moonTransfer: {
+      label: 'Moon Transfer',
+      setup() {
+        const earth = bodyById('earth');
+        launchDir = radToDeg(Math.atan2(bodyById('moon').y - earth.y, bodyById('moon').x - earth.x));
+        launchVel = 26; launchAlt = 4; launchOrigin = 'earth';
+        syncLaunchInputs();
+        launchProbe(earth, launchDir, launchVel, launchAlt, launchMass);
+      },
+      check(p) { return !!p.encounters['moon'] || (p.lastEncounter && p.lastEncounter.body === 'Moon'); },
+      successMsg: 'Objective complete: reached the Moon\u2019s sphere of influence!',
+    },
+    moonFlyby: {
+      label: 'Moon Flyby',
+      setup() { MISSIONS.moonTransfer.setup(); },
+      check(p) { return p.lastEncounter && p.lastEncounter.body === 'Moon'; },
+      successMsg: 'Objective complete: lunar flyby performed!',
+    },
+    marsTransfer: {
+      label: 'Mars Transfer',
+      setup() {
+        const earth = bodyById('earth');
+        const mars = bodyById('mars');
+        launchDir = radToDeg(Math.atan2(mars.y - earth.y, mars.x - earth.x));
+        launchVel = 34; launchAlt = 4; launchOrigin = 'earth';
+        syncLaunchInputs();
+        launchProbe(earth, launchDir, launchVel, launchAlt, launchMass);
+      },
+      check(p) { return !!p.encounters['mars'] || (p.lastEncounter && p.lastEncounter.body === 'Mars'); },
+      successMsg: 'Objective complete: reached Mars\u2019 sphere of influence!',
+    },
+    marsFlyby: {
+      label: 'Mars Flyby',
+      setup() { MISSIONS.marsTransfer.setup(); },
+      check(p) { return p.lastEncounter && p.lastEncounter.body === 'Mars'; },
+      successMsg: 'Objective complete: Mars flyby performed!',
+    },
+    solarEscape: {
+      label: 'Solar Escape',
+      setup() {
+        const earth = bodyById('earth');
+        launchDir = 90; launchVel = 46; launchAlt = 4; launchOrigin = 'earth';
+        syncLaunchInputs();
+        launchProbe(earth, launchDir, launchVel, launchAlt, launchMass);
+      },
+      check(p) { return p.escaped; },
+      successMsg: 'Objective complete: escaped the solar system!',
+    },
+    freeSandbox: { label: 'Free Sandbox', setup() {}, check() { return false; } },
+  };
 
-  function toSimCoords(clientX, clientY) {
-    const sun = bodies[0];
-    return { x: clientX - W / 2 + sun.x, y: clientY - H / 2 + sun.y };
+  function setActiveMission(id) {
+    const m = MISSIONS[id];
+    if (!m) return;
+    activeMission = { id, label: m.label, completed: false };
+    document.getElementById('statMission').textContent = m.label.toUpperCase();
+    logMessage('Mission set: ' + m.label + '.', 'info');
+    if (m.setup) m.setup();
   }
 
-  canvas.addEventListener('mousedown', (e) => {
-    const earth = bodies.find((b) => b.id === 'earth');
-    const sim = toSimCoords(e.clientX, e.clientY);
-    const dist = Math.hypot(sim.x - earth.x, sim.y - earth.y);
-    if (dist < 60) {
-      aiming = true;
-      aimStart = { x: sim.x, y: sim.y };
-      aimCurrent = { x: sim.x, y: sim.y };
+  function checkMissionObjectives() {
+    if (!activeMission || activeMission.id === 'freeSandbox' || activeMission.completed) return;
+    const m = MISSIONS[activeMission.id];
+    if (!m || !probes.length) return;
+    const probe = probes[probes.length - 1];
+    if (m.check(probe)) {
+      activeMission.completed = true;
+      logMessage(m.successMsg, 'success');
     }
+  }
+
+  // =====================================================================
+  // 11. CAMERA SYSTEM
+  // =====================================================================
+  const camera = { x: 0, y: 0, zoom: 1, followId: null };
+
+  function worldToScreen(x, y) {
+    return { x: W / 2 + (x - camera.x) * camera.zoom, y: H / 2 + (y - camera.y) * camera.zoom };
+  }
+  function screenToWorld(sx, sy) {
+    return { x: camera.x + (sx - W / 2) / camera.zoom, y: camera.y + (sy - H / 2) / camera.zoom };
+  }
+  function findEntityById(id) {
+    return bodies.find((b) => b.id === id) || probes.find((p) => p.id === id) || null;
+  }
+  function updateCamera() {
+    if (camera.followId) {
+      const target = findEntityById(camera.followId);
+      if (target) { camera.x += (target.x - camera.x) * 0.09; camera.y += (target.y - camera.y) * 0.09; }
+    }
+  }
+  function focusOn(entity) {
+    if (!entity) return;
+    camera.x = entity.x; camera.y = entity.y;
+  }
+
+  // =====================================================================
+  // 12. INPUT HANDLING
+  // =====================================================================
+  const canvas = document.getElementById('sim');
+  const ctx = canvas.getContext('2d');
+  let W, H, DPR;
+
+  function resize() {
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    W = window.innerWidth; H = window.innerHeight;
+    canvas.width = W * DPR; canvas.height = H * DPR;
+    canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    buildStars();
+  }
+  window.addEventListener('resize', resize);
+
+  function bodyById(id) { return bodies.find((b) => b.id === id); }
+
+  function pickEntityAt(worldX, worldY) {
+    let best = null, bestDist = Infinity;
+    const consider = (e, minR) => {
+      const d = vecLen(e.x - worldX, e.y - worldY);
+      const r = Math.max(minR, (e.radius || 3)) + 6 / camera.zoom;
+      if (d < r && d < bestDist) { bestDist = d; best = e; }
+    };
+    for (const b of bodies) consider(b, b.radius);
+    for (const p of probes) consider(p, 3);
+    return best;
+  }
+
+  let isAiming = false, isPanning = false;
+  let aimStartWorld = { x: 0, y: 0 }, aimCurrentWorld = { x: 0, y: 0 };
+  let previewPath = [];
+  let panStartScreen = { x: 0, y: 0 }, panStartCamera = { x: 0, y: 0 };
+  let mouseDownEntity = null, mouseDownScreen = { x: 0, y: 0 };
+  let lastMouseScreen = { x: 0, y: 0 };
+
+  canvas.addEventListener('mousedown', (e) => {
+    const world = screenToWorld(e.clientX, e.clientY);
+    mouseDownScreen = { x: e.clientX, y: e.clientY };
+    mouseDownEntity = pickEntityAt(world.x, world.y);
+
+    if (launchMode) {
+      const origin = bodyById(launchOrigin);
+      const distToOrigin = vecLen(world.x - origin.x, world.y - origin.y);
+      if (distToOrigin < sphereOfInfluence(origin)) {
+        isAiming = true;
+        aimStartWorld = { x: origin.x, y: origin.y };
+        aimCurrentWorld = world;
+        canvas.classList.add('aiming');
+        return;
+      }
+    }
+    isPanning = true;
+    panStartScreen = { x: e.clientX, y: e.clientY };
+    panStartCamera = { x: camera.x, y: camera.y };
+    canvas.classList.add('panning');
   });
 
   window.addEventListener('mousemove', (e) => {
-    if (!aiming) return;
-    aimCurrent = toSimCoords(e.clientX, e.clientY);
-    const earth = bodies.find((b) => b.id === 'earth');
-    const dx = aimCurrent.x - aimStart.x, dy = aimCurrent.y - aimStart.y;
-    const vx = earth.vx + dx * 0.08 * launchPower;
-    const vy = earth.vy + dy * 0.08 * launchPower;
-    const dirLen = Math.hypot(dx, dy) || 1;
-    const launchX = aimStart.x + (dx / dirLen) * (earth.radius + 4);
-    const launchY = aimStart.y + (dy / dirLen) * (earth.radius + 4);
-    previewPath = predictTrajectory(launchX, launchY, vx, vy, 900);
+    lastMouseScreen = { x: e.clientX, y: e.clientY };
+    if (isAiming) {
+      const origin = bodyById(launchOrigin);
+      aimCurrentWorld = screenToWorld(e.clientX, e.clientY);
+      const dx = aimCurrentWorld.x - aimStartWorld.x, dy = aimCurrentWorld.y - aimStartWorld.y;
+      const dragLen = vecLen(dx, dy);
+      launchDir = radToDeg(Math.atan2(dy, dx));
+      launchVel = clamp(dragLen * 0.35, 1, 60);
+      syncLaunchInputs();
+      if (predictOn) {
+        const dirX = dx / (dragLen || 1), dirY = dy / (dragLen || 1);
+        const lx = origin.x + dirX * (origin.radius + launchAlt);
+        const ly = origin.y + dirY * (origin.radius + launchAlt);
+        previewPath = predictTrajectory(lx, ly, origin.vx + dirX * launchVel, origin.vy + dirY * launchVel, predictSteps);
+      }
+      return;
+    }
+    if (isPanning) {
+      const dx = (e.clientX - panStartScreen.x) / camera.zoom;
+      const dy = (e.clientY - panStartScreen.y) / camera.zoom;
+      if (vecLen(e.clientX - mouseDownScreen.x, e.clientY - mouseDownScreen.y) > 4) camera.followId = null;
+      camera.x = panStartCamera.x - dx;
+      camera.y = panStartCamera.y - dy;
+    }
   });
 
   window.addEventListener('mouseup', (e) => {
-    if (!aiming) return;
-    aiming = false;
-    const earth = bodies.find((b) => b.id === 'earth');
-    const dx = aimCurrent.x - aimStart.x, dy = aimCurrent.y - aimStart.y;
-    if (Math.hypot(dx, dy) < 8) { previewPath = []; return; } // ignore accidental clicks
-
-    const vx = earth.vx + dx * 0.08 * launchPower;
-    const vy = earth.vy + dy * 0.08 * launchPower;
-    const dirLen = Math.hypot(dx, dy) || 1;
-    const launchX = aimStart.x + (dx / dirLen) * (earth.radius + 4);
-    const launchY = aimStart.y + (dy / dirLen) * (earth.radius + 4);
-
-    probes.push({
-      id: 'probe-' + Date.now(),
-      x: launchX, y: launchY, vx, vy,
-      trail: [], crashed: false, escaped: false, encounters: {},
-    });
-    if (probes.length > MAX_PROBES) probes.shift();
-    logMessage('Probe launched from Earth.', 'info');
-    previewPath = [];
+    if (isAiming) {
+      isAiming = false;
+      canvas.classList.remove('aiming');
+      const moved = vecLen(e.clientX - mouseDownScreen.x, e.clientY - mouseDownScreen.y);
+      previewPath = [];
+      if (moved > 6) doLaunch(); // drag released far enough -> fire immediately
+      return;
+    }
+    if (isPanning) {
+      isPanning = false;
+      canvas.classList.remove('panning');
+      const moved = vecLen(e.clientX - mouseDownScreen.x, e.clientY - mouseDownScreen.y);
+      if (moved < 6 && mouseDownEntity) selectEntity(mouseDownEntity);
+    }
   });
 
-  // ---------------------------------------------------------------------
-  // UI wiring
-  // ---------------------------------------------------------------------
-  const timeScaleInput = document.getElementById('timeScale');
-  const launchPowerInput = document.getElementById('launchPower');
-  const pauseBtn = document.getElementById('pauseBtn');
-  const trailsBtn = document.getElementById('trailsBtn');
-  const clearProbesBtn = document.getElementById('clearProbesBtn');
-  const resetBtn = document.getElementById('resetBtn');
-  const infoBody = document.getElementById('infoBody');
-  const logBody = document.getElementById('logBody');
+  canvas.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const before = screenToWorld(e.clientX, e.clientY);
+    const factor = e.deltaY < 0 ? 1.12 : 0.89;
+    camera.zoom = clamp(camera.zoom * factor, 0.15, 8);
+    const after = screenToWorld(e.clientX, e.clientY);
+    camera.x += before.x - after.x;
+    camera.y += before.y - after.y;
+  }, { passive: false });
 
-  timeScaleInput.addEventListener('input', () => { timeScale = parseFloat(timeScaleInput.value); });
-  launchPowerInput.addEventListener('input', () => { launchPower = parseFloat(launchPowerInput.value); });
-  pauseBtn.addEventListener('click', () => {
-    running = !running;
-    pauseBtn.textContent = running ? 'Pause' : 'Resume';
-    pauseBtn.classList.toggle('active', !running);
+  canvas.addEventListener('dblclick', (e) => {
+    const world = screenToWorld(e.clientX, e.clientY);
+    const hit = pickEntityAt(world.x, world.y);
+    if (hit) { selectEntity(hit); camera.followId = hit.id; logMessage('Following ' + (hit.name || hit.id) + '.', 'info'); }
   });
-  trailsBtn.addEventListener('click', () => {
-    showTrails = !showTrails;
-    trailsBtn.textContent = showTrails ? 'Hide Trails' : 'Show Trails';
-    trailsBtn.classList.toggle('active', showTrails);
+
+  window.addEventListener('keydown', (e) => {
+    const tag = (document.activeElement && document.activeElement.tagName) || '';
+    if (tag === 'INPUT' || tag === 'SELECT') return;
+    if (e.code === 'Space') { e.preventDefault(); togglePause(); }
+    else if (e.key === 'r' || e.key === 'R') resetSimulation();
+    else if (e.key === 'f' || e.key === 'F') { if (selected) focusOn(selected.ref); }
+    else if (e.key === 't' || e.key === 'T') toggleCheckbox('chkTrails');
+    else if (e.key === 'v' || e.key === 'V') toggleCheckbox('chkVel');
+    else if (e.key === 'p' || e.key === 'P') toggleCheckbox('chkPredict');
+    else if (e.key === '+' || e.key === '=') bumpSpeed(1);
+    else if (e.key === '-' || e.key === '_') bumpSpeed(-1);
+    else if (e.key === 'Escape') { launchMode = false; syncLaunchModeBtn(); }
+    else if (['w', 'a', 's', 'd', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].indexOf(e.key) !== -1) {
+      const step = 24 / camera.zoom;
+      camera.followId = null;
+      if (e.key === 'w' || e.key === 'ArrowUp') camera.y -= step;
+      if (e.key === 's' || e.key === 'ArrowDown') camera.y += step;
+      if (e.key === 'a' || e.key === 'ArrowLeft') camera.x -= step;
+      if (e.key === 'd' || e.key === 'ArrowRight') camera.x += step;
+    }
+  });
+
+  function toggleCheckbox(id) { const el = document.getElementById(id); el.checked = !el.checked; el.dispatchEvent(new Event('change')); }
+  function bumpSpeed(dir) {
+    const speeds = [0.25, 0.5, 1, 2, 5, 10, 25, 50];
+    let idx = speeds.indexOf(timeScale);
+    if (idx === -1) idx = 2;
+    idx = clamp(idx + dir, 0, speeds.length - 1);
+    timeScale = speeds[idx];
+    document.getElementById('speedSel').value = String(timeScale);
+  }
+
+  // =====================================================================
+  // 13. UI CONTROLS
+  // =====================================================================
+  const el = (id) => document.getElementById(id);
+
+  function syncLaunchInputs() {
+    el('dirRange').value = launchDir.toFixed(0); el('dirNum').value = launchDir.toFixed(0);
+    el('velRange').value = launchVel.toFixed(1); el('velNum').value = launchVel.toFixed(1);
+    el('altRange').value = launchAlt.toFixed(0); el('altNum').value = launchAlt.toFixed(0);
+    el('massRange').value = launchMass.toFixed(1); el('massNum').value = launchMass.toFixed(1);
+    el('originSel').value = launchOrigin;
+  }
+  function bindRangeNumber(rangeId, numId, onChange) {
+    const r = el(rangeId), n = el(numId);
+    r.addEventListener('input', () => { n.value = r.value; onChange(parseFloat(r.value)); });
+    n.addEventListener('input', () => { r.value = n.value; onChange(parseFloat(n.value)); });
+  }
+  bindRangeNumber('dirRange', 'dirNum', (v) => (launchDir = v));
+  bindRangeNumber('velRange', 'velNum', (v) => (launchVel = v));
+  bindRangeNumber('altRange', 'altNum', (v) => (launchAlt = v));
+  bindRangeNumber('massRange', 'massNum', (v) => (launchMass = v));
+  bindRangeNumber('dvRange', 'dvNum', (v) => (dvAmount = v));
+  el('originSel').addEventListener('change', (e) => { launchOrigin = e.target.value; });
+
+  function doLaunch() {
+    const origin = bodyById(launchOrigin);
+    launchProbe(origin, launchDir, launchVel, launchAlt, launchMass);
+  }
+  el('launchBtn').addEventListener('click', doLaunch);
+  el('clearProbesBtn').addEventListener('click', () => { probes = []; logMessage('All probes cleared.', 'info'); });
+
+  function syncLaunchModeBtn() {
+    el('toggleLaunchModeBtn').classList.toggle('active', launchMode);
+    el('toggleLaunchModeBtn').textContent = launchMode ? 'Disable Launch Mode' : 'Enable Launch Mode';
+  }
+  el('toggleLaunchModeBtn').addEventListener('click', () => { launchMode = !launchMode; syncLaunchModeBtn(); });
+
+  el('chkTrails').addEventListener('change', (e) => {
+    showTrails = e.target.checked;
     if (!showTrails) { bodies.forEach((b) => (b.trail.length = 0)); probes.forEach((p) => (p.trail.length = 0)); }
   });
-  clearProbesBtn.addEventListener('click', () => { probes = []; logMessage('All probes cleared.', 'info'); });
-  resetBtn.addEventListener('click', () => { initSystem(); });
+  el('chkVel').addEventListener('change', (e) => (showVel = e.target.checked));
+  el('chkGrav').addEventListener('change', (e) => (showGrav = e.target.checked));
+  el('chkSOI').addEventListener('change', (e) => (showSOI = e.target.checked));
+  el('chkLagrange').addEventListener('change', (e) => (showLagrange = e.target.checked));
+  el('chkField').addEventListener('change', (e) => (showField = e.target.checked));
+  el('chkPredict').addEventListener('change', (e) => (predictOn = e.target.checked));
+  el('predictLen').addEventListener('change', (e) => (predictSteps = parseInt(e.target.value, 10)));
 
-  function logMessage(text, type) {
-    messages.unshift({ text, type: type || 'info' });
-    if (messages.length > 30) messages.length = 30;
-    logBody.innerHTML = messages.map((m) => '<div class="entry ' + m.type + '">' + m.text + '</div>').join('');
+  document.querySelectorAll('[data-mission]').forEach((btn) => {
+    btn.addEventListener('click', () => setActiveMission(btn.getAttribute('data-mission')));
+  });
+  document.querySelectorAll('[data-burn]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      if (selected && selected.type === 'probe') applyBurn(selected.ref, btn.getAttribute('data-burn'), dvAmount);
+    });
+  });
+
+  function togglePause() {
+    running = !running;
+    el('playPauseBtn').textContent = running ? 'Pause' : 'Resume';
+    el('statStatus').textContent = running ? 'RUNNING' : 'PAUSED';
   }
+  el('playPauseBtn').addEventListener('click', togglePause);
+  el('stepBtn').addEventListener('click', () => { if (!running) updatePhysics(BASE_DT); });
+  el('speedSel').addEventListener('change', (e) => (timeScale = parseFloat(e.target.value)));
+  el('resetBtn').addEventListener('click', resetSimulation);
+  el('resetBtn2').addEventListener('click', resetSimulation);
+  el('clearLogBtn').addEventListener('click', () => { messages = []; renderLog(); });
 
-  function updateInfoPanel() {
-    if (!probes.length) { infoBody.innerHTML = '<div class="empty">No probe launched yet.</div>'; return; }
-    const p = probes[probes.length - 1];
-    const speed = sunRelativeSpeed(p).toFixed(1);
-    let closest = null, closestDist = Infinity;
-    for (const b of bodies) {
-      if (b.id === 'sun') continue;
-      const d = Math.hypot(b.x - p.x, b.y - p.y);
-      if (d < closestDist) { closestDist = d; closest = b; }
+  el('eduBtn').addEventListener('click', () => el('eduOverlay').classList.remove('hidden'));
+  el('eduClose').addEventListener('click', () => el('eduOverlay').classList.add('hidden'));
+  el('helpBtn').addEventListener('click', () => el('helpOverlay').classList.remove('hidden'));
+  el('helpClose').addEventListener('click', () => el('helpOverlay').classList.add('hidden'));
+  el('panelToggle').addEventListener('click', () => {
+    el('leftPanel').classList.toggle('open');
+    el('rightPanel').classList.toggle('open');
+  });
+
+  el('followBtn').addEventListener('click', () => { if (selected) { camera.followId = selected.ref.id; logMessage('Following ' + (selected.ref.name || selected.ref.id) + '.', 'info'); } });
+  el('stopFollowBtn').addEventListener('click', () => (camera.followId = null));
+  el('centerBtn').addEventListener('click', () => { if (selected) focusOn(selected.ref); });
+  el('focusBtn').addEventListener('click', () => { if (selected) focusOn(selected.ref); });
+
+  el('simplifiedBtn').addEventListener('click', () => { activeConfig = CONFIG_SIMPLIFIED; syncConfigInputs(); initSystem(activeConfig); el('simplifiedBtn').classList.add('active'); el('realisticBtn').classList.remove('active'); });
+  el('realisticBtn').addEventListener('click', () => { activeConfig = CONFIG_REALISTIC; syncConfigInputs(); initSystem(activeConfig); el('realisticBtn').classList.add('active'); el('simplifiedBtn').classList.remove('active'); });
+
+  function syncConfigInputs() {
+    el('cfgSunMass').value = activeConfig.sun.mass;
+    el('cfgEarthMass').value = activeConfig.earth.mass;
+    el('cfgEarthR').value = activeConfig.earth.orbitalRadius;
+    el('cfgMarsR').value = activeConfig.mars.orbitalRadius;
+    el('cfgMoonR').value = activeConfig.moon.orbitalRadius;
+    el('cfgVelMult').value = activeConfig.velocityMultiplier;
+  }
+  el('rebuildBtn').addEventListener('click', () => {
+    const custom = JSON.parse(JSON.stringify(activeConfig));
+    custom.sun.mass = parseFloat(el('cfgSunMass').value) || custom.sun.mass;
+    custom.earth.mass = parseFloat(el('cfgEarthMass').value) || custom.earth.mass;
+    custom.earth.orbitalRadius = parseFloat(el('cfgEarthR').value) || custom.earth.orbitalRadius;
+    custom.mars.orbitalRadius = parseFloat(el('cfgMarsR').value) || custom.mars.orbitalRadius;
+    custom.moon.orbitalRadius = parseFloat(el('cfgMoonR').value) || custom.moon.orbitalRadius;
+    custom.velocityMultiplier = parseFloat(el('cfgVelMult').value) || 1;
+    activeConfig = custom;
+    initSystem(custom);
+    logMessage('Custom system rebuilt — experiment with unstable orbits!', 'info');
+  });
+
+  el('exportBtn').addEventListener('click', () => {
+    const data = {
+      config: activeConfig, timeScale, camera: { x: camera.x, y: camera.y, zoom: camera.zoom },
+      probes: probes.map((p) => ({ x: p.x, y: p.y, vx: p.vx, vy: p.vy, mass: p.mass, fuel: p.fuel, name: p.name })),
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'orbital-scenario.json';
+    a.click();
+    URL.revokeObjectURL(a.href);
+    logMessage('Scenario exported.', 'info');
+  });
+  el('importBtn').addEventListener('click', () => el('importFile').click());
+  el('importFile').addEventListener('change', (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const data = JSON.parse(String(reader.result));
+        if (!data || !data.config) throw new Error('Invalid scenario file');
+        activeConfig = data.config;
+        initSystem(activeConfig);
+        if (typeof data.timeScale === 'number') { timeScale = data.timeScale; el('speedSel').value = String(timeScale); }
+        if (data.camera) { camera.x = data.camera.x || 0; camera.y = data.camera.y || 0; camera.zoom = data.camera.zoom || 1; }
+        if (Array.isArray(data.probes)) {
+          data.probes.forEach((pd) => {
+            probes.push({
+              id: nextId('probe-'), name: pd.name || nextProbeName(),
+              x: pd.x, y: pd.y, vx: pd.vx, vy: pd.vy, ax: 0, ay: 0,
+              mass: pd.mass || 1, fuel: pd.fuel != null ? pd.fuel : 100,
+              trail: [], missionTime: 0, crashed: false, escaped: false, encounters: {}, lastEncounter: null, color: '#6fffe8',
+            });
+          });
+        }
+        logMessage('Scenario imported.', 'info');
+      } catch (err) {
+        logMessage('Failed to import scenario: ' + err.message, 'warning');
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  });
+
+  el('hohmannBtn').addEventListener('click', () => {
+    const route = el('hohmannSel').value;
+    hohmannPreview = computeHohmann(route);
+  });
+
+  // =====================================================================
+  // HOHMANN TRANSFER — classic two-burn minimum-energy transfer between
+  // two circular orbits around a shared primary body.
+  // =====================================================================
+  function computeHohmann(route) {
+    const sun = bodyById('sun'), earth = bodyById('earth'), mars = bodyById('mars'), moon = bodyById('moon');
+    let primary, r1, r2;
+    if (route === 'earthMars') {
+      primary = sun;
+      r1 = vecLen(earth.x - sun.x, earth.y - sun.y);
+      r2 = vecLen(mars.x - sun.x, mars.y - sun.y);
+    } else if (route === 'marsEarth') {
+      primary = sun;
+      r1 = vecLen(mars.x - sun.x, mars.y - sun.y);
+      r2 = vecLen(earth.x - sun.x, earth.y - sun.y);
+    } else {
+      // earthMoon: departing from a low Earth orbit toward the Moon's orbit.
+      primary = earth;
+      r1 = earth.radius + 20;
+      r2 = vecLen(moon.x - earth.x, moon.y - earth.y);
     }
-    const status = p.crashed ? 'Crashed' : p.escaped ? 'Escaping system' : 'In flight';
-    infoBody.innerHTML =
-      '<div class="stat"><span>Status</span><b>' + status + '</b></div>' +
-      '<div class="stat"><span>Speed vs. Sun</span><b>' + speed + '</b></div>' +
-      '<div class="stat"><span>Nearest body</span><b>' + (closest ? closest.name : '—') + '</b></div>' +
-      '<div class="stat"><span>Distance</span><b>' + closestDist.toFixed(0) + '</b></div>' +
-      '<div class="stat"><span>Active probes</span><b>' + probes.filter((pr) => !pr.crashed).length + '</b></div>';
+    const mu = G * primary.mass;
+    const aT = (r1 + r2) / 2;
+
+    const v1 = circularVelocity(primary.mass, r1);
+    const vTransferAtR1 = Math.sqrt(mu * (2 / r1 - 1 / aT));
+    const deltaV1 = vTransferAtR1 - v1;
+
+    const v2 = circularVelocity(primary.mass, r2);
+    const vTransferAtR2 = Math.sqrt(mu * (2 / r2 - 1 / aT));
+    const deltaV2 = v2 - vTransferAtR2;
+
+    const transferTime = Math.PI * Math.sqrt((aT * aT * aT) / mu);
+    const totalDv = Math.abs(deltaV1) + Math.abs(deltaV2);
+
+    el('hohmannInfo').innerHTML =
+      'Departure \u0394v: <b>' + deltaV1.toFixed(2) + '</b><br/>' +
+      'Arrival \u0394v: <b>' + deltaV2.toFixed(2) + '</b><br/>' +
+      'Total \u0394v: <b>' + totalDv.toFixed(2) + '</b><br/>' +
+      'Transfer time: <b>' + transferTime.toFixed(1) + 's</b>';
+
+    return { primary, r1, r2 };
   }
 
-  // ---------------------------------------------------------------------
-  // Starfield background (drawn once to an offscreen canvas)
-  // ---------------------------------------------------------------------
+  // =====================================================================
+  // LAGRANGE POINTS (Earth–Moon) — approximate educational placement,
+  // not a precise restricted three-body solution.
+  // =====================================================================
+  function computeLagrangePoints() {
+    const earth = bodyById('earth'), moon = bodyById('moon');
+    const dx = moon.x - earth.x, dy = moon.y - earth.y;
+    const d = vecLen(dx, dy) || 1;
+    const ux = dx / d, uy = dy / d;
+    const massRatio = moon.mass / (earth.mass + moon.mass);
+    const rHill = d * Math.cbrt(massRatio / 3);
+
+    const L1 = { x: moon.x - ux * rHill, y: moon.y - uy * rHill, label: 'L1' };
+    const L2 = { x: moon.x + ux * rHill, y: moon.y + uy * rHill, label: 'L2' };
+    const L3 = { x: earth.x - ux * d * (1 + (5 * massRatio) / 12), y: earth.y - uy * d * (1 + (5 * massRatio) / 12), label: 'L3' };
+    const ang = Math.atan2(dy, dx);
+    const L4 = { x: earth.x + d * Math.cos(ang + Math.PI / 3), y: earth.y + d * Math.sin(ang + Math.PI / 3), label: 'L4' };
+    const L5 = { x: earth.x + d * Math.cos(ang - Math.PI / 3), y: earth.y + d * Math.sin(ang - Math.PI / 3), label: 'L5' };
+    return [L1, L2, L3, L4, L5];
+  }
+
+  // =====================================================================
+  // 15. EVENT LOGGING
+  // =====================================================================
+  function logMessage(text, type) {
+    const stamp = formatClock(simulationTime, true);
+    messages.unshift({ text: '[' + stamp + '] ' + text, type: type || 'info' });
+    if (messages.length > 60) messages.length = 60;
+    renderLog();
+  }
+  function renderLog() {
+    el('logBody').innerHTML = messages.map((m) => '<div class="log-entry ' + m.type + '">' + m.text + '</div>').join('');
+  }
+
+  function formatClock(t, short) {
+    const totalMinutes = Math.floor((t / SECONDS_PER_DAY) * 24 * 60);
+    const days = Math.floor(totalMinutes / (24 * 60));
+    const hours = Math.floor((totalMinutes % (24 * 60)) / 60);
+    const mins = totalMinutes % 60;
+    if (short) return String(hours).padStart(2, '0') + ':' + String(mins).padStart(2, '0');
+    return String(days).padStart(2, '0') + 'd ' + String(hours).padStart(2, '0') + 'h ' + String(mins).padStart(2, '0') + 'm';
+  }
+
+  // =====================================================================
+  // 16. INITIALIZATION
+  // =====================================================================
+  function initSystem(config) {
+    bodies = []; probes = []; messages = []; selected = null;
+    camera.x = 0; camera.y = 0; camera.zoom = 1; camera.followId = null;
+    simulationTime = 0; probeNameIndex = 0;
+    activeMission = { id: 'freeSandbox', label: 'Free Sandbox' };
+    el('statMission').textContent = 'FREE SANDBOX';
+    logMessage('Simulation initialized (' + (config === CONFIG_REALISTIC ? 'Realistic' : 'Simplified') + ' mode).', 'info');
+
+    const vm = config.velocityMultiplier || 1;
+    const sun = makeBody({ id: 'sun', name: 'Sun', mass: config.sun.mass, radius: config.sun.radius, color: '#ffd54f', glow: true });
+    bodies.push(sun);
+
+    const eCfg = config.earth;
+    const vEarth = circularVelocity(sun.mass, eCfg.orbitalRadius) * vm;
+    const earth = makeBody({
+      id: 'earth', name: 'Earth', mass: eCfg.mass, radius: eCfg.radius, color: '#4fa8ff',
+      x: sun.x + eCfg.orbitalRadius * Math.cos(eCfg.orbitalAngle), y: sun.y + eCfg.orbitalRadius * Math.sin(eCfg.orbitalAngle),
+      vx: sun.vx - vEarth * Math.sin(eCfg.orbitalAngle), vy: sun.vy + vEarth * Math.cos(eCfg.orbitalAngle),
+    });
+    bodies.push(earth);
+
+    const mCfg = config.moon;
+    const vMoon = circularVelocity(earth.mass, mCfg.orbitalRadius) * vm;
+    const moon = makeBody({
+      id: 'moon', name: 'Moon', mass: mCfg.mass, radius: mCfg.radius, color: '#b7bfd4',
+      x: earth.x + mCfg.orbitalRadius * Math.cos(mCfg.orbitalAngle), y: earth.y + mCfg.orbitalRadius * Math.sin(mCfg.orbitalAngle),
+      vx: earth.vx - vMoon * Math.sin(mCfg.orbitalAngle), vy: earth.vy + vMoon * Math.cos(mCfg.orbitalAngle),
+    });
+    bodies.push(moon);
+
+    const marsCfg = config.mars;
+    const vMars = circularVelocity(sun.mass, marsCfg.orbitalRadius) * vm;
+    const mars = makeBody({
+      id: 'mars', name: 'Mars', mass: marsCfg.mass, radius: marsCfg.radius, color: '#e0703f',
+      x: sun.x + marsCfg.orbitalRadius * Math.cos(marsCfg.orbitalAngle), y: sun.y + marsCfg.orbitalRadius * Math.sin(marsCfg.orbitalAngle),
+      vx: sun.vx - vMars * Math.sin(marsCfg.orbitalAngle), vy: sun.vy + vMars * Math.cos(marsCfg.orbitalAngle),
+    });
+    bodies.push(mars);
+
+    running = true;
+    el('playPauseBtn').textContent = 'Pause';
+    el('statStatus').textContent = 'RUNNING';
+    hohmannPreview = null;
+  }
+
+  function resetSimulation() { initSystem(activeConfig); }
+  function selectEntity(e) {
+    selected = { type: bodies.indexOf(e) !== -1 ? 'body' : 'probe', ref: e };
+  }
+
+  // =====================================================================
+  // Starfield (procedural, seeded so stars stay put; drawn once per resize)
+  // =====================================================================
   let starCanvas = null;
   function buildStars() {
+    if (!W || !H) return;
     starCanvas = document.createElement('canvas');
     starCanvas.width = W; starCanvas.height = H;
     const sctx = starCanvas.getContext('2d');
-    sctx.fillStyle = '#05060c';
+    sctx.fillStyle = '#060714';
     sctx.fillRect(0, 0, W, H);
-    let seed = 42;
-    function rand() { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return (seed % 10000) / 10000; }
-    for (let i = 0; i < 420; i++) {
+    const rand = seededRandom(42);
+    for (let i = 0; i < 460; i++) {
       const x = rand() * W, y = rand() * H, r = rand() * 1.3 + 0.2;
       sctx.globalAlpha = 0.3 + rand() * 0.7;
       sctx.fillStyle = '#fff';
@@ -470,17 +1319,10 @@
     }
     sctx.globalAlpha = 1;
   }
-  buildStars();
-  window.addEventListener('resize', () => { buildStars(); });
 
-  // ---------------------------------------------------------------------
-  // Rendering
-  // ---------------------------------------------------------------------
-  function worldToScreen(x, y) {
-    const sun = bodies[0];
-    return { x: W / 2 + (x - sun.x), y: H / 2 + (y - sun.y) };
-  }
-
+  // =====================================================================
+  // 14. RENDERING
+  // =====================================================================
   function drawTrail(trail, color) {
     if (trail.length < 2) return;
     ctx.beginPath();
@@ -488,99 +1330,320 @@
       const s = worldToScreen(trail[i].x, trail[i].y);
       if (i === 0) ctx.moveTo(s.x, s.y); else ctx.lineTo(s.x, s.y);
     }
-    ctx.strokeStyle = color;
-    ctx.globalAlpha = 0.45;
-    ctx.lineWidth = 1.4;
-    ctx.stroke();
-    ctx.globalAlpha = 1;
+    ctx.strokeStyle = color; ctx.globalAlpha = 0.45; ctx.lineWidth = 1.4; ctx.stroke(); ctx.globalAlpha = 1;
+  }
+
+  function drawArrow(fromX, fromY, toX, toY, color, width) {
+    ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = width || 1.5;
+    ctx.beginPath(); ctx.moveTo(fromX, fromY); ctx.lineTo(toX, toY); ctx.stroke();
+    const ang = Math.atan2(toY - fromY, toX - fromX);
+    ctx.beginPath();
+    ctx.moveTo(toX, toY);
+    ctx.lineTo(toX - 7 * Math.cos(ang - 0.4), toY - 7 * Math.sin(ang - 0.4));
+    ctx.lineTo(toX - 7 * Math.cos(ang + 0.4), toY - 7 * Math.sin(ang + 0.4));
+    ctx.closePath(); ctx.fill();
+  }
+
+  function drawBodyVisual(b, s) {
+    if (b.glow) {
+      const grad = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, b.radius * camera.zoom * 3.2);
+      grad.addColorStop(0, 'rgba(255,213,79,0.55)');
+      grad.addColorStop(1, 'rgba(255,213,79,0)');
+      ctx.fillStyle = grad;
+      ctx.beginPath(); ctx.arc(s.x, s.y, b.radius * camera.zoom * 3.2, 0, Math.PI * 2); ctx.fill();
+    }
+    const r = Math.max(1.5, b.radius * camera.zoom);
+    const grad2 = ctx.createRadialGradient(s.x - r * 0.3, s.y - r * 0.3, r * 0.1, s.x, s.y, r);
+    grad2.addColorStop(0, shadeColor(b.color, 40));
+    grad2.addColorStop(1, shadeColor(b.color, -25));
+    ctx.beginPath(); ctx.fillStyle = grad2; ctx.arc(s.x, s.y, r, 0, Math.PI * 2); ctx.fill();
+
+    if (selected && selected.ref === b) {
+      ctx.strokeStyle = '#6fd3ff'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(s.x, s.y, r + 5, 0, Math.PI * 2); ctx.stroke();
+    }
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.font = '11px Segoe UI, sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText(b.name, s.x, s.y - r - 8);
+  }
+
+  function shadeColor(hex, amt) {
+    const c = hex.replace('#', '');
+    const num = parseInt(c.length === 3 ? c.split('').map((x) => x + x).join('') : c, 16);
+    let r = (num >> 16) + amt, g = ((num >> 8) & 0xff) + amt, b = (num & 0xff) + amt;
+    r = clamp(r, 0, 255); g = clamp(g, 0, 255); b = clamp(b, 0, 255);
+    return 'rgb(' + r + ',' + g + ',' + b + ')';
+  }
+
+  function drawSOIRing(b) {
+    const soi = sphereOfInfluence(b);
+    const s = worldToScreen(b.x, b.y);
+    ctx.strokeStyle = 'rgba(111,211,255,0.35)'; ctx.setLineDash([4, 4]); ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(s.x, s.y, soi * camera.zoom, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
+  }
+
+  function drawGravityField() {
+    const spacing = 70;
+    const cols = Math.ceil(W / spacing) + 2, rows = Math.ceil(H / spacing) + 2;
+    ctx.strokeStyle = 'rgba(150,170,255,0.25)'; ctx.lineWidth = 1;
+    for (let cx = -1; cx < cols; cx++) {
+      for (let cy = -1; cy < rows; cy++) {
+        const sx = cx * spacing, sy = cy * spacing;
+        const world = screenToWorld(sx, sy);
+        const { ax, ay } = calculateGravity(world.x, world.y, null);
+        const mag = vecLen(ax, ay) || 0.0001;
+        const len = clamp(mag * 40, 2, 14);
+        const ex = sx + (ax / mag) * len, ey = sy + (ay / mag) * len;
+        ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, ey); ctx.stroke();
+      }
+    }
+  }
+
+  function drawLagrangePoints() {
+    const pts = computeLagrangePoints();
+    ctx.font = '10px Segoe UI, sans-serif'; ctx.textAlign = 'center';
+    for (const p of pts) {
+      const s = worldToScreen(p.x, p.y);
+      ctx.fillStyle = 'rgba(255,214,148,0.85)';
+      ctx.beginPath(); ctx.arc(s.x, s.y, 3, 0, Math.PI * 2); ctx.fill();
+      ctx.fillText(p.label, s.x, s.y - 8);
+    }
+  }
+
+  function drawHohmannPreview() {
+    if (!hohmannPreview) return;
+    const { primary, r1, r2 } = hohmannPreview;
+    const center = worldToScreen(primary.x, primary.y);
+    const aT = (r1 + r2) / 2 * camera.zoom;
+    const bT = Math.sqrt(Math.max(0, r1 * camera.zoom * r2 * camera.zoom));
+    ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.setLineDash([6, 6]); ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.ellipse(center.x - (aT - r1 * camera.zoom), center.y, aT, bT, 0, 0, Math.PI * 2);
+    ctx.stroke(); ctx.setLineDash([]);
+  }
+
+  function drawMinimap() {
+    const mm = document.getElementById('minimap');
+    const mctx = mm.getContext('2d');
+    const dpr2 = Math.min(window.devicePixelRatio || 1, 2);
+    if (mm.width !== mm.clientWidth * dpr2) { mm.width = mm.clientWidth * dpr2; mm.height = mm.clientHeight * dpr2; }
+    mctx.setTransform(dpr2, 0, 0, dpr2, 0, 0);
+    const w = mm.clientWidth, h = mm.clientHeight;
+    mctx.clearRect(0, 0, w, h);
+    const mars = bodyById('mars');
+    const scale = (Math.min(w, h) / 2 - 10) / Math.max(60, vecLen(mars.x, mars.y));
+    const cx = w / 2, cy = h / 2;
+    for (const b of bodies) {
+      mctx.fillStyle = b.color;
+      mctx.beginPath(); mctx.arc(cx + b.x * scale, cy + b.y * scale, b.id === 'sun' ? 3 : 2, 0, Math.PI * 2); mctx.fill();
+    }
+    for (const p of probes) {
+      mctx.fillStyle = p.crashed ? '#ff5a5a' : '#6fffe8';
+      mctx.beginPath(); mctx.arc(cx + p.x * scale, cy + p.y * scale, 1.4, 0, Math.PI * 2); mctx.fill();
+    }
+    // camera viewport rectangle
+    const halfW = (W / 2) / camera.zoom * scale, halfH = (H / 2) / camera.zoom * scale;
+    mctx.strokeStyle = 'rgba(255,255,255,0.5)'; mctx.lineWidth = 1;
+    mctx.strokeRect(cx + camera.x * scale - halfW, cy + camera.y * scale - halfH, halfW * 2, halfH * 2);
   }
 
   function draw() {
     if (starCanvas) ctx.drawImage(starCanvas, 0, 0, W, H);
+    if (showField) drawGravityField();
 
     if (showTrails) {
       for (const b of bodies) drawTrail(b.trail, b.color);
       for (const p of probes) drawTrail(p.trail, p.crashed ? '#ff5a5a' : '#6fffe8');
     }
+    if (showSOI) { for (const b of bodies) if (b.id !== 'sun') drawSOIRing(b); }
+    if (showLagrange) drawLagrangePoints();
+    drawHohmannPreview();
 
-    // Aiming line + predicted trajectory
-    if (aiming) {
-      const earth = bodies.find((b) => b.id === 'earth');
-      const s0 = worldToScreen(earth.x, earth.y);
-      const s1 = worldToScreen(aimCurrent.x, aimCurrent.y);
-      ctx.strokeStyle = '#6fffe8';
-      ctx.lineWidth = 1.5;
-      ctx.setLineDash([5, 5]);
-      ctx.beginPath(); ctx.moveTo(s0.x, s0.y); ctx.lineTo(s1.x, s1.y); ctx.stroke();
-      ctx.setLineDash([]);
-
+    if (isAiming) {
+      const origin = bodyById(launchOrigin);
+      const s0 = worldToScreen(origin.x, origin.y);
+      const s1 = worldToScreen(aimCurrentWorld.x, aimCurrentWorld.y);
+      drawArrow(s0.x, s0.y, s1.x, s1.y, '#6fffe8', 1.8);
       if (previewPath.length > 1) {
         ctx.beginPath();
         for (let i = 0; i < previewPath.length; i++) {
           const s = worldToScreen(previewPath[i].x, previewPath[i].y);
           if (i === 0) ctx.moveTo(s.x, s.y); else ctx.lineTo(s.x, s.y);
         }
-        ctx.strokeStyle = 'rgba(111, 255, 232, 0.55)';
-        ctx.setLineDash([2, 4]);
-        ctx.lineWidth = 1.2;
-        ctx.stroke();
-        ctx.setLineDash([]);
+        ctx.strokeStyle = 'rgba(111,255,232,0.55)'; ctx.setLineDash([2, 4]); ctx.lineWidth = 1.2; ctx.stroke(); ctx.setLineDash([]);
       }
     }
 
-    // Bodies
-    for (const b of bodies) {
-      const s = worldToScreen(b.x, b.y);
-      if (b.glow) {
-        const grad = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, b.radius * 3.2);
-        grad.addColorStop(0, 'rgba(255,213,79,0.55)');
-        grad.addColorStop(1, 'rgba(255,213,79,0)');
-        ctx.fillStyle = grad;
-        ctx.beginPath(); ctx.arc(s.x, s.y, b.radius * 3.2, 0, Math.PI * 2); ctx.fill();
-      }
-      ctx.beginPath();
-      ctx.fillStyle = b.color;
-      ctx.arc(s.x, s.y, b.radius, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = 'rgba(255,255,255,0.85)';
-      ctx.font = '11px Segoe UI, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText(b.name, s.x, s.y - b.radius - 8);
-    }
+    for (const b of bodies) drawBodyVisual(b, worldToScreen(b.x, b.y));
 
-    // Probes
     for (const p of probes) {
       const s = worldToScreen(p.x, p.y);
       ctx.beginPath();
       ctx.fillStyle = p.crashed ? '#ff5a5a' : p.escaped ? '#6fffb0' : '#6fffe8';
-      ctx.arc(s.x, s.y, 3, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.arc(s.x, s.y, 3, 0, Math.PI * 2); ctx.fill();
+      if (selected && selected.ref === p) { ctx.strokeStyle = '#6fd3ff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(s.x, s.y, 7, 0, Math.PI * 2); ctx.stroke(); }
+
+      if (showVel) {
+        const vlen = vecLen(p.vx, p.vy) || 0.0001;
+        drawArrow(s.x, s.y, s.x + (p.vx / vlen) * 26, s.y + (p.vy / vlen) * 26, '#8fd3ff', 1.3);
+      }
+      if (showGrav && p.ax !== undefined) {
+        const alen = vecLen(p.ax, p.ay) || 0.0001;
+        drawArrow(s.x, s.y, s.x + (p.ax / alen) * 20, s.y + (p.ay / alen) * 20, '#ff9a6f', 1.3);
+      }
+    }
+
+    drawMinimap();
+  }
+
+  // =====================================================================
+  // Tooltip + panel updates
+  // =====================================================================
+  function updateTooltip() {
+    if (isAiming || isPanning) { el('tooltip').style.display = 'none'; return; }
+    const world = screenToWorld(lastMouseScreen.x, lastMouseScreen.y);
+    const hit = pickEntityAt(world.x, world.y);
+    const tip = el('tooltip');
+    if (!hit) { tip.style.display = 'none'; return; }
+    const speed = hit === bodies[0] ? vecLen(hit.vx, hit.vy) : vecLen(hit.vx - bodies[0].vx, hit.vy - bodies[0].vy);
+    const dist = vecLen(hit.x - bodies[0].x, hit.y - bodies[0].y);
+    tip.innerHTML = '<b>' + (hit.name || 'Probe') + '</b><br/>Speed: ' + speed.toFixed(1) + '<br/>Distance from Sun: ' + dist.toFixed(0) + (hit.mass ? '<br/>Mass: ' + hit.mass : '');
+    tip.style.left = (lastMouseScreen.x + 16) + 'px';
+    tip.style.top = (lastMouseScreen.y + 12) + 'px';
+    tip.style.display = 'block';
+  }
+
+  function updateTelemetry() {
+    const body = el('selectionBody');
+    const actions = el('selectionActions');
+    const elemSection = el('orbitalElementsSection');
+    const elemBody = el('orbitalElementsBody');
+    const encSection = el('encounterSection');
+    const encBody = el('encounterBody');
+    const burnSection = el('burnSection');
+
+    if (!selected) {
+      body.innerHTML = '<div class="empty">Click a body or probe to inspect it.</div>';
+      actions.style.display = 'none'; elemSection.style.display = 'none'; encSection.style.display = 'none'; burnSection.style.display = 'none';
+      return;
+    }
+    actions.style.display = 'grid';
+    const sun = bodies[0];
+    const ref = selected.ref;
+    const speed = vecLen(ref.vx, ref.vy);
+    const distSun = vecLen(ref.x - sun.x, ref.y - sun.y);
+
+    if (selected.type === 'body') {
+      burnSection.style.display = 'none'; encSection.style.display = 'none';
+      let periodStr = '—';
+      if (ref.id !== 'sun') {
+        const primary = ref.id === 'moon' ? bodyById('earth') : sun;
+        const relX = ref.x - primary.x, relY = ref.y - primary.y, relVx = ref.vx - primary.vx, relVy = ref.vy - primary.vy;
+        const elements = orbitalElements(relX, relY, relVx, relVy, primary.mass);
+        if (elements.period) periodStr = elements.period.toFixed(1) + 's';
+      }
+      body.innerHTML =
+        '<div class="stat-line"><span>Name</span><b>' + ref.name + '</b></div>' +
+        '<div class="stat-line"><span>Mass</span><b>' + ref.mass + '</b></div>' +
+        '<div class="stat-line"><span>Radius</span><b>' + ref.radius + '</b></div>' +
+        '<div class="stat-line"><span>Position</span><b>' + ref.x.toFixed(0) + ', ' + ref.y.toFixed(0) + '</b></div>' +
+        '<div class="stat-line"><span>Velocity</span><b>' + ref.vx.toFixed(2) + ', ' + ref.vy.toFixed(2) + '</b></div>' +
+        '<div class="stat-line"><span>Speed</span><b>' + speed.toFixed(2) + '</b></div>' +
+        '<div class="stat-line"><span>Distance from Sun</span><b>' + distSun.toFixed(0) + '</b></div>' +
+        '<div class="stat-line"><span>Orbital period</span><b>' + periodStr + '</b></div>';
+      elemSection.style.display = 'none';
+    } else {
+      const dom = dominantBodyFor(ref.x, ref.y);
+      const relX = ref.x - dom.x, relY = ref.y - dom.y, relVx = ref.vx - dom.vx, relVy = ref.vy - dom.vy;
+      const relSpeed = vecLen(relVx, relVy);
+      const accel = vecLen(ref.ax || 0, ref.ay || 0);
+      const classification = classifyTrajectory(ref);
+      const vCirc = circularVelocity(dom.mass, vecLen(relX, relY));
+      const vEsc = escapeVelocity(dom.mass, vecLen(relX, relY));
+
+      body.innerHTML =
+        '<div class="stat-line"><span>Name</span><b>' + ref.name + '</b></div>' +
+        '<div class="stat-line"><span>Position</span><b>' + ref.x.toFixed(0) + ', ' + ref.y.toFixed(0) + '</b></div>' +
+        '<div class="stat-line"><span>Velocity</span><b>' + ref.vx.toFixed(2) + ', ' + ref.vy.toFixed(2) + '</b></div>' +
+        '<div class="stat-line"><span>Speed</span><b>' + speed.toFixed(2) + '</b></div>' +
+        '<div class="stat-line"><span>Acceleration</span><b>' + accel.toFixed(3) + '</b></div>' +
+        '<div class="stat-line"><span>Nearest body</span><b>' + dom.name + '</b></div>' +
+        '<div class="stat-line"><span>Distance to it</span><b>' + vecLen(relX, relY).toFixed(0) + '</b></div>' +
+        '<div class="stat-line"><span>Relative speed</span><b>' + relSpeed.toFixed(2) + '</b></div>' +
+        '<div class="stat-line"><span>Circular velocity</span><b>' + vCirc.toFixed(2) + '</b></div>' +
+        '<div class="stat-line"><span>Escape velocity</span><b>' + vEsc.toFixed(2) + '</b></div>' +
+        '<div class="stat-line"><span>Fuel</span><b>' + ref.fuel.toFixed(0) + '</b></div>' +
+        '<div class="stat-line"><span>Mission time</span><b>' + ref.missionTime.toFixed(1) + 's</b></div>' +
+        '<div class="stat-line"><span>Trajectory</span><b style="color:' + (speed >= vEsc ? '#6fffb0' : '#e8ecf5') + '">' + classification + '</b></div>';
+
+      const elements = orbitalElements(relX, relY, relVx, relVy, dom.mass);
+      elemSection.style.display = 'block';
+      elemBody.innerHTML =
+        '<div class="stat-line"><span>Primary</span><b>' + dom.name + '</b></div>' +
+        '<div class="stat-line"><span>Semi-major axis</span><b>' + (elements.a ? elements.a.toFixed(1) : '—') + '</b></div>' +
+        '<div class="stat-line"><span>Eccentricity</span><b>' + elements.e.toFixed(3) + '</b></div>' +
+        '<div class="stat-line"><span>Periapsis</span><b>' + (elements.periapsis != null ? elements.periapsis.toFixed(1) : '—') + '</b></div>' +
+        '<div class="stat-line"><span>Apoapsis</span><b>' + (elements.apoapsis != null ? elements.apoapsis.toFixed(1) : '—') + '</b></div>' +
+        '<div class="stat-line"><span>Period</span><b>' + (elements.period ? elements.period.toFixed(1) + 's' : '—') + '</b></div>' +
+        '<div class="stat-line"><span>Specific energy</span><b>' + elements.specificEnergy.toFixed(2) + '</b></div>';
+
+      burnSection.style.display = 'block';
+      if (ref.lastEncounter) {
+        encSection.style.display = 'block';
+        const le = ref.lastEncounter;
+        encBody.innerHTML =
+          '<div class="stat-line"><span>Body</span><b>' + le.body + '</b></div>' +
+          '<div class="stat-line"><span>Closest approach</span><b>' + le.closest.toFixed(1) + '</b></div>' +
+          '<div class="stat-line"><span>Incoming speed</span><b>' + le.incoming.toFixed(2) + '</b></div>' +
+          '<div class="stat-line"><span>Outgoing speed</span><b>' + le.outgoing.toFixed(2) + '</b></div>' +
+          '<div class="stat-line"><span>\u0394 velocity</span><b style="color:' + (le.delta > 0 ? '#6fffb0' : '#ff9a6f') + '">' + (le.delta > 0 ? '+' : '') + le.delta.toFixed(2) + '</b></div>';
+      } else { encSection.style.display = 'none'; }
     }
   }
 
-  // ---------------------------------------------------------------------
-  // Main loop
-  // ---------------------------------------------------------------------
-  let frameCount = 0;
-  function tick() {
+  function updateTopbar(fps) {
+    const clock = formatClock(simulationTime, false);
+    el('statSimTime').textContent = clock;
+    el('clockDisplay').textContent = clock;
+    el('statFps').textContent = fps.toFixed(0);
+    el('scaleRate').textContent = ((BASE_DT * timeScale * 3600) / SECONDS_PER_DAY * 24).toFixed(1);
+  }
+
+  // =====================================================================
+  // 17. MAIN LOOP
+  // =====================================================================
+  let lastTime = performance.now();
+  let fpsSmoothed = 60;
+
+  function tick(now) {
+    const realDt = Math.min(0.1, (now - lastTime) / 1000);
+    lastTime = now;
+    const instFps = realDt > 0 ? 1 / realDt : 60;
+    fpsSmoothed += (instFps - fpsSmoothed) * 0.08;
+
     if (running) {
       const totalDt = BASE_DT * timeScale;
-      const substeps = Math.min(24, Math.max(1, Math.round(timeScale * 4)));
+      const substeps = clamp(Math.round(timeScale * 4), 1, 40);
       const subDt = totalDt / substeps;
-      for (let i = 0; i < substeps; i++) stepPhysics(subDt);
+      for (let i = 0; i < substeps; i++) updatePhysics(subDt);
 
       frameCount++;
       if (frameCount % 2 === 0) {
-        for (const b of bodies) { b.trail.push({ x: b.x, y: b.y }); if (b.trail.length > 500) b.trail.shift(); }
-        for (const p of probes) { p.trail.push({ x: p.x, y: p.y }); if (p.trail.length > 800) p.trail.shift(); }
+        for (const b of bodies) { b.trail.push({ x: b.x, y: b.y }); if (b.trail.length > MAX_BODY_TRAIL) b.trail.shift(); }
+        for (const p of probes) { p.trail.push({ x: p.x, y: p.y }); if (p.trail.length > MAX_PROBE_TRAIL) p.trail.shift(); }
       }
-      updateInfoPanel();
     }
+    updateCamera();
+    updateTelemetry();
+    updateTooltip();
+    updateTopbar(fpsSmoothed);
     draw();
     requestAnimationFrame(tick);
   }
 
-  initSystem();
+  resize();
+  syncConfigInputs();
+  initSystem(activeConfig);
   requestAnimationFrame(tick);
 })();
 </script>
