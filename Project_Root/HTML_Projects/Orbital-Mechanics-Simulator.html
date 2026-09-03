@@ -133,7 +133,28 @@
   .modal-card h4 { color: #6fd3ff; margin-bottom: 4px; }
   .modal-card p { color: #b7bfd4; font-size: 13px; line-height: 1.6; margin-top: 0; }
   .modal-card kbd { background: #1c2030; border: 1px solid #3a4058; border-radius: 4px; padding: 1px 7px; font-size: 11.5px; }
-  .modal-close { float: right; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); color: #e8ecf5; border-radius: 8px; padding: 5px 12px; cursor: pointer; }
+  .modal-header {
+    position: sticky; top: -26px; z-index: 5;
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    margin: -26px -30px 16px; padding: 20px 30px 14px;
+    background: rgba(14,16,28,0.98);
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+  }
+  .modal-header h2 { margin: 0; }
+  .modal-header-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+  .modal-close { flex-shrink: 0; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); color: #e8ecf5; border-radius: 8px; padding: 5px 12px; cursor: pointer; }
+  .modal-top { flex-shrink: 0; background: transparent; border: 1px solid rgba(111,211,255,0.3); color: #8fd3ff; border-radius: 8px; padding: 5px 12px; cursor: pointer; font-size: 12px; }
+  .modal-top:hover { background: rgba(111,211,255,0.12); }
+  .edu-toc { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 20px; padding-bottom: 16px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+  .edu-toc a { font-size: 11px; color: #8fd3ff; text-decoration: none; background: rgba(111,211,255,0.1); border: 1px solid rgba(111,211,255,0.25); border-radius: 999px; padding: 5px 12px; }
+  .edu-toc a:hover { background: rgba(111,211,255,0.2); }
+  .modal-card section { margin-bottom: 22px; padding-bottom: 18px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+  .modal-card section:last-child { border-bottom: none; }
+  .modal-card ul { color: #b7bfd4; font-size: 13px; line-height: 1.65; padding-left: 20px; margin-top: 6px; }
+  .modal-card li { margin-bottom: 4px; }
+  .formula { display: inline-block; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; padding: 3px 9px; font-family: 'Consolas', 'Courier New', monospace; font-size: 12.5px; color: #6fffe8; margin: 4px 0; }
+  .callout { background: rgba(111,211,255,0.08); border-left: 3px solid #6fd3ff; border-radius: 4px; padding: 10px 14px; font-size: 12.5px; color: #cfe0f5; margin-top: 10px; }
+  .callout b { color: #8fd3ff; }
 
   #panelToggle { display: none; position: absolute; top: 52px; left: 8px; z-index: 25; }
 
@@ -287,6 +308,8 @@
       <button class="btn" data-burn="radialOut" type="button">+ Radial Out</button>
       <button class="btn" data-burn="radialIn" type="button">+ Radial In</button>
     </div>
+    <button class="btn accent" id="circularizeBtn" type="button">Circularize Orbit</button>
+    <div class="hint">Auto-applies small prograde/retrograde nudges every tick until eccentricity relative to the dominant body drops below 0.03, or fuel runs out.</div>
   </div>
 </aside>
 
@@ -330,28 +353,210 @@
 
 <div class="modal hidden" id="eduOverlay">
   <div class="modal-card">
-    <button class="modal-close" id="eduClose" type="button">Close ✕</button>
-    <h2>Orbital Mechanics — Quick Reference</h2>
-    <h4>Gravity</h4>
-    <p>Every mass pulls every other mass toward it. The force weakens with the square of distance: F = G·m₁·m₂/r². This single rule drives everything below.</p>
-    <h4>Orbit</h4>
-    <p>An orbit is continuous free-fall: an object falls toward a planet, but it is moving sideways fast enough that it keeps missing the ground, tracing an ellipse (or circle) instead of crashing.</p>
-    <h4>Escape Velocity</h4>
-    <p>Orbital velocity keeps you falling around a body forever. Escape velocity (v = √(2GM/r)) is the speed at which an object has enough kinetic energy to coast away to infinity instead of falling back.</p>
-    <h4>Gravity Assist (Slingshot)</h4>
-    <p>A spacecraft passing close to a moving planet can trade momentum with it: in the planet's own reference frame the spacecraft's speed is unchanged, but relative to the Sun it can gain (or lose) real velocity — for free, without burning fuel.</p>
-    <h4>Hohmann Transfer</h4>
-    <p>The most fuel-efficient way to move between two circular orbits: one burn stretches your orbit into an ellipse that just touches the destination orbit; a second burn circularizes you there. Two small burns beat one huge one.</p>
+    <div class="modal-header">
+      <h2>Orbital Mechanics — Field Guide</h2>
+      <div class="modal-header-actions">
+        <button class="modal-top" id="eduTop" type="button">↑ Top</button>
+        <button class="modal-close" id="eduClose" type="button">Close ✕</button>
+      </div>
+    </div>
+    <div class="edu-toc">
+      <a href="#edu-gravity">Gravity</a>
+      <a href="#edu-orbit">Orbits</a>
+      <a href="#edu-kepler">Kepler's Laws</a>
+      <a href="#edu-elements">Orbital Elements</a>
+      <a href="#edu-escape">Escape Velocity</a>
+      <a href="#edu-classify">Trajectory Types</a>
+      <a href="#edu-burns">Burns &amp; Vectors</a>
+      <a href="#edu-circularize">Auto-Circularize</a>
+      <a href="#edu-assist">Gravity Assists</a>
+      <a href="#edu-hohmann">Hohmann Transfers</a>
+      <a href="#edu-soi">Sphere of Influence</a>
+      <a href="#edu-lagrange">Lagrange Points</a>
+      <a href="#edu-scale">Simulation Scale</a>
+      <a href="#edu-tips">Try It Yourself</a>
+    </div>
+
+    <section id="edu-gravity">
+      <h4>Gravity</h4>
+      <p>Every object with mass pulls every other object with mass toward it. Isaac Newton described the strength of that pull with one compact rule:</p>
+      <div class="formula">F = G · (m₁ · m₂) / r²</div>
+      <p>F is the force between two bodies, m₁ and m₂ are their masses, r is the distance between their centers, and G is the gravitational constant (a fixed number that sets the overall strength of gravity in whatever units you're using). The important part is the r² on the bottom: double the distance and the pull drops to a quarter of its strength. Gravity never truly reaches zero, but it fades fast.</p>
+      <p>From force we get acceleration using Newton's second law (F = m·a, rearranged to a = F/m), which simplifies neatly for gravity because the object's own mass cancels out:</p>
+      <div class="formula">a = G · M / r²</div>
+      <p>This is why a feather and a hammer fall at the same rate in a vacuum — the acceleration due to gravity doesn't depend on the falling object's own mass, only on the mass M of whatever is pulling it and the distance r.</p>
+      <p>In two dimensions, the simulator computes this every physics step for every pair of bodies:</p>
+      <ul>
+        <li>dx = body2.x − body1.x, dy = body2.y − body1.y</li>
+        <li>distance = √(dx² + dy²)</li>
+        <li>the direction of the pull is (dx/distance, dy/distance) — a unit vector pointing from body1 toward body2</li>
+        <li>that direction is scaled by the acceleration magnitude a = G·M/r² and added to body1's velocity</li>
+      </ul>
+      <p>Everything in this lab — orbits, slingshots, escapes, collisions — is just this one rule, applied over and over, to every body, every fraction of a second.</p>
+    </section>
+
+    <section id="edu-orbit">
+      <h4>What Is an Orbit?</h4>
+      <p>An orbit is <i>continuous free-fall</i>. Picture firing a cannonball horizontally from a very tall tower. Gravity pulls it down and it curves toward the ground. Fire it faster, and it still curves downward at the same rate — but because the ground is also curving away (the planet is round), a fast enough cannonball falls "around" the planet forever instead of hitting it. That falling-but-missing is exactly what an orbit is.</p>
+      <p>There is no special "orbit force" — a planet, moon, spacecraft, and dropped rock all obey the identical gravity equation above. The only difference between "falling into the ground" and "orbiting forever" is sideways speed.</p>
+      <p>Orbits come in a family of shapes, all technically conic sections, determined entirely by an object's speed at a given distance:</p>
+      <ul>
+        <li><b>Circular</b> — speed exactly matches the circular orbital velocity at that distance; the object stays the same distance from its primary the whole time.</li>
+        <li><b>Elliptical</b> — speed is close to, but not exactly, circular; the object swings in an oval, moving faster near periapsis (closest point) and slower near apoapsis (farthest point). All the planets in our own solar system follow ellipses, just very gentle ones.</li>
+        <li><b>Parabolic</b> — the exact borderline case: the object has precisely escape velocity and will just barely coast to infinity, arriving there with zero speed left.</li>
+        <li><b>Hyperbolic</b> — the object has more than escape velocity; it swings past its primary once and leaves permanently, still carrying speed to spare. This is the shape of a gravity-assist flyby.</li>
+      </ul>
+      <div class="callout"><b>In this simulator:</b> launch a probe from Earth with a moderate sideways velocity and it should curve into a stable ellipse instead of falling straight back down or flying off into space. Try the "Earth Orbit" mission preset to see a tuned example.</div>
+    </section>
+
+    <section id="edu-kepler">
+      <h4>Kepler's Three Laws</h4>
+      <p>Centuries before Newton explained <i>why</i>, Johannes Kepler worked out <i>how</i> planets move, purely from observation. His three laws still describe every orbit in this simulator:</p>
+      <ul>
+        <li><b>1st Law — Ellipses:</b> every orbit is an ellipse with the primary body sitting at one focus (not the center). A circle is just a special case where both foci coincide.</li>
+        <li><b>2nd Law — Equal areas in equal times:</b> a line drawn from the primary to the orbiting body sweeps out equal areas in equal time intervals. In practice this means an object moves fastest at periapsis (closest approach) and slowest at apoapsis (farthest point) — watch a probe's trail speed up and slow down as it swings around an elliptical orbit.</li>
+        <li><b>3rd Law — Period vs. distance:</b> the square of an orbital period is proportional to the cube of its semi-major axis (T² ∝ a³). Farther-out orbits don't just have more ground to cover, they also move more slowly — which is exactly why Mars visibly drifts around the Sun slower than Earth in this simulation.</li>
+      </ul>
+    </section>
+
+    <section id="edu-elements">
+      <h4>Reading the Orbital Elements Panel</h4>
+      <p>When you select a probe, the right-hand panel computes its orbit relative to whichever body currently dominates its gravity (its "primary"). These numbers fully describe the shape and timing of an orbit:</p>
+      <ul>
+        <li><b>Semi-major axis (a)</b> — half the "long axis" of the ellipse; roughly the orbit's average size.</li>
+        <li><b>Eccentricity (e)</b> — how stretched the ellipse is. e = 0 is a perfect circle, 0 &lt; e &lt; 1 is an ellipse, e = 1 is a parabola (exactly escape), e &gt; 1 is a hyperbola (escaping with speed to spare).</li>
+        <li><b>Periapsis</b> — the closest point to the primary in the orbit (perigee for Earth, perihelion for the Sun).</li>
+        <li><b>Apoapsis</b> — the farthest point from the primary (apogee for Earth, aphelion for the Sun). Hyperbolic/escape trajectories have no apoapsis — they never come back.</li>
+        <li><b>Period</b> — how long a full loop takes, from Kepler's third law.</li>
+        <li><b>Specific orbital energy</b> — kinetic energy minus gravitational potential energy, per unit mass. Negative means bound (an ellipse or circle); zero or positive means unbound (escaping).</li>
+      </ul>
+    </section>
+
+    <section id="edu-escape">
+      <h4>Orbital Velocity vs. Escape Velocity</h4>
+      <p>At any given distance r from a primary of mass M, there are two important speeds:</p>
+      <div class="formula">v(circular) = √(G·M / r)</div>
+      <div class="formula">v(escape) = √(2·G·M / r)</div>
+      <p>Notice escape velocity is always exactly √2 (≈1.414×) the circular velocity at the same distance. Below circular velocity, you fall back down. At circular velocity, you loop forever in a perfect circle. Between circular and escape velocity, you loop forever in an ellipse. At or above escape velocity, you leave and never return.</p>
+      <p>The panel highlights a probe's trajectory in green once its speed reaches or exceeds the local escape velocity — a quick visual check for "am I actually leaving, or just on a big loop?"</p>
+    </section>
+
+    <section id="edu-classify">
+      <h4>Trajectory Classifications Explained</h4>
+      <ul>
+        <li><b>Suborbital</b> — still essentially at the surface/altitude of the primary; hasn't built up enough speed or distance to be considered "in orbit" yet.</li>
+        <li><b>Circular orbit</b> — eccentricity is very close to 0.</li>
+        <li><b>Elliptical orbit</b> — bound, but stretched; will keep looping between periapsis and apoapsis indefinitely (in a simplified two-body sense).</li>
+        <li><b>Escape trajectory</b> — speed exceeds local escape velocity and the probe is moving away; it will not return to that primary.</li>
+        <li><b>Collision course</b> — the computed periapsis is smaller than the primary's radius, meaning the current path will intersect the body if nothing changes.</li>
+      </ul>
+    </section>
+
+    <section id="edu-burns">
+      <h4>Prograde, Retrograde, and Radial Burns</h4>
+      <p>A "burn" is a sudden change in velocity (Δv) from a spacecraft's engines. Where you point that thrust matters enormously:</p>
+      <ul>
+        <li><b>Prograde</b> — thrusting in the direction you're already moving. Raises the far side of your orbit (apoapsis). This is how you climb to a higher orbit or begin a transfer to somewhere farther out.</li>
+        <li><b>Retrograde</b> — thrusting backward, against your motion. Lowers the far side of your orbit (or the near side, if you're past apoapsis). This is how you drop into a lower orbit, slow down for an arrival, or de-orbit entirely.</li>
+        <li><b>Radial-out / Radial-in</b> — thrusting perpendicular to your motion, away from or toward the primary. These barely change your orbit's size but rotate its orientation — useful for plane changes in a full 3D sim, and for fine-tuning approach angles here.</li>
+      </ul>
+      <p>Because a burn only changes velocity at one instant, its effect only becomes visible on the <i>opposite</i> side of the orbit from where you burned — a classic orbital-mechanics surprise for newcomers used to driving a car, where pointing and thrusting change your path immediately.</p>
+    </section>
+
+    <section id="edu-circularize">
+      <h4>How "Circularize Orbit" Works</h4>
+      <p>Manually flattening an ellipse into a circle the textbook way means timing a precise prograde burn at exactly periapsis or apoapsis. The <b>Circularize Orbit</b> button (in the Maneuver/Burn panel, once a probe is selected) automates that with a simpler, continuous technique instead of one big timed burn:</p>
+      <ul>
+        <li>Every physics step, it looks at the probe's current distance r from whichever body currently dominates its gravity, and computes that body's local circular velocity there: v(circular) = √(G·M / r).</li>
+        <li>It compares that target speed to the probe's <i>actual</i> current speed relative to that same body.</li>
+        <li>It then nudges the probe's velocity by a small amount — purely along the existing prograde/retrograde direction, exactly like the manual burn buttons, never radially — speeding up if it's slower than circular velocity, slowing down if it's faster.</li>
+        <li>This repeats continuously, tick after tick, rather than firing one large burn. Because r and v are linked through orbital energy and angular momentum, steadily pulling speed toward the local circular value at every point in the orbit gradually drags the whole ellipse toward a circle over the course of a few orbits, instead of instantly.</li>
+      </ul>
+      <p>Each nudge also consumes a small amount of fuel proportional to its size (same rule as a manual burn). The feature keeps running, checking the resulting eccentricity from the Orbital Elements panel's formulas after every step, until one of three things happens:</p>
+      <ul>
+        <li><b>Success</b> — eccentricity drops below 0.03 (essentially circular): it disengages automatically and logs a green success message naming the body it circularized around.</li>
+        <li><b>Out of fuel</b> — if fuel hits zero mid-correction, it disengages and logs a warning instead of silently doing nothing.</li>
+        <li><b>Manual stop</b> — click the button again at any time (it relabels itself "Stop Circularizing" while active) to cancel early.</li>
+      </ul>
+      <div class="callout"><b>In this simulator:</b> capture a probe into a stretched ellipse around Mars or the Moon (see the Gravity Assists tips above), select it, then click Circularize Orbit and watch the Eccentricity value in the Orbital Elements panel count down toward zero over the next several orbits.</div>
+    </section>
+
+    <section id="edu-assist">
+      <h4>Gravity Assists (Slingshot Maneuvers)</h4>
+      <p>A spacecraft can gain or lose real velocity — for free, without burning any fuel — simply by flying close to a moving planet. This sounds like it breaks the rules, but it doesn't: energy is conserved overall, it's just being traded with the planet.</p>
+      <p>Here's the trick: in the <i>planet's own</i> frame of reference, the spacecraft enters and leaves the encounter at the same speed (gravity is conservative — what speeds you up on the way in, slows you back down by the same amount on the way out, relative to the planet). But the planet itself is moving relative to the Sun. Add the planet's own velocity back in, and the spacecraft's <i>heliocentric</i> (Sun-relative) speed can come out higher or lower than it went in, depending on the approach angle.</p>
+      <ul>
+        <li>Approach so the planet is roughly "catching up from behind" and swing around its leading side — you gain heliocentric speed (this is how Voyager, New Horizons, and others reached the outer solar system).</li>
+        <li>Approach from the opposite geometry and you lose heliocentric speed instead — useful for missions that need to slow down without fuel, like slowing toward the inner solar system.</li>
+      </ul>
+      <p>The simulator detects this automatically: whenever a probe enters a planet's sphere of influence, it records the probe's Sun-relative speed; when it leaves, it compares the speeds and logs the encounter, including the closest-approach distance and the resulting Δv.</p>
+      <div class="callout"><b>In this simulator:</b> launch a probe on a path that swings just outside Mars or the Moon (not straight at it — angle matters) and watch the Mission Log for a "Gravity assist" entry showing your speed before and after.</div>
+    </section>
+
+    <section id="edu-hohmann">
+      <h4>Hohmann Transfer Orbits</h4>
+      <p>If you want to move a spacecraft from one circular orbit to a larger (or smaller) one using the least possible fuel, the classic answer is a Hohmann transfer — two burns, one ellipse:</p>
+      <ul>
+        <li><b>Burn 1 (departure):</b> a prograde burn at your starting orbit stretches your circular orbit into an ellipse whose far point (apoapsis) just touches the destination orbit.</li>
+        <li><b>Coast:</b> you fall freely along that ellipse for exactly half its period.</li>
+        <li><b>Burn 2 (arrival):</b> a second prograde burn at that far point circularizes you into the destination orbit (skip this step and you'll fly straight back down into an ellipse instead — a free return trajectory).</li>
+      </ul>
+      <p>It is the most fuel-efficient transfer between two circular, coplanar orbits, precisely because it uses the minimum possible total velocity change (Δv) — at the cost of taking longer than a more "brute force" direct burn would.</p>
+      <p>The Hohmann tool in the left panel computes the transfer ellipse's semi-major axis, both required Δv values, and the coasting time between two selected orbits (using the classic vis-viva relationship), and sketches the ellipse for reference. It won't line up perfectly with the planets' actual current positions — real mission planners also have to solve the "phase angle" problem of launching at the right moment so the destination planet is actually there when you arrive — but the shape and Δv numbers are the real, textbook-correct values for the orbit radii involved.</p>
+    </section>
+
+    <section id="edu-soi">
+      <h4>Sphere of Influence</h4>
+      <p>Every body in the simulation is pulling on a probe simultaneously, but in practice one body's gravity almost always dominates locally. A "sphere of influence" is a simplified boundary around a planet or moon inside which it's most useful to think of a probe as "orbiting that body" rather than the Sun, even though technically every body's gravity always contributes something.</p>
+      <p>Toggle <b>Sphere of Influence</b> in the left panel to draw these boundaries. They're also what triggers gravity-assist detection and the mission objectives that ask you to "reach" or "flyby" a body.</p>
+    </section>
+
+    <section id="edu-lagrange">
+      <h4>Lagrange Points</h4>
+      <p>For any pair of orbiting bodies (here, Earth and the Moon), there are five special points where the combined gravity of both bodies, plus the centrifugal effect of orbiting along with them, balances out. An object placed exactly there can (in theory) stay in a fixed position relative to both bodies without expending fuel:</p>
+      <ul>
+        <li><b>L1</b> — between the two bodies, closer to the smaller one. Great for observing the larger body continuously (real-world example: solar observatories sit at the Sun-Earth L1).</li>
+        <li><b>L2</b> — just beyond the smaller body, on the far side from the larger one. Popular for space telescopes that need to stay shielded from both bodies at once.</li>
+        <li><b>L3</b> — on the opposite side of the larger body from the smaller one.</li>
+        <li><b>L4 / L5</b> — 60° ahead of and behind the smaller body along its orbit, forming equilateral triangles with both bodies. These two are the only ones that are genuinely <i>stable</i> — nudge something near L4/L5 and it tends to stay nearby, which is why these points naturally collect dust and asteroids in real solar systems.</li>
+      </ul>
+      <p>The points drawn here use a simplified approximation (accurate enough to see their layout and general behavior) rather than an exact restricted three-body solution.</p>
+    </section>
+
+    <section id="edu-scale">
+      <h4>About the Simulation's Scale</h4>
+      <p>This simulator does not use literal real-world kilometers, kilograms, or seconds — at true solar-system scale, Mars would be a speck far off-screen and the Moon would be invisible next to Earth. Instead, distances, masses, and time are all internally consistent <i>scaled</i> units, tuned so that:</p>
+      <ul>
+        <li>Gravity still obeys the real inverse-square law.</li>
+        <li>Relative relationships stay physically correct — Mars genuinely orbits slower than Earth because it's farther from the Sun, exactly as Kepler's third law predicts.</li>
+        <li>Escape velocity, orbital velocity, gravity assists, and Hohmann transfers all behave the way the real formulas say they should, just measured in the simulator's own units instead of km/s.</li>
+      </ul>
+      <p>Planet radii are also exaggerated compared to their orbital distances, purely so you can actually see and click on them. Switch between <b>Simplified</b> and <b>Realistic</b> system modes in the left panel to compare a stylized, easy-to-fly setup against one whose relative masses and sizes are closer to Mars' and the Moon's true proportions to Earth.</p>
+    </section>
+
+    <section id="edu-tips">
+      <h4>Try It Yourself</h4>
+      <ul>
+        <li>Launch straight "up" from Earth with a very high velocity and watch it fail to loop back — that's a suborbital or escape trajectory, depending on speed.</li>
+        <li>Launch sideways relative to Earth's motion at a moderate speed and altitude — that's the easiest way into a stable elliptical orbit.</li>
+        <li>Select a probe already in orbit and try a small prograde burn — watch the <i>opposite</i> side of its orbit rise on the next lap.</li>
+        <li>Aim a probe to pass just outside Mars or the Moon (not head-on) and check the Mission Log for a gravity-assist readout.</li>
+        <li>Use the Hohmann tool to preview an Earth → Mars transfer, then try launching a probe with roughly that departure Δv added to Earth's own orbital velocity.</li>
+        <li>Crank the Sun's mass or Mars' orbital radius way down in the System Mode panel and press "Rebuild System" to intentionally create unstable orbits, close encounters, or ejections.</li>
+      </ul>
+    </section>
   </div>
 </div>
 
 <div class="modal hidden" id="helpOverlay">
   <div class="modal-card">
-    <button class="modal-close" id="helpClose" type="button">Close ✕</button>
-    <h2>Keyboard Shortcuts</h2>
+    <div class="modal-header">
+      <h2>Keyboard Shortcuts</h2>
+      <button class="modal-close" id="helpClose" type="button">Close ✕</button>
+    </div>
     <p><kbd>Space</kbd> Pause / Resume &nbsp; <kbd>R</kbd> Reset &nbsp; <kbd>F</kbd> Focus selected &nbsp; <kbd>T</kbd> Toggle trails</p>
     <p><kbd>V</kbd> Velocity vectors &nbsp; <kbd>P</kbd> Toggle prediction &nbsp; <kbd>+</kbd> / <kbd>-</kbd> Simulation speed</p>
-    <p><kbd>W A S D</kbd> or Arrow keys — Pan camera &nbsp; <kbd>Esc</kbd> Cancel launch mode</p>
+    <p><kbd>W A S D</kbd> or Arrow keys — Pan camera &nbsp; <kbd>Esc</kbd> Close this panel / cancel launch mode</p>
     <p>Mouse: drag empty space to pan, scroll to zoom toward cursor, click a body/probe to select it, double-click to follow it.</p>
   </div>
 </div>
@@ -530,6 +735,7 @@
       if (p.crashed) continue;
       updateEncounterTracking(p);
       updateEscapeTracking(p);
+      updateCircularization(p, dt);
     }
     checkMissionObjectives();
     simulationTime += dt;
@@ -602,7 +808,7 @@
       id: nextId('probe-'), name: nextProbeName(),
       x: launchX, y: launchY, vx, vy, ax: 0, ay: 0,
       mass, fuel: 100, trail: [], missionTime: 0,
-      crashed: false, escaped: false, encounters: {}, lastEncounter: null,
+      crashed: false, escaped: false, encounters: {}, lastEncounter: null, circularizing: false,
       color: '#6fffe8',
     };
     probes.push(probe);
@@ -692,6 +898,46 @@
     if (distToSun > 420 && speed > vEsc && radialOutward > 0) {
       p.escaped = true;
       logMessage(p.name + ' exceeded solar escape velocity and is leaving the system!', 'escape');
+    }
+  }
+
+  // Auto-circularization: rather than requiring the user to time burns at
+  // exact periapsis/apoapsis, this applies a very small prograde or
+  // retrograde nudge every physics step, continuously steering the
+  // probe's speed toward the local circular velocity at its current
+  // distance from the dominant body. Over several orbits this converges
+  // the eccentricity toward zero, using only the same prograde/retrograde
+  // directions the manual burn buttons use (never radial).
+  const CIRCULARIZE_ECC_THRESHOLD = 0.03;
+  const CIRCULARIZE_RATE = 6; // max speed correction per second
+
+  function updateCircularization(p, dt) {
+    if (!p.circularizing || p.crashed) return;
+    if (p.fuel <= 0) {
+      p.circularizing = false;
+      logMessage(p.name + ': circularization aborted — out of fuel.', 'warning');
+      return;
+    }
+    const dom = dominantBodyFor(p.x, p.y);
+    const rx = p.x - dom.x, ry = p.y - dom.y;
+    const r = Math.max(vecLen(rx, ry), 0.001);
+    const relVx = p.vx - dom.vx, relVy = p.vy - dom.vy;
+    const relSpeed = Math.max(vecLen(relVx, relVy), 0.0001);
+    const vCirc = circularVelocity(dom.mass, r);
+
+    // Nudge speed (relative to the dominant body) toward vCirc, purely
+    // along the current prograde/retrograde direction.
+    const progradeX = relVx / relSpeed, progradeY = relVy / relSpeed;
+    const diff = vCirc - relSpeed;
+    const step = clamp(diff, -CIRCULARIZE_RATE * dt, CIRCULARIZE_RATE * dt);
+    p.vx += progradeX * step;
+    p.vy += progradeY * step;
+    p.fuel = Math.max(0, p.fuel - Math.abs(step) * 3);
+
+    const el = orbitalElements(rx, ry, p.vx - dom.vx, p.vy - dom.vy, dom.mass);
+    if (el.e !== null && el.e < CIRCULARIZE_ECC_THRESHOLD) {
+      p.circularizing = false;
+      logMessage(p.name + ' circularized around ' + dom.name + ' (e=' + el.e.toFixed(3) + ').', 'success');
     }
   }
 
@@ -980,7 +1226,13 @@
     else if (e.key === 'p' || e.key === 'P') toggleCheckbox('chkPredict');
     else if (e.key === '+' || e.key === '=') bumpSpeed(1);
     else if (e.key === '-' || e.key === '_') bumpSpeed(-1);
-    else if (e.key === 'Escape') { launchMode = false; syncLaunchModeBtn(); }
+    else if (e.key === 'Escape') {
+      const eduOpen = !el('eduOverlay').classList.contains('hidden');
+      const helpOpen = !el('helpOverlay').classList.contains('hidden');
+      if (eduOpen) { el('eduOverlay').classList.add('hidden'); }
+      else if (helpOpen) { el('helpOverlay').classList.add('hidden'); }
+      else { launchMode = false; syncLaunchModeBtn(); }
+    }
     else if (['w', 'a', 's', 'd', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].indexOf(e.key) !== -1) {
       const step = 24 / camera.zoom;
       camera.followId = null;
@@ -1058,6 +1310,12 @@
       if (selected && selected.type === 'probe') applyBurn(selected.ref, btn.getAttribute('data-burn'), dvAmount);
     });
   });
+  el('circularizeBtn').addEventListener('click', () => {
+    if (!selected || selected.type !== 'probe') return;
+    const p = selected.ref;
+    p.circularizing = !p.circularizing;
+    logMessage(p.name + (p.circularizing ? ': auto-circularization engaged.' : ': auto-circularization stopped.'), 'info');
+  });
 
   function togglePause() {
     running = !running;
@@ -1073,6 +1331,7 @@
 
   el('eduBtn').addEventListener('click', () => el('eduOverlay').classList.remove('hidden'));
   el('eduClose').addEventListener('click', () => el('eduOverlay').classList.add('hidden'));
+  el('eduTop').addEventListener('click', () => el('eduOverlay').querySelector('.modal-card').scrollTo({ top: 0, behavior: 'smooth' }));
   el('helpBtn').addEventListener('click', () => el('helpOverlay').classList.remove('hidden'));
   el('helpClose').addEventListener('click', () => el('helpOverlay').classList.add('hidden'));
   el('panelToggle').addEventListener('click', () => {
@@ -1141,7 +1400,7 @@
               id: nextId('probe-'), name: pd.name || nextProbeName(),
               x: pd.x, y: pd.y, vx: pd.vx, vy: pd.vy, ax: 0, ay: 0,
               mass: pd.mass || 1, fuel: pd.fuel != null ? pd.fuel : 100,
-              trail: [], missionTime: 0, crashed: false, escaped: false, encounters: {}, lastEncounter: null, color: '#6fffe8',
+              trail: [], missionTime: 0, crashed: false, escaped: false, encounters: {}, lastEncounter: null, circularizing: false, color: '#6fffe8',
             });
           });
         }
@@ -1588,6 +1847,8 @@
         '<div class="stat-line"><span>Specific energy</span><b>' + elements.specificEnergy.toFixed(2) + '</b></div>';
 
       burnSection.style.display = 'block';
+      el('circularizeBtn').classList.toggle('active', !!ref.circularizing);
+      el('circularizeBtn').textContent = ref.circularizing ? 'Stop Circularizing' : 'Circularize Orbit';
       if (ref.lastEncounter) {
         encSection.style.display = 'block';
         const le = ref.lastEncounter;
@@ -1615,6 +1876,22 @@
   let lastTime = performance.now();
   let fpsSmoothed = 60;
 
+  // The Moon orbiting Earth is the fastest-moving, shortest-period motion
+  // in the system -- if the integrator's timestep is too large relative
+  // to *that* period, its orbit (and to a lesser extent Earth's and
+  // Mars's) will visibly precess/drift over time instead of staying in
+  // a stable, repeating ellipse. Rather than sizing substeps only off
+  // timeScale, size them off the fastest orbital period actually present,
+  // so accuracy scales with what the system needs, not just the speed
+  // slider -- this keeps orbits stable even at high timeScale or after a
+  // "Rebuild System" with a closer/faster Moon.
+  function fastestOrbitalPeriod() {
+    const earth = bodyById('earth'), moon = bodyById('moon');
+    if (!earth || !moon) return 10;
+    const r = vecLen(moon.x - earth.x, moon.y - earth.y);
+    return 2 * Math.PI * Math.sqrt((r * r * r) / (G * earth.mass));
+  }
+
   function tick(now) {
     const realDt = Math.min(0.1, (now - lastTime) / 1000);
     lastTime = now;
@@ -1623,7 +1900,8 @@
 
     if (running) {
       const totalDt = BASE_DT * timeScale;
-      const substeps = clamp(Math.round(timeScale * 4), 1, 40);
+      const targetSubDt = fastestOrbitalPeriod() / 200; // aim for ~200 integration steps per fastest orbit
+      const substeps = clamp(Math.ceil(totalDt / targetSubDt), 1, 200);
       const subDt = totalDt / substeps;
       for (let i = 0; i < substeps; i++) updatePhysics(subDt);
 
