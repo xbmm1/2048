@@ -14,7 +14,7 @@
     user-select: none;
   }
   button { font-family: inherit; }
-  #sim { display: block; width: 100vw; height: 100vh; cursor: grab; }
+  #sim { display: block; width: 100vw; height: 100vh; cursor: grab; touch-action: none; }
   #sim.aiming { cursor: crosshair; }
   #sim.panning { cursor: grabbing; }
 
@@ -76,6 +76,16 @@
 
   .stat-line { display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 12px; color: #b7bfd4; }
   .stat-line b { color: #e8ecf5; font-weight: 600; }
+  .detail-help {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 17px; height: 17px; margin-left: 5px; padding: 0;
+    border: 1px solid #658ba5; border-radius: 50%;
+    background: rgba(111,211,255,0.08); color: #8fd3ff;
+    font-size: 11px; line-height: 1; cursor: pointer; vertical-align: middle;
+  }
+  .detail-help:hover, .detail-help:focus-visible { background: rgba(111,211,255,0.25); border-color: #8fd3ff; }
+  #rightPanel .stat-line { gap: 6px; }
+  #rightPanel .stat-line > b { text-align: right; }
   .empty { color: #7d879c; font-style: italic; font-size: 12px; }
 
   /* ---------------- Bottom bar ---------------- */
@@ -157,14 +167,27 @@
   .callout b { color: #8fd3ff; }
 
   #panelToggle { display: none; position: absolute; top: 52px; left: 8px; z-index: 25; }
+  #touchControls { display: none; position: absolute; top: 52px; right: 8px; z-index: 25; gap: 6px; }
+  #touchControls button { width: auto; min-width: 44px; min-height: 44px; }
 
   @media (max-width: 900px) {
     .side-panel { transform: translateX(-110%); }
     #rightPanel { transform: translateX(110%); }
-    .side-panel.open { transform: translateX(0); }
-    #panelToggle { display: block; }
+    .side-panel.open, #rightPanel.open { transform: translateX(0); }
+    .side-panel:not(.open) { display: none; }
+    #panelToggle { display: block; width: auto; min-height: 44px; }
+    #touchControls { display: flex; }
+    .side-panel { top: 106px; bottom: 150px; width: min(320px, 100vw); }
+    #minimap { top: 110px; right: 8px; width: 90px; height: 90px; z-index: 14; }
+    #topbar { overflow-x: auto; gap: 12px; }
+    #topbar > * { flex-shrink: 0; }
     #bottombar { height: 150px; }
     #scalePanel, #timeControls { width: 40%; }
+  }
+  @media (max-width: 600px) {
+    #scalePanel { display: none; }
+    #timeControls { width: 48%; flex-shrink: 0; }
+    #logPanel { min-width: 0; padding: 8px; }
   }
 </style>
 </head>
@@ -187,6 +210,11 @@
 </header>
 
 <button id="panelToggle" class="btn" type="button">☰ Panels</button>
+<div id="touchControls">
+  <button id="inspectorToggle" class="btn" type="button">Inspector</button>
+  <button id="zoomOutBtn" class="btn" type="button" aria-label="Zoom out">−</button>
+  <button id="zoomInBtn" class="btn" type="button" aria-label="Zoom in">+</button>
+</div>
 
 <aside class="side-panel" id="leftPanel">
   <div class="section">
@@ -225,7 +253,7 @@
     <button class="btn" id="toggleLaunchModeBtn" type="button">Enable Launch Mode</button>
     <button class="btn accent" id="launchBtn" type="button">LAUNCH PROBE</button>
     <button class="btn" id="clearProbesBtn" type="button">Clear Probes</button>
-    <div class="hint">Toggle Launch Mode, then click-drag away from the origin body to aim visually — direction &amp; velocity update live. Or just set the sliders and press LAUNCH PROBE directly.</div>
+    <div class="hint">Toggle Launch Mode, then drag with a mouse, finger, or pen from the origin body to aim. Release to launch. The dotted path predicts an unpowered flight from the current state. Or set the sliders and press LAUNCH PROBE.</div>
   </div>
 
   <div class="section">
@@ -274,6 +302,7 @@
     <button class="btn" id="exportBtn" type="button">Export Scenario</button>
     <button class="btn" id="importBtn" type="button">Import Scenario</button>
     <input id="importFile" type="file" accept="application/json" style="display:none" />
+    <div class="hint">Snapshots restore bodies, probes, time, missions, and camera. Imports require the version 2 format; older exports did not save planet positions.</div>
   </div>
 </aside>
 
@@ -300,7 +329,7 @@
   </div>
 
   <div class="section" id="burnSection" style="display:none;">
-    <h3>Maneuver / Burn</h3>
+    <h3>Maneuver / Burn <button class="detail-help" type="button" data-learn="edu-burns" title="More Details" aria-label="More Details: Maneuver / Burn">?</button></h3>
     <div class="row"><label for="dvRange">&Delta;v</label><input id="dvRange" type="range" min="0" max="10" step="0.1" value="2" /><input id="dvNum" type="number" min="0" max="10" step="0.1" value="2" /></div>
     <div class="btn-grid">
       <button class="btn" data-burn="prograde" type="button">+ Prograde</button>
@@ -309,7 +338,7 @@
       <button class="btn" data-burn="radialIn" type="button">+ Radial In</button>
     </div>
     <button class="btn accent" id="circularizeBtn" type="button">Circularize Orbit</button>
-    <div class="hint">Auto-applies small prograde/retrograde nudges every tick until eccentricity relative to the dominant body drops below 0.03, or fuel runs out.</div>
+    <div class="hint">Auto-applies small prograde/retrograde nudges every tick until eccentricity relative to the dominant body drops below 0.03, or fuel runs out. <button class="detail-help" type="button" data-learn="edu-circularize" title="More Details" aria-label="More Details: Circularize Orbit">?</button></div>
   </div>
 </aside>
 
@@ -351,7 +380,7 @@
   </div>
 </footer>
 
-<div class="modal hidden" id="eduOverlay">
+<div class="modal hidden" id="eduOverlay" role="dialog" aria-modal="true" aria-label="Orbital Mechanics Field Guide">
   <div class="modal-card">
     <div class="modal-header">
       <h2>Orbital Mechanics — Field Guide</h2>
@@ -558,6 +587,7 @@
     <p><kbd>V</kbd> Velocity vectors &nbsp; <kbd>P</kbd> Toggle prediction &nbsp; <kbd>+</kbd> / <kbd>-</kbd> Simulation speed</p>
     <p><kbd>W A S D</kbd> or Arrow keys — Pan camera &nbsp; <kbd>Esc</kbd> Close this panel / cancel launch mode</p>
     <p>Mouse: drag empty space to pan, scroll to zoom toward cursor, click a body/probe to select it, double-click to follow it.</p>
+    <p>Touch or pen: drag to pan, tap an object to select it, and drag from the launch origin in Launch Mode to aim and release to launch. On small screens, use the +/− buttons to zoom and Panels/Inspector to switch controls.</p>
   </div>
 </div>
 
@@ -595,7 +625,9 @@
   // =====================================================================
   const G = 50;                     // scaled gravitational constant
   const SOFTENING = 6 * 6;          // Plummer softening, avoids singularities on close flybys
-  const BASE_DT = 0.025;             // physics timestep at 1x speed (scaled seconds)
+  const BASE_DT = 0.025;            // simulation seconds per fixed physics tick at 1x
+  const REAL_STEP = 1 / 60;         // preserve the original 60 FPS simulation pace
+  const MAX_FRAME_DT = 0.1;         // cap catch-up work after a long frame
   const MAX_PROBES = 8;
   const MAX_BODY_TRAIL = 500;
   const MAX_PROBE_TRAIL = 900;
@@ -660,9 +692,9 @@
   // Returns the net gravitational acceleration at (px,py) from every body
   // except `exclude`. Softening (SOFTENING added to r^2) keeps the force
   // finite even if a probe's predicted path passes through a body center.
-  function calculateGravity(px, py, exclude) {
+  function calculateGravity(px, py, exclude, sourceBodies = bodies) {
     let ax = 0, ay = 0;
-    for (const b of bodies) {
+    for (const b of sourceBodies) {
       if (b === exclude) continue;
       const dx = b.x - px, dy = b.y - py;
       const distSq = dx * dx + dy * dy + SOFTENING;
@@ -698,28 +730,29 @@
   //   3) acceleration at the new positions
   //   4) velocity update using the average of old & new acceleration
   // =====================================================================
-  function velocityVerletStep(dt) {
-    const acc0 = bodies.map((b) => calculateGravity(b.x, b.y, b));
-    bodies.forEach((b, i) => {
+  function velocityVerletStep(dt, sourceBodies = bodies, sourceProbes = probes) {
+    // Probes feel the bodies' gravity without perturbing them. Sample all
+    // initial accelerations before moving any body to the next time level.
+    const liveProbes = sourceProbes.filter((p) => !p.crashed);
+    const acc0 = sourceBodies.map((b) => calculateGravity(b.x, b.y, b, sourceBodies));
+    const pAcc0 = liveProbes.map((p) => calculateGravity(p.x, p.y, null, sourceBodies));
+    sourceBodies.forEach((b, i) => {
       b.x += b.vx * dt + 0.5 * acc0[i].ax * dt * dt;
       b.y += b.vy * dt + 0.5 * acc0[i].ay * dt * dt;
     });
-    const acc1 = bodies.map((b) => calculateGravity(b.x, b.y, b));
-    bodies.forEach((b, i) => {
+    const acc1 = sourceBodies.map((b) => calculateGravity(b.x, b.y, b, sourceBodies));
+    sourceBodies.forEach((b, i) => {
       b.vx += 0.5 * (acc0[i].ax + acc1[i].ax) * dt;
       b.vy += 0.5 * (acc0[i].ay + acc1[i].ay) * dt;
     });
 
-    // Probes are treated as massless test particles: they feel gravity
-    // from every body but exert none themselves, so they never perturb
-    // the planets no matter how many are in flight.
-    const liveProbes = probes.filter((p) => !p.crashed);
-    const pAcc0 = liveProbes.map((p) => calculateGravity(p.x, p.y, null));
+    // Advance probes from the same initial time as the bodies, then sample
+    // final accelerations using both sets of positions at the new time.
     liveProbes.forEach((p, i) => {
       p.x += p.vx * dt + 0.5 * pAcc0[i].ax * dt * dt;
       p.y += p.vy * dt + 0.5 * pAcc0[i].ay * dt * dt;
     });
-    const pAcc1 = liveProbes.map((p) => calculateGravity(p.x, p.y, null));
+    const pAcc1 = liveProbes.map((p) => calculateGravity(p.x, p.y, null, sourceBodies));
     liveProbes.forEach((p, i) => {
       p.vx += 0.5 * (pAcc0[i].ax + pAcc1[i].ax) * dt;
       p.vy += 0.5 * (pAcc0[i].ay + pAcc1[i].ay) * dt;
@@ -812,7 +845,10 @@
       color: '#6fffe8',
     };
     probes.push(probe);
-    if (probes.length > MAX_PROBES) probes.shift();
+    if (probes.length > MAX_PROBES) {
+      const removed = probes.shift();
+      if (camera.followId === removed.id) camera.followId = null;
+    }
     logMessage(probe.name + ' launched from ' + origin.name + '.', 'info');
     selected = { type: 'probe', ref: probe };
     return probe;
@@ -820,9 +856,15 @@
 
   function applyBurn(probe, type, dv) {
     if (probe.fuel <= 0) { logMessage(probe.name + ' has no fuel remaining.', 'warning'); return; }
-    const speed = Math.max(vecLen(probe.vx, probe.vy), 0.0001);
-    const progradeX = probe.vx / speed, progradeY = probe.vy / speed;
     const dom = dominantBodyFor(probe.x, probe.y);
+    // Match the reference frame used by orbital telemetry and circularization.
+    const relVx = probe.vx - dom.vx, relVy = probe.vy - dom.vy;
+    const speed = vecLen(relVx, relVy);
+    if ((type === 'prograde' || type === 'retrograde') && speed < 0.0001) {
+      logMessage(probe.name + ': no prograde direction at zero relative speed. Use a radial burn first.', 'warning');
+      return;
+    }
+    const progradeX = relVx / Math.max(speed, 0.0001), progradeY = relVy / Math.max(speed, 0.0001);
     const rx = probe.x - dom.x, ry = probe.y - dom.y;
     const rlen = Math.max(vecLen(rx, ry), 0.0001);
     const radialOutX = rx / rlen, radialOutY = ry / rlen;
@@ -945,41 +987,26 @@
   // 9. TRAJECTORY PREDICTION — simulate a cloned copy of the system
   // forward without touching live state, for the launch-aim preview.
   // =====================================================================
+  function integrationSubsteps(totalDt, sourceBodies = bodies) {
+    return clamp(Math.ceil(totalDt / (fastestOrbitalPeriod(sourceBodies) / 200)), 1, 200);
+  }
+
   function predictTrajectory(startX, startY, vx, vy, steps) {
-    const clone = bodies.map((b) => ({ x: b.x, y: b.y, vx: b.vx, vy: b.vy, mass: b.mass }));
-    let px = startX, py = startY, pvx = vx, pvy = vy;
+    const clone = bodies.map((b) => ({ ...b, trail: [] }));
+    const probe = { x: startX, y: startY, vx, vy, missionTime: 0, crashed: false };
     const path = [];
-    const dt = BASE_DT;
-    const cap = Math.min(steps, 6000); // hard cap regardless of caller, protects performance
-    for (let s = 0; s < cap; s++) {
-      const accs = clone.map((b) => {
-        let ax = 0, ay = 0;
-        for (const o of clone) {
-          if (o === b) continue;
-          const dx = o.x - b.x, dy = o.y - b.y;
-          const distSq = dx * dx + dy * dy + SOFTENING;
-          const dist = Math.sqrt(distSq);
-          const f = (G * o.mass) / (distSq * dist);
-          ax += f * dx; ay += f * dy;
+    // Each sample covers one live physics tick, including its adaptive substeps.
+    const totalDt = BASE_DT * timeScale;
+    for (let s = 0; s < Math.min(steps, 6000); s++) {
+      const substeps = integrationSubsteps(totalDt, clone);
+      for (let i = 0; i < substeps; i++) {
+        velocityVerletStep(totalDt / substeps, clone, [probe]);
+        if (clone.some((b) => vecLen(b.x - probe.x, b.y - probe.y) < b.radius + 3)) {
+          path.push({ x: probe.x, y: probe.y });
+          return path;
         }
-        return { ax, ay };
-      });
-      clone.forEach((b, i) => { b.vx += accs[i].ax * dt; b.vy += accs[i].ay * dt; });
-      clone.forEach((b) => { b.x += b.vx * dt; b.y += b.vy * dt; });
-
-      let ax = 0, ay = 0;
-      for (const b of clone) {
-        const dx = b.x - px, dy = b.y - py;
-        const distSq = dx * dx + dy * dy + SOFTENING;
-        const dist = Math.sqrt(distSq);
-        const f = (G * b.mass) / (distSq * dist);
-        ax += f * dx; ay += f * dy;
       }
-      pvx += ax * dt; pvy += ay * dt;
-      px += pvx * dt; py += pvy * dt;
-      path.push({ x: px, y: py });
-
-      for (const b of clone) { if (vecLen(b.x - px, b.y - py) < 10) return path; }
+      path.push({ x: probe.x, y: probe.y });
     }
     return path;
   }
@@ -1104,7 +1131,7 @@
 
   function resize() {
     DPR = Math.min(window.devicePixelRatio || 1, 2);
-    W = window.innerWidth; H = window.innerHeight;
+    W = document.documentElement.clientWidth; H = document.documentElement.clientHeight;
     canvas.width = W * DPR; canvas.height = H * DPR;
     canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
@@ -1129,11 +1156,34 @@
   let isAiming = false, isPanning = false;
   let aimStartWorld = { x: 0, y: 0 }, aimCurrentWorld = { x: 0, y: 0 };
   let previewPath = [];
+  let lastPreviewTime = -Infinity;
+  function refreshPreview(now) {
+    if (!isAiming || !predictOn) { previewPath = []; return; }
+    if (now - lastPreviewTime < 100) return;
+    lastPreviewTime = now;
+    const origin = bodyById(launchOrigin);
+    const dirX = Math.cos(degToRad(launchDir)), dirY = Math.sin(degToRad(launchDir));
+    previewPath = predictTrajectory(
+      origin.x + dirX * (origin.radius + launchAlt), origin.y + dirY * (origin.radius + launchAlt),
+      origin.vx + dirX * launchVel, origin.vy + dirY * launchVel, predictSteps);
+  }
   let panStartScreen = { x: 0, y: 0 }, panStartCamera = { x: 0, y: 0 };
   let mouseDownEntity = null, mouseDownScreen = { x: 0, y: 0 };
   let lastMouseScreen = { x: 0, y: 0 };
 
-  canvas.addEventListener('mousedown', (e) => {
+  let activePointer = null;
+  function cancelGesture() {
+    isAiming = false; isPanning = false; activePointer = null;
+    previewPath = []; mouseDownEntity = null;
+    canvas.classList.remove('aiming', 'panning');
+  }
+  canvas.addEventListener('pointercancel', cancelGesture);
+  canvas.addEventListener('lostpointercapture', cancelGesture);
+  canvas.addEventListener('pointerdown', (e) => {
+    if (activePointer !== null || !e.isPrimary || e.button !== 0) return;
+    activePointer = e.pointerId;
+    canvas.setPointerCapture(e.pointerId);
+    lastMouseScreen = { x: e.clientX, y: e.clientY };
     const world = screenToWorld(e.clientX, e.clientY);
     mouseDownScreen = { x: e.clientX, y: e.clientY };
     mouseDownEntity = pickEntityAt(world.x, world.y);
@@ -1155,7 +1205,8 @@
     canvas.classList.add('panning');
   });
 
-  window.addEventListener('mousemove', (e) => {
+  window.addEventListener('pointermove', (e) => {
+    if (activePointer !== null && e.pointerId !== activePointer) return;
     lastMouseScreen = { x: e.clientX, y: e.clientY };
     if (isAiming) {
       const origin = bodyById(launchOrigin);
@@ -1165,12 +1216,6 @@
       launchDir = radToDeg(Math.atan2(dy, dx));
       launchVel = clamp(dragLen * 0.35, 1, 60);
       syncLaunchInputs();
-      if (predictOn) {
-        const dirX = dx / (dragLen || 1), dirY = dy / (dragLen || 1);
-        const lx = origin.x + dirX * (origin.radius + launchAlt);
-        const ly = origin.y + dirY * (origin.radius + launchAlt);
-        previewPath = predictTrajectory(lx, ly, origin.vx + dirX * launchVel, origin.vy + dirY * launchVel, predictSteps);
-      }
       return;
     }
     if (isPanning) {
@@ -1182,7 +1227,9 @@
     }
   });
 
-  window.addEventListener('mouseup', (e) => {
+  window.addEventListener('pointerup', (e) => {
+    if (e.pointerId !== activePointer) return;
+    activePointer = null;
     if (isAiming) {
       isAiming = false;
       canvas.classList.remove('aiming');
@@ -1229,7 +1276,7 @@
     else if (e.key === 'Escape') {
       const eduOpen = !el('eduOverlay').classList.contains('hidden');
       const helpOpen = !el('helpOverlay').classList.contains('hidden');
-      if (eduOpen) { el('eduOverlay').classList.add('hidden'); }
+      if (eduOpen) { closeLearning(); }
       else if (helpOpen) { el('helpOverlay').classList.add('hidden'); }
       else { launchMode = false; syncLaunchModeBtn(); }
     }
@@ -1268,7 +1315,13 @@
   function bindRangeNumber(rangeId, numId, onChange) {
     const r = el(rangeId), n = el(numId);
     r.addEventListener('input', () => { n.value = r.value; onChange(parseFloat(r.value)); });
-    n.addEventListener('input', () => { r.value = n.value; onChange(parseFloat(n.value)); });
+    n.addEventListener('input', () => {
+      const value = n.valueAsNumber;
+      if (!Number.isFinite(value)) return; // allow an empty field while editing
+      r.value = String(clamp(value, Number(r.min), Number(r.max)));
+      onChange(Number(r.value)); // use the range's normalized value, including step
+    });
+    n.addEventListener('change', () => { n.value = r.value; });
   }
   bindRangeNumber('dirRange', 'dirNum', (v) => (launchDir = v));
   bindRangeNumber('velRange', 'velNum', (v) => (launchVel = v));
@@ -1282,7 +1335,13 @@
     launchProbe(origin, launchDir, launchVel, launchAlt, launchMass);
   }
   el('launchBtn').addEventListener('click', doLaunch);
-  el('clearProbesBtn').addEventListener('click', () => { probes = []; logMessage('All probes cleared.', 'info'); });
+  el('clearProbesBtn').addEventListener('click', () => {
+    if (selected && selected.type === 'probe') selected = null;
+    if (probes.some((p) => p.id === camera.followId)) camera.followId = null;
+    probes = [];
+    updateTelemetry();
+    logMessage('All probes cleared.', 'info');
+  });
 
   function syncLaunchModeBtn() {
     el('toggleLaunchModeBtn').classList.toggle('active', launchMode);
@@ -1319,6 +1378,8 @@
 
   function togglePause() {
     running = !running;
+    realAccumulator = 0;
+    lastTime = performance.now();
     el('playPauseBtn').textContent = running ? 'Pause' : 'Resume';
     el('statStatus').textContent = running ? 'RUNNING' : 'PAUSED';
   }
@@ -1330,14 +1391,20 @@
   el('clearLogBtn').addEventListener('click', () => { messages = []; renderLog(); });
 
   el('eduBtn').addEventListener('click', () => el('eduOverlay').classList.remove('hidden'));
-  el('eduClose').addEventListener('click', () => el('eduOverlay').classList.add('hidden'));
+  el('eduClose').addEventListener('click', closeLearning);
   el('eduTop').addEventListener('click', () => el('eduOverlay').querySelector('.modal-card').scrollTo({ top: 0, behavior: 'smooth' }));
   el('helpBtn').addEventListener('click', () => el('helpOverlay').classList.remove('hidden'));
   el('helpClose').addEventListener('click', () => el('helpOverlay').classList.add('hidden'));
   el('panelToggle').addEventListener('click', () => {
     el('leftPanel').classList.toggle('open');
-    el('rightPanel').classList.toggle('open');
+    el('rightPanel').classList.remove('open');
   });
+  el('inspectorToggle').addEventListener('click', () => {
+    el('rightPanel').classList.toggle('open');
+    el('leftPanel').classList.remove('open');
+  });
+  el('zoomInBtn').addEventListener('click', () => { camera.zoom = clamp(camera.zoom * 1.2, 0.15, 8); });
+  el('zoomOutBtn').addEventListener('click', () => { camera.zoom = clamp(camera.zoom / 1.2, 0.15, 8); });
 
   el('followBtn').addEventListener('click', () => { if (selected) { camera.followId = selected.ref.id; logMessage('Following ' + (selected.ref.name || selected.ref.id) + '.', 'info'); } });
   el('stopFollowBtn').addEventListener('click', () => (camera.followId = null));
@@ -1357,60 +1424,140 @@
   }
   el('rebuildBtn').addEventListener('click', () => {
     const custom = JSON.parse(JSON.stringify(activeConfig));
-    custom.sun.mass = parseFloat(el('cfgSunMass').value) || custom.sun.mass;
-    custom.earth.mass = parseFloat(el('cfgEarthMass').value) || custom.earth.mass;
-    custom.earth.orbitalRadius = parseFloat(el('cfgEarthR').value) || custom.earth.orbitalRadius;
-    custom.mars.orbitalRadius = parseFloat(el('cfgMarsR').value) || custom.mars.orbitalRadius;
-    custom.moon.orbitalRadius = parseFloat(el('cfgMoonR').value) || custom.moon.orbitalRadius;
-    custom.velocityMultiplier = parseFloat(el('cfgVelMult').value) || 1;
+    const fields = [
+      ['cfgSunMass', custom.sun, 'mass'], ['cfgEarthMass', custom.earth, 'mass'],
+      ['cfgEarthR', custom.earth, 'orbitalRadius'], ['cfgMarsR', custom.mars, 'orbitalRadius'],
+      ['cfgMoonR', custom.moon, 'orbitalRadius'], ['cfgVelMult', custom, 'velocityMultiplier'],
+    ];
+    for (const [id, target, key] of fields) {
+      const value = el(id).valueAsNumber;
+      if (!Number.isFinite(value) || value < 0.000001 || value > 1000000) {
+        logMessage('Rebuild cancelled: enter positive finite values (at most 1,000,000).', 'warning');
+        el(id).focus();
+        return;
+      }
+      target[key] = value;
+    }
     activeConfig = custom;
     initSystem(custom);
     logMessage('Custom system rebuilt — experiment with unstable orbits!', 'info');
   });
 
-  el('exportBtn').addEventListener('click', () => {
-    const data = {
-      config: activeConfig, timeScale, camera: { x: camera.x, y: camera.y, zoom: camera.zoom },
-      probes: probes.map((p) => ({ x: p.x, y: p.y, vx: p.vx, vy: p.vy, mass: p.mass, fuel: p.fuel, name: p.name })),
+  function scenarioSnapshot() {
+    return JSON.parse(JSON.stringify({
+      version: 2, config: activeConfig, bodies, probes, simulationTime, timeScale,
+      running, frameCount, idCounter, probeNameIndex, activeMission, camera, realAccumulator,
+      selectedId: selected ? selected.ref.id : null,
+      launch: { origin: launchOrigin, direction: launchDir, velocity: launchVel, altitude: launchAlt, mass: launchMass },
+    }));
+  }
+
+  function validateScenario(data) {
+    const fail = () => { throw new Error('Invalid scenario data'); };
+    const num = (v, min = -1e12, max = 1e12) => {
+      if (typeof v !== 'number' || !Number.isFinite(v) || v < min || v > max) fail();
     };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const text = (v) => { if (typeof v !== 'string' || v.length > 120) fail(); };
+    const bool = (v) => { if (typeof v !== 'boolean') fail(); };
+    if (!data || data.version !== 2) throw new Error('This file is not a version 2 snapshot. Older exports lack planet positions and cannot restore an exact state.');
+    const cfg = data.config;
+    if (!cfg) fail();
+    for (const id of ['sun', 'earth', 'moon', 'mars']) {
+      const b = cfg[id]; if (!b) fail();
+      num(b.mass, 0.000001, 1000000); num(b.radius, 0.000001, 1000000);
+      if (id !== 'sun') { num(b.orbitalRadius, 0.000001, 1000000); num(b.orbitalAngle); }
+    }
+    num(cfg.velocityMultiplier, 0.000001, 1000000);
+    if (!Array.isArray(data.bodies) || data.bodies.length !== 4 || !Array.isArray(data.probes) || data.probes.length > MAX_PROBES) fail();
+    const ids = new Set();
+    const entity = (e, limit) => {
+      if (!e) fail(); text(e.id); text(e.name);
+      if (!e.id || ids.has(e.id)) fail(); ids.add(e.id);
+      for (const key of ['x', 'y', 'vx', 'vy']) num(e[key]);
+      num(e.mass, 0.000001, 1000000);
+      if (typeof e.color !== 'string' || !/^#[0-9a-f]{6}$/i.test(e.color)) fail();
+      if (!Array.isArray(e.trail) || e.trail.length > limit) fail();
+      for (const point of e.trail) { if (!point) fail(); num(point.x); num(point.y); }
+    };
+    data.bodies.forEach((b, i) => {
+      entity(b, MAX_BODY_TRAIL);
+      if (b.id !== ['sun', 'earth', 'moon', 'mars'][i]) fail();
+      num(b.radius, 0.000001, 1000000);
+    });
+    data.probes.forEach((p) => {
+      entity(p, MAX_PROBE_TRAIL);
+      num(p.ax); num(p.ay); num(p.fuel, 0, 100); num(p.missionTime, 0);
+      bool(p.crashed); bool(p.escaped); bool(p.circularizing);
+      if (!p.encounters || typeof p.encounters !== 'object' || Array.isArray(p.encounters)) fail();
+      for (const [id, encounter] of Object.entries(p.encounters)) {
+        if (!['earth', 'moon', 'mars'].includes(id) || !encounter) fail();
+        num(encounter.entrySpeed, 0); num(encounter.closest, 0); text(encounter.bodyName);
+      }
+      if (p.lastEncounter !== null) {
+        const e = p.lastEncounter; if (!e) fail();
+        text(e.body); num(e.closest, 0); num(e.incoming, 0); num(e.outgoing, 0); num(e.delta);
+      }
+    });
+    num(data.simulationTime, 0); bool(data.running);
+    num(data.realAccumulator, 0, REAL_STEP);
+    if (![0.25, 0.5, 1, 2, 5, 10, 25, 50].includes(data.timeScale)) fail();
+    for (const key of ['frameCount', 'idCounter', 'probeNameIndex']) {
+      num(data[key], 0, Number.MAX_SAFE_INTEGER); if (!Number.isInteger(data[key])) fail();
+    }
+    if (!data.activeMission || !Object.hasOwn(MISSIONS, data.activeMission.id)) fail();
+    if (data.activeMission.completed !== undefined) bool(data.activeMission.completed);
+    if (!data.camera) fail();
+    num(data.camera.x); num(data.camera.y); num(data.camera.zoom, 0.15, 8);
+    for (const id of [data.selectedId, data.camera.followId]) { if (id !== null && !ids.has(id)) fail(); }
+    const launch = data.launch; if (!launch || !['earth', 'moon', 'mars'].includes(launch.origin)) fail();
+    num(launch.direction, 0, 360); num(launch.velocity, 1, 60); num(launch.altitude, 0, 40); num(launch.mass, 0.5, 10);
+    return data;
+  }
+
+  function restoreScenario(data) {
+    validateScenario(data); // all validation finishes before any live state changes
+    activeConfig = data.config;
+    bodies = data.bodies; probes = data.probes;
+    simulationTime = data.simulationTime; timeScale = data.timeScale; running = data.running;
+    frameCount = data.frameCount; idCounter = data.idCounter; probeNameIndex = data.probeNameIndex;
+    // Keep the next generated ID unique even for a hand-edited valid snapshot.
+    for (const p of probes) { const match = /^probe-(\d+)$/.exec(p.id); if (match) idCounter = Math.max(idCounter, Number(match[1])); }
+    activeMission = { id: data.activeMission.id, label: MISSIONS[data.activeMission.id].label, completed: !!data.activeMission.completed };
+    camera.x = data.camera.x; camera.y = data.camera.y; camera.zoom = data.camera.zoom; camera.followId = data.camera.followId;
+    const ref = findEntityById(data.selectedId);
+    selected = ref ? { type: bodies.includes(ref) ? 'body' : 'probe', ref } : null;
+    launchOrigin = data.launch.origin; launchDir = data.launch.direction; launchVel = data.launch.velocity;
+    launchAlt = data.launch.altitude; launchMass = data.launch.mass;
+    messages = []; renderLog(); cancelGesture(); hohmannPreview = null;
+    el('hohmannInfo').textContent = '';
+    realAccumulator = data.realAccumulator; lastTime = performance.now();
+    syncConfigInputs(); syncLaunchInputs();
+    el('speedSel').value = String(timeScale);
+    el('statMission').textContent = activeMission.label.toUpperCase();
+    el('playPauseBtn').textContent = running ? 'Pause' : 'Resume';
+    el('statStatus').textContent = running ? 'RUNNING' : 'PAUSED';
+    el('simplifiedBtn').classList.toggle('active', JSON.stringify(activeConfig) === JSON.stringify(CONFIG_SIMPLIFIED));
+    el('realisticBtn').classList.toggle('active', JSON.stringify(activeConfig) === JSON.stringify(CONFIG_REALISTIC));
+    updateTelemetry(); updateTopbar(fpsSmoothed);
+  }
+
+  el('exportBtn').addEventListener('click', () => {
+    const blob = new Blob([JSON.stringify(scenarioSnapshot(), null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'orbital-scenario.json';
-    a.click();
-    URL.revokeObjectURL(a.href);
-    logMessage('Scenario exported.', 'info');
+    a.href = URL.createObjectURL(blob); a.download = 'orbital-scenario.json'; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    logMessage('Scenario snapshot exported.', 'info');
   });
   el('importBtn').addEventListener('click', () => el('importFile').click());
-  el('importFile').addEventListener('change', (e) => {
+  el('importFile').addEventListener('change', async (e) => {
     const file = e.target.files && e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      try {
-        const data = JSON.parse(String(reader.result));
-        if (!data || !data.config) throw new Error('Invalid scenario file');
-        activeConfig = data.config;
-        initSystem(activeConfig);
-        if (typeof data.timeScale === 'number') { timeScale = data.timeScale; el('speedSel').value = String(timeScale); }
-        if (data.camera) { camera.x = data.camera.x || 0; camera.y = data.camera.y || 0; camera.zoom = data.camera.zoom || 1; }
-        if (Array.isArray(data.probes)) {
-          data.probes.forEach((pd) => {
-            probes.push({
-              id: nextId('probe-'), name: pd.name || nextProbeName(),
-              x: pd.x, y: pd.y, vx: pd.vx, vy: pd.vy, ax: 0, ay: 0,
-              mass: pd.mass || 1, fuel: pd.fuel != null ? pd.fuel : 100,
-              trail: [], missionTime: 0, crashed: false, escaped: false, encounters: {}, lastEncounter: null, circularizing: false, color: '#6fffe8',
-            });
-          });
-        }
-        logMessage('Scenario imported.', 'info');
-      } catch (err) {
-        logMessage('Failed to import scenario: ' + err.message, 'warning');
-      }
-    };
-    reader.readAsText(file);
     e.target.value = '';
+    if (!file) return;
+    try {
+      if (file.size > 5000000) throw new Error('Scenario file exceeds 5 MB.');
+      restoreScenario(JSON.parse(await file.text()));
+      logMessage('Scenario snapshot restored.', 'info');
+    } catch (err) { logMessage('Failed to import scenario: ' + err.message, 'warning'); }
   });
 
   el('hohmannBtn').addEventListener('click', () => {
@@ -1493,7 +1640,15 @@
     renderLog();
   }
   function renderLog() {
-    el('logBody').innerHTML = messages.map((m) => '<div class="log-entry ' + m.type + '">' + m.text + '</div>').join('');
+    el('logBody').replaceChildren(...messages.map((m) => {
+      const row = document.createElement('div');
+      row.className = 'log-entry ' + m.type; row.textContent = m.text;
+      return row;
+    }));
+  }
+
+  function escapeHtml(value) {
+    return String(value).replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
   }
 
   function formatClock(t, short) {
@@ -1509,6 +1664,9 @@
   // 16. INITIALIZATION
   // =====================================================================
   function initSystem(config) {
+    cancelGesture();
+    realAccumulator = 0;
+    lastTime = performance.now();
     bodies = []; probes = []; messages = []; selected = null;
     camera.x = 0; camera.y = 0; camera.zoom = 1; camera.followId = null;
     simulationTime = 0; probeNameIndex = 0;
@@ -1556,6 +1714,7 @@
   function resetSimulation() { initSystem(activeConfig); }
   function selectEntity(e) {
     selected = { type: bodies.indexOf(e) !== -1 ? 'body' : 'probe', ref: e };
+    updateTelemetry();
   }
 
   // =====================================================================
@@ -1766,11 +1925,80 @@
     if (!hit) { tip.style.display = 'none'; return; }
     const speed = hit === bodies[0] ? vecLen(hit.vx, hit.vy) : vecLen(hit.vx - bodies[0].vx, hit.vy - bodies[0].vy);
     const dist = vecLen(hit.x - bodies[0].x, hit.y - bodies[0].y);
-    tip.innerHTML = '<b>' + (hit.name || 'Probe') + '</b><br/>Speed: ' + speed.toFixed(1) + '<br/>Distance from Sun: ' + dist.toFixed(0) + (hit.mass ? '<br/>Mass: ' + hit.mass : '');
+    tip.innerHTML = '<b>' + escapeHtml(hit.name || 'Probe') + '</b><br/>Speed: ' + speed.toFixed(1) + '<br/>Distance from Sun: ' + dist.toFixed(0) + (hit.mass ? '<br/>Mass: ' + hit.mass : '');
     tip.style.left = (lastMouseScreen.x + 16) + 'px';
     tip.style.top = (lastMouseScreen.y + 12) + 'px';
     tip.style.display = 'block';
   }
+
+  const DETAIL_TOPICS = {
+    'Mass': 'edu-gravity', 'Radius': 'edu-scale', 'Position': 'edu-scale',
+    'Velocity': 'edu-burns', 'Speed': 'edu-orbit', 'Acceleration': 'edu-gravity',
+    'Distance from Sun': 'edu-scale', 'Orbital period': 'edu-kepler',
+    'Nearest body': 'edu-soi', 'Distance to it': 'edu-gravity', 'Relative speed': 'edu-burns',
+    'Circular velocity': 'edu-escape', 'Escape velocity': 'edu-escape',
+    'Fuel': 'edu-burns', 'Mission time': 'edu-scale', 'Trajectory': 'edu-classify',
+    'Primary': 'edu-elements', 'Semi-major axis': 'edu-elements', 'Eccentricity': 'edu-elements',
+    'Periapsis': 'edu-elements', 'Apoapsis': 'edu-elements', 'Period': 'edu-elements',
+    'Specific energy': 'edu-elements',
+  };
+
+  function renderDetailRows(container, html) {
+    const template = document.createElement('template');
+    template.innerHTML = html;
+    const incoming = Array.from(template.content.children);
+    const existing = Array.from(container.children);
+    // Keep labels and help buttons mounted so live values cannot interrupt
+    // hovering, clicking, or keyboard focus when telemetry refreshes.
+    const sameRows = existing.length === incoming.length && incoming.every((row, i) =>
+      existing[i].dataset.detailLabel === row.querySelector('span').textContent);
+    if (sameRows) {
+      incoming.forEach((row, i) => {
+        const next = row.querySelector('b'), current = existing[i].querySelector('b');
+        current.textContent = next.textContent;
+        current.style.cssText = next.style.cssText;
+      });
+      return;
+    }
+    for (const row of incoming) {
+      const label = row.querySelector('span'), name = label.textContent;
+      row.dataset.detailLabel = name;
+      const topic = container.id === 'encounterBody' ? 'edu-assist' : DETAIL_TOPICS[name];
+      if (!topic) continue; // names are identifiers, not a learning topic
+      const help = document.createElement('button');
+      help.type = 'button'; help.className = 'detail-help'; help.textContent = '?';
+      help.dataset.learn = topic; help.title = 'More Details';
+      help.setAttribute('aria-label', 'More Details: ' + name);
+      label.append(help);
+    }
+    container.replaceChildren(template.content);
+  }
+
+  let learningTrigger = null;
+  function openLearningSection(id, trigger) {
+    const section = document.getElementById(id);
+    if (!section || !el('eduOverlay').contains(section)) return;
+    learningTrigger = trigger;
+    el('eduOverlay').classList.remove('hidden');
+    const card = el('eduOverlay').querySelector('.modal-card');
+    const header = card.querySelector('.modal-header');
+    // Account for the sticky header even when the guide was already scrolled.
+    card.scrollTop += section.getBoundingClientRect().top - header.getBoundingClientRect().bottom - 12;
+    const heading = section.querySelector('h4');
+    heading.tabIndex = -1;
+    heading.focus({ preventScroll: true });
+  }
+
+  function closeLearning() {
+    el('eduOverlay').classList.add('hidden');
+    if (learningTrigger && learningTrigger.isConnected) learningTrigger.focus({ preventScroll: true });
+    learningTrigger = null;
+  }
+
+  el('rightPanel').addEventListener('click', (event) => {
+    const help = event.target.closest('button[data-learn]');
+    if (help) openLearningSection(help.dataset.learn, help);
+  });
 
   function updateTelemetry() {
     const body = el('selectionBody');
@@ -1801,15 +2029,15 @@
         const elements = orbitalElements(relX, relY, relVx, relVy, primary.mass);
         if (elements.period) periodStr = elements.period.toFixed(1) + 's';
       }
-      body.innerHTML =
-        '<div class="stat-line"><span>Name</span><b>' + ref.name + '</b></div>' +
+      renderDetailRows(body,
+        '<div class="stat-line"><span>Name</span><b>' + escapeHtml(ref.name) + '</b></div>' +
         '<div class="stat-line"><span>Mass</span><b>' + ref.mass + '</b></div>' +
         '<div class="stat-line"><span>Radius</span><b>' + ref.radius + '</b></div>' +
         '<div class="stat-line"><span>Position</span><b>' + ref.x.toFixed(0) + ', ' + ref.y.toFixed(0) + '</b></div>' +
         '<div class="stat-line"><span>Velocity</span><b>' + ref.vx.toFixed(2) + ', ' + ref.vy.toFixed(2) + '</b></div>' +
         '<div class="stat-line"><span>Speed</span><b>' + speed.toFixed(2) + '</b></div>' +
         '<div class="stat-line"><span>Distance from Sun</span><b>' + distSun.toFixed(0) + '</b></div>' +
-        '<div class="stat-line"><span>Orbital period</span><b>' + periodStr + '</b></div>';
+        '<div class="stat-line"><span>Orbital period</span><b>' + periodStr + '</b></div>');
       elemSection.style.display = 'none';
     } else {
       const dom = dominantBodyFor(ref.x, ref.y);
@@ -1820,31 +2048,31 @@
       const vCirc = circularVelocity(dom.mass, vecLen(relX, relY));
       const vEsc = escapeVelocity(dom.mass, vecLen(relX, relY));
 
-      body.innerHTML =
-        '<div class="stat-line"><span>Name</span><b>' + ref.name + '</b></div>' +
+      renderDetailRows(body,
+        '<div class="stat-line"><span>Name</span><b>' + escapeHtml(ref.name) + '</b></div>' +
         '<div class="stat-line"><span>Position</span><b>' + ref.x.toFixed(0) + ', ' + ref.y.toFixed(0) + '</b></div>' +
         '<div class="stat-line"><span>Velocity</span><b>' + ref.vx.toFixed(2) + ', ' + ref.vy.toFixed(2) + '</b></div>' +
         '<div class="stat-line"><span>Speed</span><b>' + speed.toFixed(2) + '</b></div>' +
         '<div class="stat-line"><span>Acceleration</span><b>' + accel.toFixed(3) + '</b></div>' +
-        '<div class="stat-line"><span>Nearest body</span><b>' + dom.name + '</b></div>' +
+        '<div class="stat-line"><span>Nearest body</span><b>' + escapeHtml(dom.name) + '</b></div>' +
         '<div class="stat-line"><span>Distance to it</span><b>' + vecLen(relX, relY).toFixed(0) + '</b></div>' +
         '<div class="stat-line"><span>Relative speed</span><b>' + relSpeed.toFixed(2) + '</b></div>' +
         '<div class="stat-line"><span>Circular velocity</span><b>' + vCirc.toFixed(2) + '</b></div>' +
         '<div class="stat-line"><span>Escape velocity</span><b>' + vEsc.toFixed(2) + '</b></div>' +
         '<div class="stat-line"><span>Fuel</span><b>' + ref.fuel.toFixed(0) + '</b></div>' +
         '<div class="stat-line"><span>Mission time</span><b>' + ref.missionTime.toFixed(1) + 's</b></div>' +
-        '<div class="stat-line"><span>Trajectory</span><b style="color:' + (speed >= vEsc ? '#6fffb0' : '#e8ecf5') + '">' + classification + '</b></div>';
+        '<div class="stat-line"><span>Trajectory</span><b style="color:' + (speed >= vEsc ? '#6fffb0' : '#e8ecf5') + '">' + classification + '</b></div>');
 
       const elements = orbitalElements(relX, relY, relVx, relVy, dom.mass);
       elemSection.style.display = 'block';
-      elemBody.innerHTML =
-        '<div class="stat-line"><span>Primary</span><b>' + dom.name + '</b></div>' +
+      renderDetailRows(elemBody,
+        '<div class="stat-line"><span>Primary</span><b>' + escapeHtml(dom.name) + '</b></div>' +
         '<div class="stat-line"><span>Semi-major axis</span><b>' + (elements.a ? elements.a.toFixed(1) : '—') + '</b></div>' +
         '<div class="stat-line"><span>Eccentricity</span><b>' + elements.e.toFixed(3) + '</b></div>' +
         '<div class="stat-line"><span>Periapsis</span><b>' + (elements.periapsis != null ? elements.periapsis.toFixed(1) : '—') + '</b></div>' +
         '<div class="stat-line"><span>Apoapsis</span><b>' + (elements.apoapsis != null ? elements.apoapsis.toFixed(1) : '—') + '</b></div>' +
         '<div class="stat-line"><span>Period</span><b>' + (elements.period ? elements.period.toFixed(1) + 's' : '—') + '</b></div>' +
-        '<div class="stat-line"><span>Specific energy</span><b>' + elements.specificEnergy.toFixed(2) + '</b></div>';
+        '<div class="stat-line"><span>Specific energy</span><b>' + elements.specificEnergy.toFixed(2) + '</b></div>');
 
       burnSection.style.display = 'block';
       el('circularizeBtn').classList.toggle('active', !!ref.circularizing);
@@ -1852,12 +2080,12 @@
       if (ref.lastEncounter) {
         encSection.style.display = 'block';
         const le = ref.lastEncounter;
-        encBody.innerHTML =
-          '<div class="stat-line"><span>Body</span><b>' + le.body + '</b></div>' +
+        renderDetailRows(encBody,
+          '<div class="stat-line"><span>Body</span><b>' + escapeHtml(le.body) + '</b></div>' +
           '<div class="stat-line"><span>Closest approach</span><b>' + le.closest.toFixed(1) + '</b></div>' +
           '<div class="stat-line"><span>Incoming speed</span><b>' + le.incoming.toFixed(2) + '</b></div>' +
           '<div class="stat-line"><span>Outgoing speed</span><b>' + le.outgoing.toFixed(2) + '</b></div>' +
-          '<div class="stat-line"><span>\u0394 velocity</span><b style="color:' + (le.delta > 0 ? '#6fffb0' : '#ff9a6f') + '">' + (le.delta > 0 ? '+' : '') + le.delta.toFixed(2) + '</b></div>';
+          '<div class="stat-line"><span>\u0394 velocity</span><b style="color:' + (le.delta > 0 ? '#6fffb0' : '#ff9a6f') + '">' + (le.delta > 0 ? '+' : '') + le.delta.toFixed(2) + '</b></div>');
       } else { encSection.style.display = 'none'; }
     }
   }
@@ -1867,14 +2095,21 @@
     el('statSimTime').textContent = clock;
     el('clockDisplay').textContent = clock;
     el('statFps').textContent = fps.toFixed(0);
-    el('scaleRate').textContent = ((BASE_DT * timeScale * 3600) / SECONDS_PER_DAY * 24).toFixed(1);
+    el('scaleRate').textContent = ((BASE_DT / REAL_STEP) * timeScale / SECONDS_PER_DAY * 24).toFixed(1);
   }
 
   // =====================================================================
   // 17. MAIN LOOP
   // =====================================================================
   let lastTime = performance.now();
+  let realAccumulator = 0;
   let fpsSmoothed = 60;
+  let lastTelemetryTime = -Infinity;
+
+  document.addEventListener('visibilitychange', () => {
+    realAccumulator = 0;
+    lastTime = performance.now();
+  });
 
   // The Moon orbiting Earth is the fastest-moving, shortest-period motion
   // in the system -- if the integrator's timestep is too large relative
@@ -1885,34 +2120,44 @@
   // so accuracy scales with what the system needs, not just the speed
   // slider -- this keeps orbits stable even at high timeScale or after a
   // "Rebuild System" with a closer/faster Moon.
-  function fastestOrbitalPeriod() {
-    const earth = bodyById('earth'), moon = bodyById('moon');
+  function fastestOrbitalPeriod(sourceBodies = bodies) {
+    const earth = sourceBodies.find((b) => b.id === 'earth'), moon = sourceBodies.find((b) => b.id === 'moon');
     if (!earth || !moon) return 10;
     const r = vecLen(moon.x - earth.x, moon.y - earth.y);
     return 2 * Math.PI * Math.sqrt((r * r * r) / (G * earth.mass));
   }
 
   function tick(now) {
-    const realDt = Math.min(0.1, (now - lastTime) / 1000);
+    const realDt = Math.max(0, (now - lastTime) / 1000);
     lastTime = now;
     const instFps = realDt > 0 ? 1 / realDt : 60;
     fpsSmoothed += (instFps - fpsSmoothed) * 0.08;
 
-    if (running) {
-      const totalDt = BASE_DT * timeScale;
-      const targetSubDt = fastestOrbitalPeriod() / 200; // aim for ~200 integration steps per fastest orbit
-      const substeps = clamp(Math.ceil(totalDt / targetSubDt), 1, 200);
-      const subDt = totalDt / substeps;
-      for (let i = 0; i < substeps; i++) updatePhysics(subDt);
+    if (running && !document.hidden) {
+      realAccumulator += Math.min(MAX_FRAME_DT, realDt);
+      // Render independently; physics and trail sampling use fixed real-time ticks.
+      while (realAccumulator + 1e-12 >= REAL_STEP) {
+        realAccumulator = Math.max(0, realAccumulator - REAL_STEP);
+        const totalDt = BASE_DT * timeScale;
+        const substeps = integrationSubsteps(totalDt);
+        const subDt = totalDt / substeps;
+        for (let i = 0; i < substeps; i++) updatePhysics(subDt);
 
-      frameCount++;
-      if (frameCount % 2 === 0) {
-        for (const b of bodies) { b.trail.push({ x: b.x, y: b.y }); if (b.trail.length > MAX_BODY_TRAIL) b.trail.shift(); }
-        for (const p of probes) { p.trail.push({ x: p.x, y: p.y }); if (p.trail.length > MAX_PROBE_TRAIL) p.trail.shift(); }
+        frameCount++;
+        if (frameCount % 2 === 0) {
+          for (const b of bodies) { b.trail.push({ x: b.x, y: b.y }); if (b.trail.length > MAX_BODY_TRAIL) b.trail.shift(); }
+          for (const p of probes) { p.trail.push({ x: p.x, y: p.y }); if (p.trail.length > MAX_PROBE_TRAIL) p.trail.shift(); }
+        }
       }
+    } else {
+      realAccumulator = 0;
     }
     updateCamera();
-    updateTelemetry();
+    refreshPreview(now);
+    if (now - lastTelemetryTime >= 100) {
+      updateTelemetry();
+      lastTelemetryTime = now;
+    }
     updateTooltip();
     updateTopbar(fpsSmoothed);
     draw();
