@@ -280,6 +280,7 @@
       <button class="btn" data-mission="solarEscape" type="button">Solar Escape</button>
     </div>
     <button class="btn" data-mission="freeSandbox" type="button">Free Sandbox</button>
+    <div class="hint">Realistic presets calculate launch conditions for the current system. Transfers aim for a close pass at the target's future position; they do not automatically brake into orbit. Manual launches still use your chosen speed.</div>
   </div>
 
   <div class="section">
@@ -369,11 +370,11 @@
   </div>
   <div id="scalePanel">
     <h3>Simulation Scale</h3>
-    <div class="stat-line"><span>Distance</span><b>1 unit ≈ 1.35M km</b></div>
+    <div class="stat-line"><span>Distance</span><b id="distanceScale">1 unit ≈ 1.35M km</b></div>
     <div class="stat-line"><span>Velocity</span><b>1 unit/s ≈ scaled</b></div>
     <div class="stat-line"><span>Mass</span><b>scaled (relative)</b></div>
     <div class="stat-line"><span>Time</span><b>scaled clock</b></div>
-    <p style="font-size:10.5px; color:#7d879c; margin-top:8px; line-height:1.5;">
+    <p id="scaleDescription" style="font-size:10.5px; color:#7d879c; margin-top:8px; line-height:1.5;">
       Planet radii are exaggerated for visibility. Orbital <i>relationships</i> (speed vs. distance, gravity assists,
       escape velocity) are physically real within this scale.
     </p>
@@ -598,11 +599,8 @@
   // =====================================================================
   // 1. CONFIGURATION
   // =====================================================================
-  // Two presets: SIMPLIFIED preserves the simulator's original tuned
-  // values; REALISTIC uses the same Sun/Earth baseline but scales Mars
-  // and the Moon toward their real relative mass/size ratios. Distances
-  // stay stylized in both (a literal-scale system would put Mars off
-  // screen and shrink the Moon to invisibility).
+  // Simplified keeps the original gameplay scale. Realistic uses smaller
+  // bodies and wider spacing for exploration, with educational scaled masses.
   const CONFIG_SIMPLIFIED = {
     sun: { mass: 2650, radius: 22 },
     earth: { orbitalRadius: 260, orbitalAngle: 0, mass: 135, radius: 11 },
@@ -611,10 +609,11 @@
     velocityMultiplier: 1,
   };
   const CONFIG_REALISTIC = {
+    scaleMode: 'realistic',
     sun: { mass: 2650, radius: 22 },
-    earth: { orbitalRadius: 260, orbitalAngle: 0, mass: 135, radius: 11 },
-    moon: { orbitalRadius: 28, orbitalAngle: 0.7, mass: 1.7, radius: 3.0 },
-    mars: { orbitalRadius: 396, orbitalAngle: 2.2, mass: 14.4, radius: 5.8 },
+    earth: { orbitalRadius: 2600, orbitalAngle: 0, mass: 135, radius: 1 },
+    moon: { orbitalRadius: 28, orbitalAngle: 0.7, mass: 1.7, radius: 0.27 },
+    mars: { orbitalRadius: 3960, orbitalAngle: 2.2, mass: 14.4, radius: 0.53 },
     velocityMultiplier: 1,
   };
 
@@ -623,6 +622,7 @@
   // =====================================================================
   // 2. GLOBAL SIMULATION STATE
   // =====================================================================
+  const MIN_ZOOM = 0.01, MAX_ZOOM = 64;
   const G = 50;                     // scaled gravitational constant
   const SOFTENING = 6 * 6;          // Plummer softening, avoids singularities on close flybys
   const BASE_DT = 0.025;            // simulation seconds per fixed physics tick at 1x
@@ -825,11 +825,11 @@
   // =====================================================================
   // 8. SPACECRAFT / PROBE SYSTEM
   // =====================================================================
-  function launchProbe(origin, directionDeg, speed, altitude, mass) {
+  function launchProbe(origin, directionDeg, speed, altitude, mass, positionDeg = directionDeg) {
     const rad = degToRad(directionDeg);
     const dirX = Math.cos(rad), dirY = Math.sin(rad);
-    const launchX = origin.x + dirX * (origin.radius + altitude);
-    const launchY = origin.y + dirY * (origin.radius + altitude);
+    const launchX = origin.x + Math.cos(degToRad(positionDeg)) * (origin.radius + altitude);
+    const launchY = origin.y + Math.sin(degToRad(positionDeg)) * (origin.radius + altitude);
 
     // The probe inherits the parent body's own velocity. Without this
     // term, launching from Earth (which is itself orbiting the Sun at
@@ -885,12 +885,17 @@
     return vecLen(p.vx - sun.vx, p.vy - sun.vy);
   }
 
+  function probeCollisionRadius() {
+    // Old snapshots without scaleMode retain their original collision size.
+    return activeConfig.scaleMode === 'realistic' ? 0.03 : 3;
+  }
+
   function checkCollisions() {
     for (const p of probes) {
       if (p.crashed) continue;
       for (const b of bodies) {
         const dist = vecLen(b.x - p.x, b.y - p.y);
-        if (dist < b.radius + 3) {
+        if (dist < b.radius + probeCollisionRadius()) {
           p.crashed = true;
           const impactSpeed = vecLen(p.vx - b.vx, p.vy - b.vy);
           logMessage('MISSION FAILURE — ' + p.name + ' impacted ' + b.name + '. Impact speed: ' + impactSpeed.toFixed(1) + '.', 'failure');
@@ -1001,7 +1006,7 @@
       const substeps = integrationSubsteps(totalDt, clone);
       for (let i = 0; i < substeps; i++) {
         velocityVerletStep(totalDt / substeps, clone, [probe]);
-        if (clone.some((b) => vecLen(b.x - probe.x, b.y - probe.y) < b.radius + 3)) {
+        if (clone.some((b) => vecLen(b.x - probe.x, b.y - probe.y) < b.radius + probeCollisionRadius())) {
           path.push({ x: probe.x, y: probe.y });
           return path;
         }
@@ -1077,13 +1082,107 @@
     freeSandbox: { label: 'Free Sandbox', setup() {}, check() { return false; } },
   };
 
+  // Presets solve launches against this simulation's softened gravity,
+  // rather than applying speeds tuned for the larger Simplified planets.
+  function planRealisticTransfer(target) {
+    const earth = bodyById('earth');
+    const distance = vecLen(target.x - earth.x, target.y - earth.y);
+    const flightTime = clamp(distance / (target.id === 'moon' ? 40 : 20), 0.5, 600);
+    const steps = Math.ceil(flightTime / BASE_DT), dt = flightTime / steps;
+    const clone = bodies.map((b) => ({ ...b, trail: [] }));
+    const frames = [clone.map((b) => ({ ...b }))];
+    for (let i = 0; i < steps; i++) {
+      velocityVerletStep(dt, clone, []);
+      frames.push(clone.map((b) => ({ ...b })));
+    }
+    const end = clone.find((b) => b.id === target.id);
+    // Aim off-center so reaching the encounter zone doesn't mean an impact.
+    const offset = target.radius + Math.max(1, sphereOfInfluence(target) * (target.id === 'moon' ? 0.7 : 0.3));
+    const heading = Math.atan2(end.y - earth.y, end.x - earth.x);
+    const goalX = end.x - Math.sin(heading) * offset;
+    const goalY = end.y + Math.cos(heading) * offset;
+    const positionAngle = Math.atan2(goalY - earth.y - earth.vy * flightTime, goalX - earth.x - earth.vx * flightTime);
+    const radius = earth.radius + 4;
+    const x = earth.x + Math.cos(positionAngle) * radius;
+    const y = earth.y + Math.sin(positionAngle) * radius;
+    const excessX = (goalX - x) / flightTime - earth.vx;
+    const excessY = (goalY - y) / flightTime - earth.vy;
+    const excess = vecLen(excessX, excessY);
+    const escapeSq = 2 * G * earth.mass / Math.sqrt(radius * radius + SOFTENING);
+    let vx = earth.vx + Math.cos(positionAngle) * Math.sqrt(excess * excess + escapeSq);
+    let vy = earth.vy + Math.sin(positionAngle) * Math.sqrt(excess * excess + escapeSq);
+    const propagate = (vx0, vy0) => {
+      let px = x, py = y, pvx = vx0, pvy = vy0, crashed = false;
+      for (let i = 0; i < steps; i++) {
+        const a0 = calculateGravity(px, py, null, frames[i]);
+        px += pvx * dt + 0.5 * a0.ax * dt * dt;
+        py += pvy * dt + 0.5 * a0.ay * dt * dt;
+        const a1 = calculateGravity(px, py, null, frames[i + 1]);
+        pvx += 0.5 * (a0.ax + a1.ax) * dt;
+        pvy += 0.5 * (a0.ay + a1.ay) * dt;
+        if (frames[i + 1].some((b) => vecLen(b.x - px, b.y - py) < b.radius + probeCollisionRadius())) crashed = true;
+      }
+      return { x: px, y: py, crashed };
+    };
+    for (let iteration = 0; iteration < 18; iteration++) {
+      const p = propagate(vx, vy), ex = goalX - p.x, ey = goalY - p.y;
+      if (vecLen(ex, ey) < 0.1 && !p.crashed) {
+        const speed = vecLen(vx - earth.vx, vy - earth.vy);
+        if (speed > 60) return null;
+        return { direction: radToDeg(Math.atan2(vy - earth.vy, vx - earth.vx)), speed, position: radToDeg(positionAngle) };
+      }
+      const epsilon = 0.02;
+      const u = propagate(vx + epsilon, vy), v = propagate(vx, vy + epsilon);
+      const a = (u.x - p.x) / epsilon, b = (v.x - p.x) / epsilon;
+      const c = (u.y - p.y) / epsilon, d = (v.y - p.y) / epsilon;
+      const det = a * d - b * c;
+      if (!Number.isFinite(det) || Math.abs(det) < 1e-9) return null;
+      let dx = (ex * d - b * ey) / det, dy = (a * ey - ex * c) / det;
+      const correction = vecLen(dx, dy);
+      if (correction > 8) { dx *= 8 / correction; dy *= 8 / correction; }
+      vx += dx; vy += dy;
+    }
+    return null;
+  }
+
+  function launchRealisticMission(id) {
+    const earth = bodyById('earth');
+    launchOrigin = 'earth';
+    let position = 0;
+    if (id === 'earthOrbit') {
+      const radius = Math.max(20, earth.radius + 4);
+      launchAlt = radius - earth.radius;
+      launchDir = 90;
+      launchVel = Math.sqrt(G * earth.mass * radius * radius / Math.pow(radius * radius + SOFTENING, 1.5));
+    } else if (id === 'solarEscape') {
+      launchAlt = 4;
+      launchDir = radToDeg(Math.atan2(earth.vy - bodies[0].vy, earth.vx - bodies[0].vx));
+      position = launchDir;
+      const radius = earth.radius + launchAlt;
+      const localEscapeSq = 2 * G * earth.mass / Math.sqrt(radius * radius + SOFTENING);
+      const solarEscape = escapeVelocity(bodies[0].mass, vecLen(earth.x - bodies[0].x, earth.y - bodies[0].y));
+      launchVel = Math.sqrt(localEscapeSq + solarEscape * solarEscape * 1.2);
+    } else {
+      const target = bodyById(id.startsWith('moon') ? 'moon' : 'mars');
+      const plan = planRealisticTransfer(target);
+      if (!plan) {
+        logMessage('No safe transfer found for the current geometry. Reset Realistic mode and try again.', 'warning');
+        return;
+      }
+      launchAlt = 4; launchDir = plan.direction; launchVel = plan.speed; position = plan.position;
+    }
+    syncLaunchInputs();
+    launchProbe(earth, launchDir, launchVel, launchAlt, launchMass, position);
+  }
+
   function setActiveMission(id) {
     const m = MISSIONS[id];
     if (!m) return;
     activeMission = { id, label: m.label, completed: false };
     document.getElementById('statMission').textContent = m.label.toUpperCase();
     logMessage('Mission set: ' + m.label + '.', 'info');
-    if (m.setup) m.setup();
+    if (activeConfig.scaleMode === 'realistic' && id !== 'freeSandbox') launchRealisticMission(id);
+    else if (m.setup) m.setup();
   }
 
   function checkMissionObjectives() {
@@ -1091,7 +1190,7 @@
     const m = MISSIONS[activeMission.id];
     if (!m || !probes.length) return;
     const probe = probes[probes.length - 1];
-    if (m.check(probe)) {
+    if (!probe.crashed && m.check(probe)) {
       activeMission.completed = true;
       logMessage(m.successMsg, 'success');
     }
@@ -1250,7 +1349,7 @@
     e.preventDefault();
     const before = screenToWorld(e.clientX, e.clientY);
     const factor = e.deltaY < 0 ? 1.12 : 0.89;
-    camera.zoom = clamp(camera.zoom * factor, 0.15, 8);
+    camera.zoom = clamp(camera.zoom * factor, MIN_ZOOM, MAX_ZOOM);
     const after = screenToWorld(e.clientX, e.clientY);
     camera.x += before.x - after.x;
     camera.y += before.y - after.y;
@@ -1403,8 +1502,8 @@
     el('rightPanel').classList.toggle('open');
     el('leftPanel').classList.remove('open');
   });
-  el('zoomInBtn').addEventListener('click', () => { camera.zoom = clamp(camera.zoom * 1.2, 0.15, 8); });
-  el('zoomOutBtn').addEventListener('click', () => { camera.zoom = clamp(camera.zoom / 1.2, 0.15, 8); });
+  el('zoomInBtn').addEventListener('click', () => { camera.zoom = clamp(camera.zoom * 1.2, MIN_ZOOM, MAX_ZOOM); });
+  el('zoomOutBtn').addEventListener('click', () => { camera.zoom = clamp(camera.zoom / 1.2, MIN_ZOOM, MAX_ZOOM); });
 
   el('followBtn').addEventListener('click', () => { if (selected) { camera.followId = selected.ref.id; logMessage('Following ' + (selected.ref.name || selected.ref.id) + '.', 'info'); } });
   el('stopFollowBtn').addEventListener('click', () => (camera.followId = null));
@@ -1462,6 +1561,7 @@
     if (!data || data.version !== 2) throw new Error('This file is not a version 2 snapshot. Older exports lack planet positions and cannot restore an exact state.');
     const cfg = data.config;
     if (!cfg) fail();
+    if (cfg.scaleMode !== undefined && cfg.scaleMode !== 'realistic') fail();
     for (const id of ['sun', 'earth', 'moon', 'mars']) {
       const b = cfg[id]; if (!b) fail();
       num(b.mass, 0.000001, 1000000); num(b.radius, 0.000001, 1000000);
@@ -1507,7 +1607,7 @@
     if (!data.activeMission || !Object.hasOwn(MISSIONS, data.activeMission.id)) fail();
     if (data.activeMission.completed !== undefined) bool(data.activeMission.completed);
     if (!data.camera) fail();
-    num(data.camera.x); num(data.camera.y); num(data.camera.zoom, 0.15, 8);
+    num(data.camera.x); num(data.camera.y); num(data.camera.zoom, MIN_ZOOM, MAX_ZOOM);
     for (const id of [data.selectedId, data.camera.followId]) { if (id !== null && !ids.has(id)) fail(); }
     const launch = data.launch; if (!launch || !['earth', 'moon', 'mars'].includes(launch.origin)) fail();
     num(launch.direction, 0, 360); num(launch.velocity, 1, 60); num(launch.altitude, 0, 40); num(launch.mass, 0.5, 10);
@@ -1538,6 +1638,7 @@
     el('statStatus').textContent = running ? 'RUNNING' : 'PAUSED';
     el('simplifiedBtn').classList.toggle('active', JSON.stringify(activeConfig) === JSON.stringify(CONFIG_SIMPLIFIED));
     el('realisticBtn').classList.toggle('active', JSON.stringify(activeConfig) === JSON.stringify(CONFIG_REALISTIC));
+    updateScaleDescription();
     updateTelemetry(); updateTopbar(fpsSmoothed);
   }
 
@@ -1704,11 +1805,23 @@
       vx: sun.vx - vMars * Math.sin(marsCfg.orbitalAngle), vy: sun.vy + vMars * Math.cos(marsCfg.orbitalAngle),
     });
     bodies.push(mars);
+    if (config.scaleMode === 'realistic') {
+      camera.x = earth.x; camera.y = earth.y; camera.zoom = 0.5;
+    }
+    updateScaleDescription();
 
     running = true;
     el('playPauseBtn').textContent = 'Pause';
     el('statStatus').textContent = 'RUNNING';
     hohmannPreview = null;
+  }
+
+  function updateScaleDescription() {
+    const realistic = activeConfig.scaleMode === 'realistic';
+    el('distanceScale').textContent = realistic ? 'Approximate proportions' : '1 unit ≈ 1.35M km';
+    el('scaleDescription').textContent = realistic
+      ? 'Smaller planets and wider spacing; masses and time remain educational approximations. Zoom out to locate Mars on the minimap, and zoom in near Earth to resolve the Moon. Tiny dots mark bodies too small to see at this zoom.'
+      : 'Planet radii are exaggerated for visibility. Orbital relationships (speed vs. distance, gravity assists, escape velocity) are physically real within this scale.';
   }
 
   function resetSimulation() { initSystem(activeConfig); }
@@ -1782,6 +1895,13 @@
     }
     ctx.fillStyle = 'rgba(255,255,255,0.85)';
     ctx.font = '11px Segoe UI, sans-serif'; ctx.textAlign = 'center';
+    if (activeConfig.scaleMode === 'realistic' && b.id === 'moon') {
+      const earth = bodyById('earth');
+      const e = worldToScreen(earth.x, earth.y);
+      const earthLabelY = e.y - Math.max(1.5, earth.radius * camera.zoom) - 8;
+      const halfWidths = (ctx.measureText(earth.name).width + ctx.measureText(b.name).width) / 2;
+      if (Math.abs(s.x - e.x) < halfWidths + 6 && Math.abs((s.y - r - 8) - earthLabelY) < 16) return;
+    }
     ctx.fillText(b.name, s.x, s.y - r - 8);
   }
 
