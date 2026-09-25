@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>0/1 Multiple Explorer</title>
+<style>
+  :root{
+    --bg:#07111f;
+    --panel:#0c1727;
+    --panel2:#111f33;
+    --text:#eef6ff;
+    --muted:#9fb1c7;
+    --line:rgba(255,255,255,.10);
+    --accent:#70e1f5;
+    --accent2:#8b7cff;
+    --good:#67e8a5;
+    --warn:#ffd166;
+    --bad:#ff7b8a;
+    --shadow:0 24px 70px rgba(0,0,0,.35);
+    --radius:22px;
+  }
+
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0;
+    min-height:100vh;
+    font-family:Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    color:var(--text);
+    background:
+      radial-gradient(circle at 15% 10%, rgba(112,225,245,.12), transparent 32rem),
+      radial-gradient(circle at 85% 5%, rgba(139,124,255,.14), transparent 30rem),
+      linear-gradient(180deg,#06101d,#08121f 55%,#050c15);
+  }
+
+  .wrap{width:min(1120px,92vw);margin:0 auto;padding:56px 0 80px}
+  .hero{padding:18px 0 28px}
+  .eyebrow{
+    display:inline-flex;gap:8px;align-items:center;
+    padding:8px 12px;border:1px solid var(--line);border-radius:999px;
+    color:var(--accent);background:rgba(112,225,245,.06);font-size:.84rem;font-weight:700;
+  }
+  h1{font-size:clamp(2.4rem,6vw,5.4rem);line-height:.95;letter-spacing:-.055em;margin:18px 0 18px;max-width:900px}
+  .grad{
+    background:linear-gradient(90deg,var(--accent),#b8f4ff 46%,#b8adff);
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+  }
+  .lead{max-width:800px;color:var(--muted);font-size:clamp(1rem,2vw,1.25rem);line-height:1.65}
+  .grid{display:grid;grid-template-columns:1.08fr .92fr;gap:22px;margin-top:30px}
+  .card{
+    background:linear-gradient(180deg,rgba(17,31,51,.92),rgba(10,21,36,.94));
+    border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);
+    padding:24px;backdrop-filter:blur(14px);
+  }
+  .card h2{margin:0 0 8px;font-size:1.25rem}
+  .sub{color:var(--muted);margin:0 0 20px;line-height:1.55}
+  label{display:block;font-size:.9rem;color:#c9d7e8;font-weight:700;margin:16px 0 8px}
+  input,select{
+    width:100%;padding:15px 16px;border-radius:14px;border:1px solid var(--line);
+    background:#081321;color:var(--text);font:inherit;outline:none;
+  }
+  input:focus,select:focus{border-color:rgba(112,225,245,.7);box-shadow:0 0 0 4px rgba(112,225,245,.08)}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  button{
+    border:0;border-radius:14px;padding:14px 16px;font:inherit;font-weight:800;cursor:pointer;
+    transition:.18s transform,.18s opacity,.18s background;
+  }
+  button:hover{transform:translateY(-1px)}
+  button:disabled{opacity:.5;cursor:not-allowed;transform:none}
+  .primary{margin-top:18px;width:100%;background:linear-gradient(90deg,var(--accent),#9b8cff);color:#04101b}
+  .secondary{background:#14243a;color:#ddecff;border:1px solid var(--line);padding:9px 12px;font-size:.86rem}
+  .status{
+    margin-top:14px;padding:12px 14px;border-radius:13px;background:#081321;border:1px solid var(--line);
+    color:var(--muted);font-size:.92rem;min-height:46px;display:flex;align-items:center
+  }
+  .status.good{color:var(--good);border-color:rgba(103,232,165,.28)}
+  .status.warn{color:var(--warn);border-color:rgba(255,209,102,.28)}
+  .status.bad{color:var(--bad);border-color:rgba(255,123,138,.28)}
+
+  .formula{
+    margin-top:18px;padding:18px;border:1px solid rgba(112,225,245,.18);border-radius:16px;
+    background:linear-gradient(135deg,rgba(112,225,245,.055),rgba(139,124,255,.06));
+    font-family:"SFMono-Regular",Consolas,monospace;line-height:1.7;color:#dff9ff;overflow:auto
+  }
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:16px}
+  .stat{padding:14px;border-radius:14px;background:#091522;border:1px solid var(--line)}
+  .stat b{display:block;font-size:1.15rem;margin-top:3px;word-break:break-word}
+  .stat span{color:var(--muted);font-size:.76rem;text-transform:uppercase;letter-spacing:.08em}
+  .result-block{margin-top:18px}
+  .result-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
+  .result-head strong{font-size:.92rem}
+  .mono{
+    white-space:pre-wrap;word-break:break-all;max-height:220px;overflow:auto;
+    background:#06101b;border:1px solid var(--line);border-radius:14px;padding:14px;
+    font-family:"SFMono-Regular",Consolas,monospace;font-size:.9rem;line-height:1.55;color:#d9f7ff
+  }
+
+  details{
+    margin-top:14px;border:1px solid var(--line);border-radius:16px;background:rgba(7,17,31,.5);overflow:hidden
+  }
+  summary{cursor:pointer;padding:16px 18px;font-weight:800;list-style:none}
+  summary::-webkit-details-marker{display:none}
+  summary::after{content:"＋";float:right;color:var(--accent)}
+  details[open] summary::after{content:"−"}
+  .detail-body{padding:0 18px 18px;color:var(--muted);line-height:1.7}
+  .detail-body code{color:#dcf9ff;background:#07111f;padding:2px 6px;border-radius:7px}
+  .detail-body .math{font-family:"SFMono-Regular",Consolas,monospace;color:#f0f8ff}
+  .steps{counter-reset:step}
+  .step{display:grid;grid-template-columns:38px 1fr;gap:12px;margin:18px 0}
+  .step::before{
+    counter-increment:step;content:counter(step);
+    width:34px;height:34px;display:grid;place-items:center;border-radius:10px;
+    background:linear-gradient(135deg,rgba(112,225,245,.18),rgba(139,124,255,.18));color:var(--accent);font-weight:900
+  }
+
+  .footer{margin-top:28px;color:#7489a1;font-size:.84rem;line-height:1.55}
+  .tiny{font-size:.82rem;color:#8398b0}
+  .hidden{display:none!important}
+
+  @media (max-width:840px){
+    .grid{grid-template-columns:1fr}
+    .row,.stats{grid-template-columns:1fr}
+    .wrap{padding-top:32px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <section class="hero">
+    <div class="eyebrow">● Modular arithmetic visualizer</div>
+    <h1>Find a multiple made of <span class="grad">only 1s and 0s.</span></h1>
+    <p class="lead">
+      Enter any positive whole number. The page constructs a guaranteed multiple whose decimal digits use only
+      <strong>1</strong> and <strong>0</strong>. If your number is coprime with 10 — meaning it ends in 1, 3, 7, or 9 —
+      the result can be made entirely of 1s.
+    </p>
+  </section>
+
+  <section class="grid">
+    <div class="card">
+      <h2>Calculator</h2>
+      <p class="sub">Phone-number formatting is okay; punctuation is ignored. Leading zeros are removed because the input is treated as an integer.</p>
+
+      <label for="numberInput">Starting number n</label>
+      <input id="numberInput" inputmode="numeric" autocomplete="off" placeholder="Example: 7 or (480) 555-0123" value="7">
+
+      <div class="row">
+        <div>
+          <label for="limitInput">Maximum repunit checks</label>
+          <input id="limitInput" type="number" min="1" max="5000000" step="1" value="500000">
+        </div>
+        <div>
+          <label for="displayLimit">Maximum displayed digits</label>
+          <input id="displayLimit" type="number" min="100" max="200000" step="100" value="20000">
+        </div>
+      </div>
+
+      <button class="primary" id="solveBtn">Find 0/1 multiple</button>
+      <div id="status" class="status">Ready.</div>
+
+      <div id="results" class="hidden">
+        <div class="stats">
+          <div class="stat"><span>gcd(n,10)</span><b id="gcdOut">—</b></div>
+          <div class="stat"><span>ones</span><b id="onesOut">—</b></div>
+          <div class="stat"><span>trailing zeros</span><b id="zerosOut">—</b></div>
+        </div>
+
+        <div class="result-block">
+          <div class="result-head">
+            <strong>0/1 product</strong>
+            <button class="secondary" data-copy="productOut">Copy</button>
+          </div>
+          <div id="productOut" class="mono"></div>
+        </div>
+
+        <div class="result-block">
+          <div class="result-head">
+            <strong>Other multiplier</strong>
+            <button class="secondary" data-copy="multiplierOut">Copy</button>
+          </div>
+          <div id="multiplierOut" class="mono"></div>
+        </div>
+
+        <div class="formula" id="equationOut"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>What the calculator is doing</h2>
+      <p class="sub">It uses the same modular-arithmetic proof, but avoids generating giant candidate numbers one by one.</p>
+
+      <div class="steps">
+        <div class="step">
+          <div><strong>Separate out factors of 2 and 5.</strong><br>
+          Write <span class="math">n = 2ᵃ × 5ᵇ × m</span>, where <span class="math">gcd(m,10)=1</span>.</div>
+        </div>
+        <div class="step">
+          <div><strong>Search for a repunit divisible by m.</strong><br>
+          Instead of constructing 1, 11, 111, ... as huge integers, update only the remainder:
+          <span class="math">r ← (10r + 1) mod m</span>.</div>
+        </div>
+        <div class="step">
+          <div><strong>Add enough zeros.</strong><br>
+          If <span class="math">t = max(a,b)</span>, then multiplying the repunit by <span class="math">10ᵗ</span>
+          supplies enough factors of both 2 and 5.</div>
+        </div>
+        <div class="step">
+          <div><strong>Divide by n.</strong><br>
+          Once the 0/1 product is known, the “other number” is simply
+          <span class="math">product ÷ n</span>.</div>
+        </div>
+      </div>
+
+      <div class="formula">
+        Example for n = 7<br>
+        r: 1 → 4 → 6 → 5 → 2 → 0<br><br>
+        Therefore 111111 is divisible by 7.<br>
+        111111 ÷ 7 = 15873<br>
+        <strong>7 × 15873 = 111111</strong>
+      </div>
+    </div>
+  </section>
+
+  <section class="card" style="margin-top:22px">
+    <h2>Expandable explanation</h2>
+    <p class="sub">Open any section for the mathematical reasoning behind the program.</p>
+
+    <details>
+      <summary>Why does a 0/1 multiple always exist?</summary>
+      <div class="detail-body">
+        Consider the repunits <code>1, 11, 111, 1111, ...</code>. For the part of <em>n</em> that is coprime with 10,
+        there are only finitely many possible remainders. By the pigeonhole principle, the sequence must eventually
+        hit remainder 0. That gives a number made entirely of 1s that is divisible by that coprime part.
+        Any factors of 2 or 5 can then be supplied by appending zeros.
+      </div>
+    </details>
+
+    <details>
+      <summary>Why do numbers ending in 1, 3, 7, or 9 need no zeros?</summary>
+      <div class="detail-body">
+        Such numbers are divisible by neither 2 nor 5, so <code>gcd(n,10)=1</code>. That means the entire input is the
+        coprime part <em>m</em>, and no trailing zeros are needed. The program therefore searches directly for a number
+        like <code>111...111</code> that is divisible by <em>n</em>.
+      </div>
+    </details>
+
+    <details>
+      <summary>What does “mod” mean?</summary>
+      <div class="detail-body">
+        <code>a mod n</code> means “the remainder after dividing <em>a</em> by <em>n</em>.” For example,
+        <code>25 mod 7 = 4</code>. The notation <code>a ≡ b (mod n)</code> means that <em>a</em> and <em>b</em>
+        leave the same remainder when divided by <em>n</em>.
+      </div>
+    </details>
+
+    <details>
+      <summary>What is gcd?</summary>
+      <div class="detail-body">
+        <strong>gcd</strong> means greatest common divisor: the largest positive integer that divides both numbers.
+        For example, <code>gcd(12,18)=6</code>. When <code>gcd(n,10)=1</code>, we say <em>n</em> and 10 are coprime.
+      </div>
+    </details>
+
+    <details>
+      <summary>Why is the remainder recurrence so useful?</summary>
+      <div class="detail-body">
+        If a repunit has remainder <em>r</em>, appending another 1 changes the number from <em>R</em> to
+        <code>10R + 1</code>. Therefore its new remainder is
+        <code>(10r + 1) mod n</code>. The browser only needs to keep a remainder in memory rather than the entire gigantic
+        repunit while it searches.
+      </div>
+    </details>
+
+    <details>
+      <summary>Why might a phone-number-sized input still take a long time?</summary>
+      <div class="detail-body">
+        The theorem guarantees that a solution exists, but it does not guarantee that the shortest repunit is small.
+        In the worst case, the search can require a number of remainder steps comparable to the coprime part of
+        <em>n</em>. A ten-digit input can therefore imply billions of possible steps. This page uses a configurable
+        safety limit so it does not lock up your browser. Raising the limit searches farther without changing the math.
+      </div>
+    </details>
+
+    <details>
+      <summary>Why this construction works even when n ends in 0, 2, 4, 5, 6, or 8</summary>
+      <div class="detail-body">
+        Factor the input as <code>n = 2ᵃ × 5ᵇ × m</code>, where <code>gcd(m,10)=1</code>.
+        Find a repunit <code>R</code> divisible by <em>m</em>. Then choose
+        <code>t = max(a,b)</code>. Since <code>10ᵗ = 2ᵗ × 5ᵗ</code>, the number
+        <code>R × 10ᵗ</code> contains only 1s followed by zeros and is divisible by every factor of <em>n</em>.
+      </div>
+    </details>
+  </section>
+
+  <p class="footer">
+    Note: this finds a proof-based 0/1 multiple, not necessarily the numerically smallest possible 0/1 multiple when trailing
+    zeros are required. It is designed to mirror the number-theory argument and remain memory-efficient.
+  </p>
+</div>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const input = $("numberInput");
+  const solveBtn = $("solveBtn");
+  const status = $("status");
+  const results = $("results");
+
+  function setStatus(message, kind="") {
+    status.textContent = message;
+    status.className = "status" + (kind ? " " + kind : "");
+  }
+
+  function sanitizeInteger(raw) {
+    const digits = raw.replace(/\D/g, "").replace(/^0+(?=\d)/, "");
+    if (!digits || /^0+$/.test(digits)) return null;
+    return BigInt(digits);
+  }
+
+  function gcd(a,b) {
+    while (b !== 0n) [a,b] = [b, a % b];
+    return a;
+  }
+
+  function factorTwoFive(n) {
+    let m = n, a = 0, b = 0;
+    while (m % 2n === 0n) { m /= 2n; a++; }
+    while (m % 5n === 0n) { m /= 5n; b++; }
+    return {m, a, b, t: Math.max(a,b)};
+  }
+
+  async function findRepunitLength(m, limit, onProgress) {
+    if (m === 1n) return 1;
+    let r = 0n;
+    const chunk = 5000;
+    for (let k = 1; k <= limit; k++) {
+      r = (r * 10n + 1n) % m;
+      if (r === 0n) return k;
+      if (k % chunk === 0) {
+        onProgress(k);
+        await new Promise(resolve => setTimeout(resolve, 0));
+      }
+    }
+    return null;
+  }
+
+  function divideDecimalStringByBigInt(decimalString, divisor) {
+    let remainder = 0n;
+    let quotient = "";
+    let started = false;
+
+    for (const ch of decimalString) {
+      remainder = remainder * 10n + BigInt(ch);
+      const q = remainder / divisor;
+      remainder %= divisor;
+      if (q !== 0n || started) {
+        quotient += q.toString();
+        started = true;
+      }
+    }
+    return {
+      quotient: quotient || "0",
+      remainder
+    };
+  }
+
+  function previewString(s, max) {
+    if (s.length <= max) return s;
+    const half = Math.floor(max / 2);
+    return s.slice(0, half) + "\n… [" + (s.length - max) + " digits hidden] …\n" + s.slice(-half);
+  }
+
+  solveBtn.addEventListener("click", async () => {
+    const n = sanitizeInteger(input.value);
+    const limit = Math.max(1, Math.min(5000000, Number($("limitInput").value) || 500000));
+    const displayLimit = Math.max(100, Math.min(200000, Number($("displayLimit").value) || 20000));
+
+    results.classList.add("hidden");
+
+    if (!n) {
+      setStatus("Enter a positive whole number greater than zero.", "bad");
+      return;
+    }
+
+    solveBtn.disabled = true;
+    const g = gcd(n, 10n);
+    const {m, a, b, t} = factorTwoFive(n);
+
+    setStatus(
+      `Searching repunits modulo ${m.toString()}…  factored n = 2^${a} × 5^${b} × ${m.toString()}`,
+      ""
+    );
+
+    const k = await findRepunitLength(m, limit, checked => {
+      setStatus(`Checked ${checked.toLocaleString()} repunits. Current search modulus: ${m.toString()}`, "");
+    });
+
+    if (k === null) {
+      $("gcdOut").textContent = g.toString();
+      $("onesOut").textContent = "not found yet";
+      $("zerosOut").textContent = t.toString();
+      results.classList.remove("hidden");
+      $("productOut").textContent = "No result within the current search limit.";
+      $("multiplierOut").textContent = "Increase “Maximum repunit checks” and try again.";
+      $("equationOut").textContent =
+        `The theorem still guarantees a solution. This run stopped after ${limit.toLocaleString()} remainder checks to protect browser performance.`;
+      setStatus(`Stopped after ${limit.toLocaleString()} checks. A solution exists, but it lies beyond this search limit.`, "warn");
+      solveBtn.disabled = false;
+      return;
+    }
+
+    const totalDigits = k + t;
+    if (totalDigits > 250000) {
+      $("gcdOut").textContent = g.toString();
+      $("onesOut").textContent = k.toLocaleString();
+      $("zerosOut").textContent = t.toLocaleString();
+      results.classList.remove("hidden");
+      $("productOut").textContent = `1 repeated ${k.toLocaleString()} times, followed by ${t.toLocaleString()} zero(s).`;
+      $("multiplierOut").textContent =
+        "The exact multiplier was not expanded because the constructed product exceeds 250,000 decimal digits.";
+      $("equationOut").textContent =
+        `n × multiplier = ( ${k.toLocaleString()} ones )${t ? ` followed by ${t} zero(s)` : ""}`;
+      setStatus(`Found the solution structure: ${k.toLocaleString()} one(s) and ${t.toLocaleString()} trailing zero(s).`, "good");
+      solveBtn.disabled = false;
+      return;
+    }
+
+    const product = "1".repeat(k) + "0".repeat(t);
+    const division = divideDecimalStringByBigInt(product, n);
+
+    if (division.remainder !== 0n) {
+      setStatus("Unexpected arithmetic error: constructed product did not divide evenly.", "bad");
+      solveBtn.disabled = false;
+      return;
+    }
+
+    $("gcdOut").textContent = g.toString();
+    $("onesOut").textContent = k.toLocaleString();
+    $("zerosOut").textContent = t.toLocaleString();
+    $("productOut").textContent = previewString(product, displayLimit);
+    $("productOut").dataset.full = product;
+    $("multiplierOut").textContent = previewString(division.quotient, displayLimit);
+    $("multiplierOut").dataset.full = division.quotient;
+    $("equationOut").textContent =
+      `${n.toString()} × ${division.quotient.length <= 120 ? division.quotient : "[multiplier with " + division.quotient.length.toLocaleString() + " digits]"}\n= ${product.length <= 120 ? product : "[0/1 product with " + product.length.toLocaleString() + " digits]"}`;
+
+    results.classList.remove("hidden");
+
+    const allOnes = t === 0;
+    setStatus(
+      allOnes
+        ? `Success — because gcd(n,10)=1, the product uses only 1s.`
+        : `Success — the product uses ${k.toLocaleString()} one(s) followed by ${t} zero(s).`,
+      "good"
+    );
+
+    solveBtn.disabled = false;
+  });
+
+  document.querySelectorAll("[data-copy]").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const el = $(btn.dataset.copy);
+      const text = el.dataset.full || el.textContent;
+      try {
+        await navigator.clipboard.writeText(text);
+        const old = btn.textContent;
+        btn.textContent = "Copied";
+        setTimeout(() => btn.textContent = old, 1200);
+      } catch {
+        btn.textContent = "Select text";
+      }
+    });
+  });
+
+  input.addEventListener("keydown", e => {
+    if (e.key === "Enter") solveBtn.click();
+  });
+})();
+</script>
+</body>
+</html>
