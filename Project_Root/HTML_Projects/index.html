@@ -10,23 +10,23 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
 <style>
   :root {
-    --bg-0: #060814;
-    --bg-1: #0b0f1e;
-    --glass-bg: rgba(255, 255, 255, 0.05);
-    --glass-bg-hover: rgba(255, 255, 255, 0.08);
+    --bg-0: #041724;
+    --bg-1: #07364a;
+    --glass-bg: rgba(4, 25, 40, 0.72);
+    --glass-bg-hover: rgba(9, 40, 57, 0.86);
     --glass-border: rgba(255, 255, 255, 0.09);
     --glass-border-hover: rgba(255, 255, 255, 0.18);
-    --text-primary: #f2f4f8;
-    --text-secondary: #9aa4b8;
-    --text-muted: #6b7488;
-    --cyan: #22d3ee;
-    --purple: #a78bfa;
-    --blue: #60a5fa;
+    --text-primary: #fff3e9;
+    --text-secondary: #ccd3d6;
+    --text-muted: #a7b7c0;
+    --orange: #ffad67;
+    --coral: #ff9366;
+    --amber: #ffcc78;
     --radius-lg: 24px;
     --radius-md: 18px;
     --radius-sm: 12px;
     --shadow-soft: 0 10px 30px rgba(0, 0, 0, 0.35);
-    --shadow-lift: 0 22px 55px rgba(34, 211, 238, 0.16), 0 8px 24px rgba(0, 0, 0, 0.45);
+    --shadow-lift: 0 22px 55px rgba(255, 125, 55, 0.16), 0 8px 24px rgba(0, 0, 0, 0.45);
     --nav-h: 72px;
     --ease: cubic-bezier(0.16, 1, 0.3, 1);
   }
@@ -54,9 +54,9 @@
     inset: 0;
     z-index: -2;
     background:
-      radial-gradient(38% 45% at 15% 12%, rgba(34, 211, 238, 0.16), transparent 60%),
-      radial-gradient(45% 50% at 85% 8%, rgba(167, 139, 250, 0.16), transparent 60%),
-      radial-gradient(50% 55% at 50% 100%, rgba(96, 165, 250, 0.14), transparent 60%),
+      radial-gradient(38% 45% at 15% 12%, rgba(255, 125, 55, 0.16), transparent 60%),
+      radial-gradient(45% 50% at 85% 8%, rgba(255, 94, 43, 0.16), transparent 60%),
+      radial-gradient(50% 55% at 50% 100%, rgba(255, 194, 104, 0.14), transparent 60%),
       linear-gradient(180deg, var(--bg-0), var(--bg-1) 45%, var(--bg-0));
     background-size: 200% 200%, 200% 200%, 200% 200%, 100% 100%;
     animation: gradientDrift 22s ease-in-out infinite alternate;
@@ -64,6 +64,39 @@
   @keyframes gradientDrift {
     0% { background-position: 0% 0%, 100% 0%, 50% 100%, 0 0; }
     100% { background-position: 20% 30%, 80% 20%, 40% 80%, 0 0; }
+  }
+
+  .sunset-landscape {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    overflow: hidden;
+    pointer-events: none;
+    opacity: 0.78;
+  }
+  .landscape-layer {
+    position: absolute;
+    left: -10%;
+    bottom: -80px;
+    width: 120%;
+    height: 65vh;
+    will-change: transform;
+  }
+  .landscape-sun {
+    position: absolute;
+    left: 70%;
+    top: 30%;
+    width: clamp(90px, 14vw, 190px);
+    aspect-ratio: 1;
+    border-radius: 50%;
+    background: #ffd17c;
+    box-shadow: 0 0 100px 30px rgba(255, 116, 45, 0.22);
+    opacity: 0.65;
+    will-change: transform;
+  }
+  #hill-chase { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; image-rendering: pixelated; }
+  @media (prefers-reduced-motion: reduce) {
+    .landscape-layer, .landscape-sun { will-change: auto; }
   }
 
   #particles {
@@ -79,8 +112,8 @@
     position: absolute;
     left: 12px;
     top: -60px;
-    background: var(--cyan);
-    color: #04141a;
+    background: var(--orange);
+    color: #091b28;
     font-weight: 700;
     padding: 10px 16px;
     border-radius: var(--radius-sm);
@@ -90,7 +123,7 @@
   .skip-link:focus { top: 12px; }
 
   :focus-visible {
-    outline: 2px solid var(--cyan);
+    outline: 2px solid var(--orange);
     outline-offset: 3px;
     border-radius: 6px;
   }
@@ -104,7 +137,7 @@
     display: flex;
     align-items: center;
     padding: 0 clamp(16px, 4vw, 40px);
-    background: rgba(9, 12, 22, 0.6);
+    background: rgba(3, 25, 39, 0.92);
     backdrop-filter: blur(18px) saturate(140%);
     -webkit-backdrop-filter: blur(18px) saturate(140%);
     border-bottom: 1px solid var(--glass-border);
@@ -134,8 +167,8 @@
     display: grid;
     place-items: center;
     font-size: 1.05rem;
-    background: linear-gradient(135deg, var(--cyan), var(--purple));
-    box-shadow: 0 6px 18px rgba(96, 165, 250, 0.35);
+    background: linear-gradient(135deg, var(--orange), var(--coral));
+    box-shadow: 0 6px 18px rgba(255, 194, 104, 0.35);
   }
   .nav-links {
     list-style: none;
@@ -155,7 +188,7 @@
     transition: color 0.2s var(--ease), background 0.2s var(--ease);
   }
   .nav-links a:hover { color: var(--text-primary); background: var(--glass-bg); }
-  .nav-links a.active { color: #04141a; background: linear-gradient(135deg, var(--cyan), var(--blue)); font-weight: 600; }
+  .nav-links a.active { color: #091b28; background: linear-gradient(135deg, var(--orange), var(--amber)); font-weight: 600; }
 
   .nav-search {
     margin-left: auto;
@@ -176,7 +209,7 @@
     transition: border-color 0.2s var(--ease), background 0.2s var(--ease), width 0.2s var(--ease);
   }
   .nav-search input::placeholder { color: var(--text-muted); }
-  .nav-search input:focus { border-color: var(--cyan); background: var(--glass-bg-hover); outline: none; }
+  .nav-search input:focus { border-color: var(--orange); background: var(--glass-bg-hover); outline: none; }
 
   .nav-toggle {
     display: none;
@@ -208,19 +241,19 @@
     background: var(--glass-bg);
     border: 1px solid var(--glass-border);
     font-size: 0.82rem;
-    color: var(--cyan);
+    color: var(--orange);
     font-weight: 600;
     letter-spacing: 0.03em;
     text-transform: uppercase;
   }
-  .hero-eyebrow .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--cyan); box-shadow: 0 0 10px var(--cyan); }
+  .hero-eyebrow .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--orange); box-shadow: 0 0 10px var(--orange); }
   .hero h1 {
     margin: 22px 0 14px;
     font-size: clamp(2.4rem, 6vw, 4.2rem);
     font-weight: 800;
     letter-spacing: -0.03em;
     line-height: 1.05;
-    background: linear-gradient(120deg, #fdfefe 10%, var(--cyan) 45%, var(--purple) 70%, var(--blue) 95%);
+    background: linear-gradient(120deg, #fff6e9 10%, var(--orange) 45%, var(--coral) 70%, var(--amber) 95%);
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
@@ -258,7 +291,7 @@
   .stat-pill strong {
     font-size: 1.4rem;
     font-weight: 800;
-    background: linear-gradient(120deg, var(--cyan), var(--blue));
+    background: linear-gradient(120deg, var(--orange), var(--amber));
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
@@ -334,7 +367,7 @@
     display: grid;
     place-items: center;
     font-size: 1.15rem;
-    background: linear-gradient(135deg, rgba(34, 211, 238, 0.18), rgba(167, 139, 250, 0.18));
+    background: linear-gradient(135deg, rgba(255, 125, 55, 0.18), rgba(255, 94, 43, 0.18));
     border: 1px solid var(--glass-border);
   }
   .featured-badge {
@@ -347,14 +380,14 @@
     text-transform: uppercase;
     padding: 5px 10px;
     border-radius: 999px;
-    color: #06121a;
-    background: linear-gradient(120deg, var(--cyan), var(--purple));
-    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.25) inset, 0 0 18px rgba(34, 211, 238, 0.55);
+    color: #091b28;
+    background: linear-gradient(120deg, var(--orange), var(--coral));
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.25) inset, 0 0 18px rgba(255, 125, 55, 0.55);
     animation: badgeGlow 2.4s ease-in-out infinite;
   }
   @keyframes badgeGlow {
-    0%, 100% { box-shadow: 0 0 0 1px rgba(255,255,255,0.25) inset, 0 0 12px rgba(34, 211, 238, 0.4); }
-    50% { box-shadow: 0 0 0 1px rgba(255,255,255,0.3) inset, 0 0 22px rgba(167, 139, 250, 0.7); }
+    0%, 100% { box-shadow: 0 0 0 1px rgba(255,255,255,0.25) inset, 0 0 12px rgba(255, 125, 55, 0.4); }
+    50% { box-shadow: 0 0 0 1px rgba(255,255,255,0.3) inset, 0 0 22px rgba(255, 94, 43, 0.7); }
   }
   .card h3 { margin: 0; font-size: 1.05rem; font-weight: 700; letter-spacing: -0.01em; line-height: 1.3; }
   .card p.desc { margin: 0; font-size: 0.88rem; color: var(--text-secondary); line-height: 1.55; flex-grow: 1; }
@@ -368,8 +401,8 @@
     background: rgba(255, 255, 255, 0.04);
     border: 1px solid var(--glass-border);
   }
-  .tag.popular { color: var(--purple); border-color: rgba(167, 139, 250, 0.35); }
-  .tag.fast { color: var(--cyan); border-color: rgba(34, 211, 238, 0.35); }
+  .tag.popular { color: var(--coral); border-color: rgba(255, 94, 43, 0.35); }
+  .tag.fast { color: var(--orange); border-color: rgba(255, 125, 55, 0.35); }
 
   .card-cta {
     display: inline-flex;
@@ -382,11 +415,11 @@
     font-size: 0.88rem;
     font-weight: 600;
     text-decoration: none;
-    color: #04121a;
-    background: linear-gradient(120deg, var(--cyan), var(--blue));
+    color: #091b28;
+    background: linear-gradient(120deg, var(--orange), var(--amber));
     transition: transform 0.2s var(--ease), box-shadow 0.2s var(--ease), filter 0.2s var(--ease);
   }
-  .card-cta:hover { transform: translateY(-2px); box-shadow: 0 10px 26px rgba(96, 165, 250, 0.35); filter: brightness(1.05); }
+  .card-cta:hover { transform: translateY(-2px); box-shadow: 0 10px 26px rgba(255, 194, 104, 0.35); filter: brightness(1.05); }
   .card-cta svg { width: 14px; height: 14px; }
 
   /* ---------- No-results state ---------- */
@@ -423,6 +456,14 @@
     .site-nav.menu-open .nav-links a { width: 100%; }
   }
 
+  @media (max-width: 639px) {
+    .nav-inner { gap: 8px; }
+    .brand { min-width: 0; font-size: 0.85rem; white-space: normal; }
+    .brand-mark { flex-shrink: 0; }
+    .nav-search input { width: 120px; }
+    .nav-toggle { flex-shrink: 0; }
+  }
+
   @media (prefers-reduced-motion: reduce) {
     html { scroll-behavior: auto; }
     .bg-gradient { animation: none; }
@@ -435,6 +476,20 @@
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
   <div class="bg-gradient" aria-hidden="true"></div>
+  <div class="sunset-landscape" aria-hidden="true">
+    <div class="landscape-sun" data-parallax="0.15"></div>
+    <svg id="chase-hill" class="landscape-layer" data-parallax="0.3" viewBox="0 0 1440 600" preserveAspectRatio="none">
+      <path id="chase-ridge" fill="none" stroke="none" d="M0 220 C180 90 260 245 440 175 S700 100 860 210 S1170 70 1440 170"/>
+      <path fill="#df652f" d="M0 220 C180 90 260 245 440 175 S700 100 860 210 S1170 70 1440 170 V600 H0Z"/>
+    </svg>
+    <canvas id="hill-chase" aria-hidden="true"></canvas>
+    <svg class="landscape-layer" data-parallax="0.65" viewBox="0 0 1440 600" preserveAspectRatio="none">
+      <path fill="#82463e" d="M0 300 C180 210 340 360 530 270 S790 200 960 295 S1230 210 1440 290 V600 H0Z"/>
+    </svg>
+    <svg class="landscape-layer" data-parallax="1" viewBox="0 0 1440 600" preserveAspectRatio="none">
+      <path fill="#062438" d="M0 390 C200 290 380 460 590 355 S910 450 1100 345 S1310 345 1440 390 V600 H0Z"/>
+    </svg>
+  </div>
   <canvas id="particles" aria-hidden="true"></canvas>
 
   <header class="site-nav" id="site-nav">
@@ -804,7 +859,7 @@
         speed: Math.random() * 0.25 + 0.05,
         drift: (Math.random() - 0.5) * 0.15,
         alpha: Math.random() * 0.4 + 0.15,
-        hue: Math.random() < 0.5 ? '34,211,238' : '167,139,250'
+        hue: Math.random() < 0.5 ? '255,125,55' : '255,194,104'
       };
     }
 
@@ -834,12 +889,108 @@
     requestAnimationFrame(tick);
   }
 
+  function initLandscape() {
+    var layers = document.querySelectorAll('[data-parallax]');
+    var preference = window.matchMedia('(prefers-reduced-motion: reduce)');
+    var queued = false;
+    function paint() {
+      queued = false;
+      var maxScroll = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+      var progress = Math.max(0, Math.min(1, window.scrollY / maxScroll));
+      layers.forEach(function (layer) {
+        var depth = Number(layer.dataset.parallax);
+        layer.style.transform = preference.matches ? 'none' :
+          'translate3d(' + (-progress * depth * 45) + 'px,' + (-progress * depth * 70) + 'px,0)';
+      });
+    }
+    function schedule() {
+      if (!queued) { queued = true; requestAnimationFrame(paint); }
+    }
+    window.addEventListener('scroll', schedule, { passive: true });
+    window.addEventListener('resize', schedule);
+    preference.addEventListener('change', schedule);
+    document.getElementById('search-input').addEventListener('input', schedule);
+    paint();
+  }
+
+  function initHillChase() {
+    var canvas = document.getElementById('hill-chase'), ctx = canvas.getContext('2d');
+    var hill = document.getElementById('chase-hill'), ridge = document.getElementById('chase-ridge');
+    var preference = window.matchMedia('(prefers-reduced-motion: reduce)');
+    var points = [], length = ridge.getTotalLength();
+    for (var i = 0; i <= 1024; i++) points.push(ridge.getPointAtLength(length * i / 1024));
+    var images = [], ready = false, active = false, elapsed = 0, last = null;
+    var timer = null, frameRequest = null, remaining = 6000, waitStarted = 0;
+    function clear() { ctx.clearRect(0, 0, canvas.width, canvas.height); }
+    function ground(x) {
+      var lo = 0, hi = points.length - 1;
+      while (hi - lo > 1) { var mid = (lo + hi) >> 1; if (points[mid].x < x) lo = mid; else hi = mid; }
+      var a = points[lo], b = points[hi];
+      var t = Math.max(0, Math.min(1, (x - a.x) / (b.x - a.x || 1)));
+      return a.y + (b.y - a.y) * t;
+    }
+    function paint() {
+      var width = window.innerWidth, height = window.innerHeight;
+      var dpr = Math.min(window.devicePixelRatio || 1, 2);
+      if (canvas.width !== Math.round(width * dpr) || canvas.height !== Math.round(height * dpr)) {
+        canvas.width = Math.round(width * dpr); canvas.height = Math.round(height * dpr);
+      }
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, width, height); ctx.imageSmoothingEnabled = false;
+      var rect = hill.getBoundingClientRect(), small = width < 640 ? 0.75 : 1;
+      var horseSize = 64 * small, buffaloSize = 48 * small, gap = horseSize * 1.8;
+      var horseX = -gap - horseSize + elapsed / 12000 * (width + gap + horseSize * 2);
+      var frame = Math.floor(elapsed / 100) % 6;
+      [horseX + gap, horseX].forEach(function (x, index) {
+        var size = index === 0 ? buffaloSize : horseSize;
+        var y = rect.top + ground((x - rect.left) / rect.width * 1440) / 600 * rect.height;
+        ctx.drawImage(images[index], frame % 3 * 64, Math.floor(frame / 3) * 64, 64, 64,
+          Math.round(x - size / 2), Math.round(y - size * 56 / 64), size, size);
+      });
+    }
+    function tick(now) {
+      frameRequest = null;
+      if (document.hidden || preference.matches) return;
+      if (last !== null) elapsed += now - last;
+      last = now;
+      if (elapsed >= 12000) {
+        active = false; clear(); remaining = 25000 + Math.random() * 20000; schedule(); return;
+      }
+      paint(); frameRequest = requestAnimationFrame(tick);
+    }
+    function schedule() {
+      if (!ready || document.hidden || preference.matches) return;
+      if (active) { last = null; frameRequest = requestAnimationFrame(tick); return; }
+      waitStarted = performance.now();
+      timer = setTimeout(function () {
+        timer = null; active = true; elapsed = 0; last = null;
+        frameRequest = requestAnimationFrame(tick);
+      }, remaining);
+    }
+    function suspend() {
+      if (timer !== null) { clearTimeout(timer); timer = null; remaining = Math.max(0, remaining - (performance.now() - waitStarted)); }
+      if (frameRequest !== null) { cancelAnimationFrame(frameRequest); frameRequest = null; }
+      last = null;
+    }
+    document.addEventListener('visibilitychange', function () { suspend(); if (!document.hidden) schedule(); });
+    preference.addEventListener('change', function () {
+      suspend(); active = false; elapsed = 0; remaining = 6000; clear(); schedule();
+    });
+    Promise.all(['assets/buffalo-run.png', 'assets/cowboy-horse-run.png'].map(function (src) {
+      return new Promise(function (resolve, reject) {
+        var img = new Image(); img.onload = function () { resolve(img); }; img.onerror = reject; img.src = src;
+      });
+    })).then(function (loaded) { images = loaded; ready = true; schedule(); }).catch(function () { clear(); });
+  }
+
   document.addEventListener('DOMContentLoaded', function () {
     render();
     initReveal();
     initSearch();
     initNav();
     initParticles();
+    initLandscape();
+    initHillChase();
   });
 })();
 </script>
