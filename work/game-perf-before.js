@@ -1077,18 +1077,17 @@
       doorHint.textContent = hint;
       doorHint.classList.toggle('visible', !!hint);
     }
-    for (const [element, value] of [[hudFloor, state.floor], [hudHp, Math.max(0, Math.round(p.health))],
-      [hudKills, state.kills], [hudKeys, `${p.keys}/${p.requiredKeys}`]]) {
-      if (element.textContent !== String(value)) element.textContent = String(value);
-    }
+    hudFloor.textContent = state.floor;
+    hudHp.textContent = Math.max(0, Math.round(state.player.health));
+    hudKills.textContent = state.kills;
+    hudKeys.textContent = `${state.player.keys}/${state.player.requiredKeys}`;
 
     const badges = [];
     for (const sub of ['speed', 'damage', 'invincible']) {
       const t = state.player.effects[sub];
       if (t > 0) badges.push(`<div class="powerup-badge ${sub}">${POWERUP_LABELS[sub]} ${t.toFixed(1)}s</div>`);
     }
-    const badgeMarkup = badges.join('');
-    if (powerupStatusEl.innerHTML !== badgeMarkup) powerupStatusEl.innerHTML = badgeMarkup;
+    powerupStatusEl.innerHTML = badges.join('');
   }
 
   let lastTime = performance.now();

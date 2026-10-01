@@ -64,10 +64,8 @@ const Raycaster = (() => {
     ctx.fillStyle = t.floorColor;
     ctx.fillRect(0, H / 2, W, H / 2);
 
-    const wallStep = W >= 640 ? 2 : 1;
-    for (let x = 0; x < W; x += wallStep) {
-      const columnWidth = Math.min(wallStep, W - x);
-      const cameraX = (2 * (x + (columnWidth - 1) / 2)) / W - 1;
+    for (let x = 0; x < W; x++) {
+      const cameraX = (2 * x) / W - 1; // -1..1 across the screen
       const rayAngle = player.angle + Math.atan(cameraX * planeLen);
       const rayDirX = Math.cos(rayAngle);
       const rayDirY = Math.sin(rayAngle);
@@ -114,7 +112,7 @@ const Raycaster = (() => {
 
       // Perpendicular (not raw) distance -- keeps walls straight, no fisheye.
       const perpDist = side === 0 ? sideDistX - deltaDistX : sideDistY - deltaDistY;
-      zbuffer.fill(perpDist, x, x + columnWidth);
+      zbuffer[x] = perpDist;
 
       const lineHeight = Math.min(H * 1.1, H / Math.max(perpDist, 0.0001));
       const drawStart = Math.max(0, (H - lineHeight) / 2);
@@ -139,19 +137,19 @@ const Raycaster = (() => {
         if (side === 1 && rayDirY < 0) texX = texW - texX - 1;
         texX = Math.max(0, Math.min(texW - 1, texX));
 
-        ctx.drawImage(tex, texX, 0, 1, texH, x, drawStart, columnWidth, drawEnd - drawStart);
+        ctx.drawImage(tex, texX, 0, 1, texH, x, drawStart, 1, drawEnd - drawStart);
 
         // Fold floor depth into the existing shading pass: no extra draws.
         const darken = 1 - shade * (t.wallTextureBrightness ?? 1);
         if (darken > 0.02) {
           ctx.fillStyle = `rgba(0,0,0,${Math.min(0.92, darken).toFixed(3)})`;
-          ctx.fillRect(x, drawStart, columnWidth, drawEnd - drawStart);
+          ctx.fillRect(x, drawStart, 1, drawEnd - drawStart);
         }
       } else {
         const checker = ((mapX % 2) + (mapY % 2) + 2) % 2;
         const base = checker === 0 ? t.wallA : t.wallB;
         ctx.fillStyle = `rgb(${(base[0] * shade) | 0},${(base[1] * shade) | 0},${(base[2] * shade) | 0})`;
-        ctx.fillRect(x, drawStart, columnWidth, drawEnd - drawStart);
+        ctx.fillRect(x, drawStart, 1, drawEnd - drawStart);
       }
     }
 
