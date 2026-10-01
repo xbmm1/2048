@@ -81,6 +81,41 @@
   }
 
   /* Chart container */
+  #simSnapshots {
+    width: 100%;
+    max-width: 630px;
+    margin-top: 20px;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20px;
+    color: #776e65;
+  }
+  #simSnapshots[hidden] { display: none; }
+  .snapshot-card { margin: 0; min-width: 0; }
+  .snapshot-card h3 { margin: 0 0 10px; }
+  .snapshot-card p { line-height: 1.6; }
+  .snapshot-board {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+    padding: 8px;
+    border-radius: 8px;
+    background: #bbada0;
+  }
+  .snapshot-board .tile {
+    width: auto;
+    height: auto;
+    aspect-ratio: 1;
+    display: grid;
+    place-items: center;
+    line-height: 1;
+    font-size: clamp(12px, 3.5vw, 22px);
+  }
+  .snapshot-board .tile-large { background: #3c3a32; color: #f9f6f2; font-size: 15px; }
+  @media (max-width: 540px) {
+    #simSnapshots { grid-template-columns: minmax(0, 1fr); max-width: 320px; }
+  }
+
   #chartContainer {
     width: 600px;
     max-width: 90vw;
@@ -149,6 +184,8 @@
 <div id="simResults" style="margin-top: 30px; padding: 15px; background: #f5f5f5; border-radius: 5px; white-space: pre-wrap; font-family: monospace; color: #776e65; display: none; max-width: 600px;"></div>
 
 <!-- Chart.js library -->
+<section id="simSnapshots" aria-label="Simulation final board snapshots" hidden></section>
+
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>
@@ -754,7 +791,7 @@ function createExpectimaxPolicy() {
 
 
 
-// Single game simulation - returns {score, steps, maxTile, durationMs}
+// Single game simulation, including an independent final-board snapshot.
 function runSingleSimulation(policy) {
   const startTime = performance.now();
   let gameBoard = createEmptyBoard();
@@ -780,7 +817,13 @@ function runSingleSimulation(policy) {
   const maxTile = getMaxTile(gameBoard);
   const durationMs = performance.now() - startTime;
   
-  return { score: gameScore, steps: steps, maxTile: maxTile, durationMs: durationMs };
+  return { score: gameScore, steps: steps, maxTile: maxTile, durationMs: durationMs, board: cloneBoard(gameBoard) };
+}
+
+// Strict comparisons retain the first game in simulation order on ties.
+function keepExtremeGames(extremes, game) {
+  if (!extremes.minGame || game.score < extremes.minGame.score) extremes.minGame = game;
+  if (!extremes.maxGame || game.score > extremes.maxGame.score) extremes.maxGame = game;
 }
 
 // Compute statistics from array of values
@@ -817,6 +860,7 @@ function computeStats(values) {
 // Defined only so its source can be extracted via .toString() - never called
 // directly on the main thread.
 function workerOnMessage(e) {
+  const extremes = { minGame: null, maxGame: null };
   const { policyName, gamesToRun, workerId } = e.data;
   let policyFactory;
   if (policyName === 'pattern') policyFactory = createPatternPolicy;
@@ -835,13 +879,14 @@ function workerOnMessage(e) {
     scores.push(result.score);
     maxTiles.push(result.maxTile);
     durations.push(result.durationMs);
+    keepExtremeGames(extremes, result);
 
     if ((i + 1) % 5 === 0 || i === gamesToRun - 1) {
       self.postMessage({ type: 'progress', workerId, completed: i + 1 });
     }
   }
 
-  self.postMessage({ type: 'done', workerId, scores, maxTiles, durations });
+  self.postMessage({ type: 'done', workerId, scores, maxTiles, durations, ...extremes });
 }
 
 const WORKER_SOURCE = [
@@ -859,6 +904,7 @@ const WORKER_SOURCE = [
   createAdvancedCornerPolicy.toString(),
   createExpectimaxPolicy.toString(),
   runSingleSimulation.toString(),
+  keepExtremeGames.toString(),
   'self.onmessage = ' + workerOnMessage.toString() + ';'
 ].join('\n\n');
 
@@ -915,7 +961,7 @@ async function simulateNGamesParallel(count, policyName) {
           updateProgress();
         } else if (msg.type === 'done') {
           worker.terminate();
-          resolve({ scores: msg.scores, maxTiles: msg.maxTiles, durations: msg.durations });
+          resolve({ scores: msg.scores, maxTiles: msg.maxTiles, durations: msg.durations, minGame: msg.minGame, maxGame: msg.maxGame });
         }
       };
 
@@ -929,6 +975,12 @@ async function simulateNGamesParallel(count, policyName) {
   });
 
   const chunkResults = await Promise.all(workerPromises);
+  // Promise.all preserves chunk order even when workers finish out of order.
+  const extremes = { minGame: null, maxGame: null };
+  for (const chunk of chunkResults) {
+    if (chunk.minGame) keepExtremeGames(extremes, chunk.minGame);
+    if (chunk.maxGame) keepExtremeGames(extremes, chunk.maxGame);
+  }
   const totalDurationMs = performance.now() - totalStartTime;
 
   const scores = [];
@@ -952,6 +1004,7 @@ async function simulateNGamesParallel(count, policyName) {
     maxTiles,
     durations,
     scoreStats,
+    ...extremes,
     maxTileDist,
     totalDurationMs
   };
@@ -959,6 +1012,7 @@ async function simulateNGamesParallel(count, policyName) {
 
 // Async batch runner for N games with progress updates
 async function simulateNGames(count, policyName) {
+  const extremes = { minGame: null, maxGame: null };
   const scores = [];
   const maxTiles = [];
   const durations = [];
@@ -979,6 +1033,7 @@ async function simulateNGames(count, policyName) {
     scores.push(result.score);
     maxTiles.push(result.maxTile);
     durations.push(result.durationMs);
+    keepExtremeGames(extremes, result);
     
     // Update progress
     document.getElementById('simProgress').textContent = `Progress: ${i+1}/${count}`;
@@ -1003,12 +1058,43 @@ async function simulateNGames(count, policyName) {
     maxTiles: maxTiles,
     durations: durations,
     scoreStats: scoreStats,
+    ...extremes,
     maxTileDist: maxTileDist,
     totalDurationMs: totalDurationMs
   };
 }
 
 // Display simulation results and save to localStorage
+function renderSimulationSnapshots(results) {
+  const container = document.getElementById('simSnapshots');
+  container.replaceChildren();
+  for (const [title, game] of [['Lowest Score Game', results.minGame], ['Highest Score Game', results.maxGame]]) {
+    if (!game) continue;
+    const card = document.createElement('figure');
+    card.className = 'snapshot-card';
+    const caption = document.createElement('figcaption');
+    const heading = document.createElement('h3');
+    heading.textContent = title;
+    const details = document.createElement('p');
+    details.textContent = `Score: ${game.score.toLocaleString()} · Moves: ${game.steps.toLocaleString()} · Largest tile: ${game.maxTile.toLocaleString()}`;
+    caption.append(heading, details);
+    const grid = document.createElement('div');
+    grid.className = 'snapshot-board';
+    grid.setAttribute('role', 'img');
+    grid.setAttribute('aria-label', `${title}, final board. Rows: ${game.board.map(row => row.map(value => value || 'empty').join(', ')).join('; ')}`);
+    game.board.flat().forEach(value => {
+      const tile = document.createElement('div');
+      tile.className = `tile tile-${value}${value > 2048 ? ' tile-large' : ''}`;
+      tile.textContent = value || '';
+      tile.setAttribute('aria-hidden', 'true');
+      grid.appendChild(tile);
+    });
+    card.append(caption, grid);
+    container.appendChild(card);
+  }
+  container.hidden = !container.childElementCount;
+}
+
 async function displaySimulationResults(policyName) {
   const runSimBtn = document.getElementById('runSimBtn');
   const simProgress = document.getElementById('simProgress');
@@ -1018,6 +1104,7 @@ async function displaySimulationResults(policyName) {
   runSimBtn.textContent = 'Running...';
   simProgress.style.display = 'block';
   simResults.style.display = 'none';
+  renderSimulationSnapshots({});
   
   try {
     const results = await simulateNGamesParallel(1000, policyName);
@@ -1055,6 +1142,8 @@ async function displaySimulationResults(policyName) {
       count: 1000,
       scores: results.scores,
       stats: stats,
+      minGame: results.minGame,
+      maxGame: results.maxGame,
       maxTileDist: maxTileDist,
       totalDurationMs: results.totalDurationMs
     };
@@ -1065,6 +1154,7 @@ async function displaySimulationResults(policyName) {
     
     // Display results
     simResults.textContent = infoText;
+    renderSimulationSnapshots(results);
     simResults.style.display = 'block';
     simProgress.textContent = `Completed 1000 games in ${(results.totalDurationMs / 1000).toFixed(2)}s`;
     
