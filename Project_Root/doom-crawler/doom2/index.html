@@ -20,6 +20,7 @@
 
     <!-- Active power-up badges -->
     <div id="powerup-status"></div>
+    <div id="fps-counter" aria-label="Frames per second">FPS —</div>
     <div id="hotbar" role="group" aria-label="Stored powerups" hidden>
       <div class="hotbar-slots">
         <div class="hotbar-slot speed" data-slot="0"><kbd>1</kbd><span>Speed</span><b>×0</b></div>
@@ -79,6 +80,7 @@
             <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Move</div>
             <div><kbd>←</kbd><kbd>→</kbd> / Mouse — Turn</div>
             <div><kbd>Space</kbd> / Click — Shoot</div>
+            <div><kbd>F</kbd> — Knife attack (close range)</div>
             <div><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> Select power-up · <kbd>E</kbd> Use</div>
             <div><kbd>M</kbd> — Toggle minimap paths</div>
             <div><kbd>P</kbd> — Pause & settings</div>
@@ -101,7 +103,7 @@
           <label>
             Mouse Sensitivity
             <span id="setting-sensitivity-value"></span>
-            <input id="setting-sensitivity" type="range" min="0.0015" max="0.006" step="0.0001" />
+            <input id="setting-sensitivity" type="range" min="0.25" max="4" step="0.05" value="1" />
           </label>
 
           <label>
@@ -143,6 +145,7 @@
 
     <!-- Weapon -->
     <div id="weapon"></div>
+    <div id="knife" hidden aria-hidden="true"></div>
   </div>
 
   <footer id="credit">Made by <span>Brian McHorney</span></footer>

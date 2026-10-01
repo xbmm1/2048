@@ -9,15 +9,31 @@
   const minimapCanvas = document.getElementById('minimap');
   const mctx = minimapCanvas.getContext('2d');
 
-  const W = canvas.width;
-  const H = canvas.height;
+  let W = canvas.width;
+  let H = canvas.height;
+  // Match the viewport aspect ratio without increasing the raycasting budget.
+  function resizeScene() {
+    const width = canvas.clientWidth, height = canvas.clientHeight;
+    if (!width || !height) return;
+    const scale = Math.min(1, 960 / width, 600 / height);
+    W = Math.max(1, Math.round(width * scale));
+    H = Math.max(1, Math.round(height * scale));
+    if (canvas.width !== W) canvas.width = W;
+    if (canvas.height !== H) canvas.height = H;
+  }
+  new ResizeObserver(resizeScene).observe(canvas);
+  resizeScene();
   const floorFade = document.getElementById('floor-fade');
+  const knifeEl = document.getElementById('knife');
+  const MELEE_DURATION = 0.5, MELEE_IMPACT = 0.2, MELEE_RANGE = 1.1;
   const doorHint = document.getElementById('door-hint');
   const FADE_SECONDS = 0.22;
 
   // Generated 6-column atlas: float, attack, hurt, dissolve (32px cells).
   const wraithAtlas = new Image();
   const doorAtlas = new Image();
+  const keySprite = new Image();
+  keySprite.src = 'assets/key-v1.png';
   doorAtlas.src = 'assets/door-v1.png';
   wraithAtlas.onload = () => Raycaster.prepareGhostAtlas(wraithAtlas);
   wraithAtlas.src = 'assets/wraith-v1.png';
@@ -37,42 +53,90 @@
   const proceduralSky = document.createElement('canvas');
   proceduralSky.width = 2048;
   proceduralSky.height = 300;
-  (function paintProceduralSky() {
+  function paintProceduralSky(floorNum) {
+    const night = Math.max(0, Math.min(1, (floorNum - 1) / 9));
+    const blend = (day, dark) => `rgb(${day.map((v, i) => Math.round(v + (dark[i] - v) * night)).join(',')})`;
     const sctx = proceduralSky.getContext('2d');
     const w = proceduralSky.width, h = proceduralSky.height;
     const grad = sctx.createLinearGradient(0, 0, 0, h);
-    grad.addColorStop(0, '#05060c');
-    grad.addColorStop(0.55, '#141827');
-    grad.addColorStop(1, '#486379');
+    grad.addColorStop(0, blend([100, 111, 137], [5, 10, 25]));
+    grad.addColorStop(0.48, blend([194, 125, 113], [30, 32, 56]));
+    grad.addColorStop(1, blend([241, 167, 102], [62, 54, 79]));
     sctx.fillStyle = grad;
     sctx.fillRect(0, 0, w, h);
 
     let seed = 1337;
-    function rand() { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return (seed % 10000) / 10000; }
-    for (let i = 0; i < 500; i++) {
-      const sx = rand() * w, sy = rand() * h * 0.7;
-      const r = rand() * 1.2 + 0.2;
-      sctx.globalAlpha = 0.4 + rand() * 0.6;
-      sctx.fillStyle = '#ffffff';
-      sctx.beginPath();
-      sctx.arc(sx, sy, r, 0, Math.PI * 2);
-      sctx.fill();
+    function rand() { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; }
+    for (let i = 0; i < 180; i++) {
+      const x = Math.floor(rand() * w), y = Math.floor(rand() * h * 0.49);
+      sctx.globalAlpha = (0.3 + rand() * 0.5) * (0.08 + 0.92 * night);
+      sctx.fillStyle = '#e4dfd3';
+      sctx.fillRect(x, y, i % 19 === 0 ? 2 : 1, 1);
     }
     sctx.globalAlpha = 1;
 
-    sctx.fillStyle = '#024202';
+    // Sun sinks behind the ridge; the moon appears elsewhere as dusk fades.
+    sctx.globalAlpha = Math.max(0, 1 - night * 1.7);
+    sctx.fillStyle = '#ffe8a0';
     sctx.beginPath();
-    sctx.moveTo(0, h);
-    let py = h * 0.78;
-    for (let x = 0; x <= w; x += 24) {
-      py += (rand() - 0.5) * 18;
-      py = Math.max(h * 0.80, Math.min(h * 0.88, py));
-      sctx.lineTo(x, py);
-    }
-    sctx.lineTo(w, h);
-    sctx.closePath();
+    sctx.ellipse(w * 0.24, h * (0.51 + night * 0.28), 21, 36, 0, 0, Math.PI * 2);
     sctx.fill();
-  })();
+    sctx.globalAlpha = Math.max(0, Math.min(1, (night - 0.2) / 0.6));
+    sctx.fillStyle = '#dfdfc8';
+    sctx.beginPath();
+    // Compensate for the panorama's horizontal stretch at the base aspect.
+    sctx.ellipse(w * 0.65, h * (0.56 - night * 0.13), 17, 29, 0, 0, Math.PI * 2);
+    sctx.fill();
+    sctx.globalAlpha = 1;
+
+    const segments = 256;
+    function paintRidge(base, amplitude, phaseShift, color, trees) {
+      const ridge = [];
+      for (let i = 0; i <= segments; i++) {
+        const phase = (i % segments) / segments * Math.PI * 2;
+        ridge.push(h * (base + amplitude * Math.sin(phase * 4 + phaseShift) +
+          amplitude * 0.5 * Math.sin(phase * 9 + phaseShift * 2) +
+          amplitude * 0.2 * Math.sin(phase * 17 + 0.8)));
+      }
+      sctx.fillStyle = color;
+      sctx.beginPath();
+      sctx.moveTo(0, h);
+      ridge.forEach((y, i) => sctx.lineTo(i / segments * w, Math.round(y)));
+      sctx.lineTo(w, h);
+      sctx.closePath();
+      sctx.fill();
+      if (!trees) return;
+      // Clustered pines with tiered branches; valleys retain open views.
+      for (let i = 0; i < 220; i++) {
+        const x = (i + rand() * 0.8) * w / 220;
+        const phase = x / w * Math.PI * 2;
+        const density = 0.5 + 0.4 * Math.sin(phase * 6 + phaseShift);
+        if (rand() > density) continue;
+        const segment = x / w * segments, index = Math.floor(segment);
+        const ground = Math.round(ridge[index] + (ridge[index + 1] - ridge[index]) * (segment - index)) + 2;
+        const tall = i % 23 === 0;
+        const height = Math.round((tall ? 35 : 12 + rand() * 15) * trees);
+        const halfWidth = Math.max(3, Math.round(height * 0.22));
+        for (const offset of [-w, 0, w]) {
+          const tx = Math.round(x + offset);
+          sctx.fillRect(tx - 1, ground - height + 3, 2, height - 2);
+          for (let tier = 0; tier < 4; tier++) {
+            const tip = ground - height + Math.round(tier * height * 0.16);
+            const tierHeight = Math.round(height * (0.32 + tier * 0.025));
+            const width = halfWidth * (0.45 + tier * 0.18);
+            for (let row = 0; row < tierHeight; row++) {
+              const spread = Math.floor(width * row / tierHeight);
+              sctx.fillRect(tx - spread, tip + row, spread * 2 + 1, 1);
+            }
+          }
+        }
+      }
+    }
+    // Periodic ridges and wrapped trees join continuously around a full turn.
+    paintRidge(0.57, 0.055, 0.5, blend([120, 75, 94], [49, 40, 65]), 0);
+    paintRidge(0.66, 0.045, 1.8, blend([64, 49, 74], [23, 29, 49]), 0.7);
+    paintRidge(0.75, 0.05, 3.2, blend([24, 25, 42], [7, 13, 25]), 1);
+  }
 
   let activeSky = proceduralSky;
   const customSky = new Image();
@@ -114,13 +178,13 @@
     const t = Math.min(1, (floorNum - 1) / 9);
     const floorC = lerpColor(WARM_FLOOR, COLD_FLOOR, t);
     const ceilC = lerpColor(WARM_CEIL, COLD_CEIL, t);
-    const tintAlpha = t * 0.35;
     return {
       wallA: lerpColor(WARM_WALL_A, COLD_WALL_A, t),
       wallB: lerpColor(WARM_WALL_B, COLD_WALL_B, t),
+      wallTextureBrightness: 1 - t * 0.35,
       floorColor: `rgb(${floorC[0]},${floorC[1]},${floorC[2]})`,
       ceilingFallback: `rgb(${ceilC[0]},${ceilC[1]},${ceilC[2]})`,
-      skyTint: tintAlpha > 0.02 ? `rgba(60,90,160,${tintAlpha.toFixed(2)})` : null,
+      skyTint: customSky.complete && customSky.naturalWidth && t > 0 ? `rgba(5,10,25,${(t * 0.35).toFixed(2)})` : null,
     };
   }
 
@@ -166,8 +230,9 @@
 
   // ---- Settings (persisted) ----
   const SETTINGS_KEY = 'dungeonCrawlerSettings';
+  const BASE_SENSITIVITY = 0.0015;
   const DEFAULT_SETTINGS = {
-    sensitivity: 0.0025,
+    sensitivity: BASE_SENSITIVITY,
     turnSpeed: 2.6,
     enemySpeed: 1.0,
     enemyCountMult: 1.0,
@@ -198,8 +263,9 @@
   }
 
   function applySettingsToUI() {
-    sensInput.value = settings.sensitivity;
-    sensValue.textContent = settings.sensitivity.toFixed(4);
+    sensInput.value = settings.sensitivity / BASE_SENSITIVITY;
+    sensValue.textContent = `${(settings.sensitivity / BASE_SENSITIVITY).toFixed(2)}×`;
+    sensInput.setAttribute('aria-valuetext', sensValue.textContent);
     turnInput.value = settings.turnSpeed;
     turnValue.textContent = settings.turnSpeed.toFixed(1);
     enemySpeedInput.value = settings.enemySpeed;
@@ -222,8 +288,9 @@
   }
 
   sensInput.addEventListener('input', () => {
-    settings.sensitivity = parseFloat(sensInput.value);
-    sensValue.textContent = settings.sensitivity.toFixed(4);
+    settings.sensitivity = parseFloat(sensInput.value) * BASE_SENSITIVITY;
+    sensValue.textContent = `${parseFloat(sensInput.value).toFixed(2)}×`;
+    sensInput.setAttribute('aria-valuetext', sensValue.textContent);
     saveSettings();
   });
   turnInput.addEventListener('input', () => {
@@ -291,6 +358,7 @@
     gameOver: false,
     floor: 1,
     floorTransition: null,
+    melee: null,
     kills: 0,
     tiles: null,
     tw: 0,
@@ -351,6 +419,7 @@
     state.tw = w;
     state.th = h;
     state.theme = themeForFloor(floorNum);
+    paintProceduralSky(floorNum);
     state.visited = Array.from({ length: h }, () => new Array(w).fill(false));
     state.projectiles = [];
 
@@ -431,6 +500,7 @@
   }
 
   function beginRun() {
+    state.melee = null;
     state.floorTransition = null;
     floorFade.style.opacity = '0';
     state.floor = 1;
@@ -494,6 +564,12 @@
   // ---- Input ----
   window.addEventListener('keydown', (e) => {
     const k = e.key.toLowerCase();
+    if (k === 'f') {
+      if (/^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName) || e.target.isContentEditable) return;
+      e.preventDefault();
+      if (!e.repeat) startMelee();
+      return;
+    }
     if (/^Digit[1-3]$/.test(e.code) || k === 'e') {
       if (!state.started || state.paused || state.gameOver ||
           /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName) || e.target.isContentEditable) return;
@@ -577,6 +653,7 @@
   }
 
   function shoot() {
+    if (state.melee) return;
     if (state.floorTransition) return;
     if (!state.started || state.paused || state.gameOver) return;
     fireWeaponFx();
@@ -607,6 +684,37 @@
         state.kills++;
       }
     }
+  }
+
+  function startMelee() {
+    if (!state.started || state.paused || state.gameOver || state.floorTransition || state.melee) return;
+    state.melee = { elapsed: 0, hit: false };
+  }
+
+  function updateMelee(dt) {
+    const swing = state.melee;
+    if (!swing) return;
+    swing.elapsed += dt;
+    if (!swing.hit && swing.elapsed >= MELEE_IMPACT) {
+      swing.hit = true;
+      const p = state.player;
+      let target = null, nearest = MELEE_RANGE;
+      for (const enemy of state.enemies) {
+        if (!enemy.alive) continue;
+        const dx = enemy.x - p.x, dy = enemy.y - p.y;
+        const distance = Math.hypot(dx, dy);
+        const angle = Math.atan2(Math.sin(Math.atan2(dy, dx) - p.angle), Math.cos(Math.atan2(dy, dx) - p.angle));
+        if (distance <= nearest && Math.abs(angle) <= Math.PI / 4 && lineClear(p.x, p.y, enemy.x, enemy.y)) {
+          target = enemy; nearest = distance;
+        }
+      }
+      if (target) {
+        target.health -= p.effects.damage > 0 ? 40 : 20;
+        target.hitFlash = 1;
+        if (target.health <= 0) { target.alive = false; target.deathTime = 0; state.kills++; }
+      }
+    }
+    if (swing.elapsed >= MELEE_DURATION) state.melee = null;
   }
 
   function applyPowerup(sub) {
@@ -704,10 +812,12 @@
 
     updateExitDoor(dt);
     if (p.keys >= p.requiredKeys && state.exit.open >= 1 && dist2(state.exit, p) < 0.4) {
+      state.melee = null;
       state.floorTransition = { phase: 'out', elapsed: 0 };
       return;
     }
 
+    updateMelee(dt);
     const now = performance.now();
     for (const e of state.enemies) {
       if (e.hitFlash > 0) e.hitFlash = Math.max(0, e.hitFlash - dt / 0.25);
@@ -819,6 +929,7 @@
             : POWERUP_COLORS[pk.sub] || '#ffffff',
           scale: pk.type === 'powerup' ? 0.6 : 0.5,
           key: pk.type === 'key',
+          image: pk.type === 'key' ? keySprite : null,
           health: pk.type === 'health',
         });
       }
@@ -885,17 +996,21 @@
       if (pk.taken || !isRevealed(pk.x, pk.y)) continue;
       const px = pk.x * scale, py = pk.y * scale;
       if (pk.type === 'key') {
-        // Tiny key icon: a ring with a short stem.
-        mctx.strokeStyle = '#ffd23f';
-        mctx.lineWidth = 1;
-        mctx.beginPath();
-        mctx.arc(px, py - 1, 1.6, 0, Math.PI * 2);
-        mctx.stroke();
-        mctx.strokeStyle = '#ffd23f';
-        mctx.beginPath();
-        mctx.moveTo(px, py + 0.5);
-        mctx.lineTo(px, py + 2.6);
-        mctx.stroke();
+        // Small pixel key: outlined yellow ring, shaft and two right teeth.
+        const kx = Math.round(px), ky = Math.round(py);
+        mctx.fillStyle = '#382315';
+        mctx.fillRect(kx - 2, ky - 5, 5, 1);
+        mctx.fillRect(kx - 3, ky - 4, 7, 5);
+        mctx.fillRect(kx - 2, ky + 1, 5, 1);
+        mctx.fillRect(kx - 1, ky + 2, 5, 5);
+        mctx.fillStyle = '#ffda45';
+        mctx.fillRect(kx - 2, ky - 4, 5, 1);
+        mctx.fillRect(kx - 2, ky - 3, 1, 3);
+        mctx.fillRect(kx + 2, ky - 3, 1, 3);
+        mctx.fillRect(kx - 2, ky, 5, 1);
+        mctx.fillRect(kx, ky + 1, 1, 5);
+        mctx.fillRect(kx + 1, ky + 3, 2, 1);
+        mctx.fillRect(kx + 1, ky + 5, 2, 1);
       } else if (pk.type === 'health') {
         // Pixel-aligned green plus with a dark border for map contrast.
         const hx = Math.round(px), hy = Math.round(py);
@@ -948,6 +1063,10 @@
   }
 
   function drawHUD() {
+    const meleeVisible = !!state.melee && state.started && !state.gameOver;
+    knifeEl.hidden = !meleeVisible;
+    weaponEl.style.visibility = meleeVisible ? 'hidden' : '';
+    if (meleeVisible) knifeEl.style.backgroundPosition = `${-Math.min(4, Math.floor(state.melee.elapsed / 0.1)) * 336}px 0`;
     updateHotbar();
     const p = state.player;
     const missingKeys = p.requiredKeys - p.keys;
@@ -972,7 +1091,25 @@
   }
 
   let lastTime = performance.now();
+  const fpsEl = document.getElementById('fps-counter');
+  let fpsElapsed = 0, fpsFrames = 0, fpsLastTime = null;
+  document.addEventListener('visibilitychange', () => {
+    fpsElapsed = 0; fpsFrames = 0; fpsLastTime = null;
+    fpsEl.textContent = 'FPS —';
+  });
   function loop(now) {
+    // Measure actual animation-frame intervals, before the physics dt clamp.
+    if (!document.hidden) {
+      if (fpsLastTime !== null) {
+        fpsElapsed += now - fpsLastTime;
+        fpsFrames++;
+        if (fpsElapsed >= 500) {
+          fpsEl.textContent = `FPS ${Math.round(fpsFrames * 1000 / fpsElapsed)}`;
+          fpsElapsed = 0; fpsFrames = 0;
+        }
+      }
+      fpsLastTime = now;
+    }
     const dt = Math.min(0.05, (now - lastTime) / 1000);
     lastTime = now;
     if (state.started && !state.paused && !state.gameOver) update(dt);

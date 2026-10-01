@@ -49,7 +49,7 @@ const Raycaster = (() => {
   function render(ctx, W, H, tiles, tw, th, player, sprites, sky, theme, textures) {
     const t = theme || DEFAULT_THEME;
     const zbuffer = new Float32Array(W);
-    const planeLen = Math.tan(FOV / 2);
+    const planeLen = Math.tan(FOV / 2) * (W / H) / (960 / 600);
     const texturesReady = !!(textures && textures.length && textures.every((img) => img.complete && img.naturalWidth > 0));
 
     ctx.imageSmoothingEnabled = false;
@@ -139,7 +139,8 @@ const Raycaster = (() => {
 
         ctx.drawImage(tex, texX, 0, 1, texH, x, drawStart, 1, drawEnd - drawStart);
 
-        const darken = 1 - shade;
+        // Fold floor depth into the existing shading pass: no extra draws.
+        const darken = 1 - shade * (t.wallTextureBrightness ?? 1);
         if (darken > 0.02) {
           ctx.fillStyle = `rgba(0,0,0,${Math.min(0.92, darken).toFixed(3)})`;
           ctx.fillRect(x, drawStart, 1, drawEnd - drawStart);
@@ -177,7 +178,8 @@ const Raycaster = (() => {
       ctx.drawImage(sky, startX, 0, sliceW, srcH, 0, 0, W, bandH);
     } else {
       const firstSrcW = srcW - startX;
-      const firstDestW = firstSrcW / scale;
+      // Shared integer boundary prevents a fractional-pixel crack at wrap.
+      const firstDestW = Math.max(1, Math.min(W - 1, Math.round(firstSrcW / scale)));
       ctx.drawImage(sky, startX, 0, firstSrcW, srcH, 0, 0, firstDestW, bandH);
       const remainSrcW = sliceW - firstSrcW;
       ctx.drawImage(sky, 0, 0, remainSrcW, srcH, firstDestW, 0, W - firstDestW, bandH);
@@ -222,6 +224,25 @@ const Raycaster = (() => {
       if (clampedBottom <= clampedTop) continue;
 
       if (s.key) {
+        if (s.image && s.image.complete && s.image.naturalWidth) {
+          ctx.beginPath();
+          let visible = false;
+          for (let x = x0; x < x1;) {
+            if (transformY >= zbuffer[x]) { x++; continue; }
+            const start = x++;
+            while (x < x1 && transformY < zbuffer[x]) x++;
+            ctx.rect(start, 0, x - start, H);
+            visible = true;
+          }
+          if (!visible) continue;
+          ctx.save();
+          ctx.clip();
+          ctx.imageSmoothingEnabled = false;
+          ctx.globalAlpha = shade;
+          ctx.drawImage(s.image, left, top, spriteSize, spriteSize);
+          ctx.restore();
+          continue;
+        }
         // Simple key silhouette: a hollow ring (bow), a vertical spine,
         // and two teeth prongs jutting out to one side near the bottom.
         const centerX = screenX;
