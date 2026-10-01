@@ -1,4 +1,37 @@
 /* ---------- Global ---------- */
+#door-hint {
+  position: absolute;
+  bottom: 58px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: 70%;
+  padding: 7px 12px;
+  border-radius: 4px;
+  background: rgba(10, 10, 15, .78);
+  color: #e4d2ad;
+  font-size: 12px;
+  line-height: 1.5;
+  text-align: center;
+  pointer-events: none;
+  z-index: 5;
+  opacity: 0;
+  transition: opacity .18s ease;
+}
+#door-hint.visible { opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  #door-hint { transition: none; }
+}
+
+#floor-fade {
+  position: absolute;
+  inset: 0;
+  background: #000;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 45;
+}
+
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 html, body {
@@ -48,6 +81,39 @@ html, body {
 #keys { color: #ffd54f !important; }
 
 /* ---------- Power-up status badges ---------- */
+#hotbar {
+  position: absolute;
+  top: 50%;
+  left: 10px;
+  width: 74px;
+  transform: translateY(-50%);
+  z-index: 5;
+  pointer-events: none;
+  text-align: center;
+}
+.hotbar-slots { display: flex; flex-direction: column; gap: 5px; }
+#hotbar[hidden], .hotbar-slot[hidden] { display: none; }
+.hotbar-slot {
+  width: 74px;
+  padding: 4px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px;
+  border: 2px solid #555;
+  background: rgba(12, 12, 20, .92);
+  font-size: 11px;
+  border-radius: 4px;
+}
+.hotbar-slot span { grid-column: 1 / -1; grid-row: 2; }
+.hotbar-slot kbd { justify-self: start; }
+.hotbar-slot b { grid-column: 2; grid-row: 1; }
+.hotbar-slot.speed { color: #4dd0ff; }
+.hotbar-slot.damage { color: #ff7043; }
+.hotbar-slot.invincible { color: #ffd54f; }
+.hotbar-slot.empty { color: #999; }
+.hotbar-slot.selected { border-color: #fff; box-shadow: 0 0 0 1px #111; }
+#hotbar-hint { margin-top: 6px; font-size: 10px; line-height: 1.4; color: #fff; text-shadow: 0 1px 3px #000; overflow-wrap: anywhere; }
+
 #powerup-status {
   position: absolute;
   top: 10px; left: 10px;

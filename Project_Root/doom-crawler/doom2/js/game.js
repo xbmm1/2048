@@ -11,6 +11,24 @@
 
   const W = canvas.width;
   const H = canvas.height;
+  const floorFade = document.getElementById('floor-fade');
+  const doorHint = document.getElementById('door-hint');
+  const FADE_SECONDS = 0.22;
+
+  // Generated 6-column atlas: float, attack, hurt, dissolve (32px cells).
+  const wraithAtlas = new Image();
+  const doorAtlas = new Image();
+  doorAtlas.src = 'assets/door-v1.png';
+  wraithAtlas.onload = () => Raycaster.prepareGhostAtlas(wraithAtlas);
+  wraithAtlas.src = 'assets/wraith-v1.png';
+  function wraithSprite(e) {
+    let row = 0, frame = Math.floor(e.animTime * 8) % 6;
+    if (!e.alive) { row = 3; frame = Math.min(5, Math.floor(e.deathTime * 10)); }
+    else if (e.hitFlash > 0) { row = 2; frame = Math.min(1, Math.floor((1 - e.hitFlash) * 2)); }
+    else if (e.attackTime > 0) { row = 1; frame = Math.min(3, Math.floor((0.4 - e.attackTime) * 10)); }
+    return { x: e.x, y: e.y, color: e.ranged ? '#d9b3ff' : '#eaf3ff', scale: 1,
+      ghost: true, flash: e.hitFlash, atlas: wraithAtlas, frame, row, ranged: e.ranged };
+  }
 
   // ---- Sky ----
   // Procedural 360 backdrop (gradient + stars + distant silhouette) used by
@@ -261,6 +279,10 @@
   const POWERUP_TYPES = ['speed', 'damage', 'invincible'];
   const POWERUP_COLORS = { speed: '#4dd0ff', damage: '#ff7043', invincible: '#085e00' };
   const POWERUP_LABELS = { speed: 'SPEED', damage: 'DAMAGE', invincible: 'INVINCIBLE' };
+  const POWERUP_SLOTS = ['speed', 'damage', 'invincible'];
+  const hotbarSlots = [...document.querySelectorAll('.hotbar-slot')];
+  const hotbarHint = document.getElementById('hotbar-hint');
+  let hotbarDisplay = '';
 
   // ---- Game state ----
   const state = {
@@ -268,6 +290,7 @@
     paused: false,
     gameOver: false,
     floor: 1,
+    floorTransition: null,
     kills: 0,
     tiles: null,
     tw: 0,
@@ -275,6 +298,8 @@
     player: {
       x: 1.5, y: 1.5, angle: 0, health: 100, keys: 0, requiredKeys: 1,
       effects: { speed: 0, damage: 0, invincible: 0 },
+      inventory: { speed: 0, damage: 0, invincible: 0 },
+      selectedSlot: 0,
     },
     enemies: [],
     pickups: [],
@@ -337,7 +362,7 @@
     state.player.keys = 0;
 
     const exitCell = farthestTile(tiles, w, h, spawn.x, spawn.y);
-    state.exit = { x: exitCell.x + 0.5, y: exitCell.y + 0.5 };
+    state.exit = { x: exitCell.x + 0.5, y: exitCell.y + 0.5, open: 0 };
 
     state.pickups = [];
     for (let i = 0; i < state.player.requiredKeys; i++) {
@@ -375,6 +400,9 @@
         ranged,
         shootCooldown: Math.random() * 1.2,
         hitFlash: 0,
+        animTime: Math.random() * 6,
+        attackTime: 0,
+        deathTime: 0,
       });
     }
   }
@@ -403,10 +431,14 @@
   }
 
   function beginRun() {
+    state.floorTransition = null;
+    floorFade.style.opacity = '0';
     state.floor = 1;
     state.kills = 0;
     state.player.health = 100;
     state.player.effects = { speed: 0, damage: 0, invincible: 0 };
+    state.player.inventory = { speed: 0, damage: 0, invincible: 0 };
+    state.player.selectedSlot = 0;
     state.gameOver = false;
     buildLevel(1);
     state.started = true;
@@ -462,6 +494,16 @@
   // ---- Input ----
   window.addEventListener('keydown', (e) => {
     const k = e.key.toLowerCase();
+    if (/^Digit[1-3]$/.test(e.code) || k === 'e') {
+      if (!state.started || state.paused || state.gameOver ||
+          /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName) || e.target.isContentEditable) return;
+      e.preventDefault();
+      if (e.repeat) return;
+      if (k === 'e') useSelectedPowerup();
+      else state.player.selectedSlot = Number(e.code.slice(-1)) - 1;
+      updateHotbar();
+      return;
+    }
     state.keysHeld[k] = true;
     if (e.code === 'Space') {
       e.preventDefault();
@@ -535,6 +577,7 @@
   }
 
   function shoot() {
+    if (state.floorTransition) return;
     if (!state.started || state.paused || state.gameOver) return;
     fireWeaponFx();
     const p = state.player;
@@ -560,16 +603,75 @@
       bestEnemy.hitFlash = 1;
       if (bestEnemy.health <= 0) {
         bestEnemy.alive = false;
+        bestEnemy.deathTime = 0;
         state.kills++;
       }
     }
   }
 
   function applyPowerup(sub) {
-    state.player.effects[sub] = POWERUP_DURATIONS[sub];
+    state.player.effects[sub] += POWERUP_DURATIONS[sub];
+  }
+
+  function useSelectedPowerup() {
+    if (state.floorTransition) return;
+    if (!state.started || state.paused || state.gameOver) return;
+    const p = state.player, sub = POWERUP_SLOTS[p.selectedSlot];
+    if (p.inventory[sub] <= 0) return;
+    p.inventory[sub]--;
+    applyPowerup(sub);
+  }
+
+  function updateHotbar() {
+    const p = state.player;
+    const firstAvailable = POWERUP_SLOTS.findIndex(sub => p.inventory[sub] > 0);
+    if (p.inventory[POWERUP_SLOTS[p.selectedSlot]] === 0 && firstAvailable !== -1) {
+      p.selectedSlot = firstAvailable;
+    }
+    const display = [p.selectedSlot, ...POWERUP_SLOTS.map(sub => p.inventory[sub])].join(':');
+    if (display === hotbarDisplay) return;
+    hotbarDisplay = display;
+    document.getElementById('hotbar').hidden = firstAvailable === -1;
+    hotbarSlots.forEach((slot, i) => {
+      const sub = POWERUP_SLOTS[i], count = p.inventory[sub];
+      slot.hidden = count === 0;
+      slot.classList.toggle('selected', i === p.selectedSlot);
+      slot.classList.toggle('empty', count === 0);
+      slot.querySelector('b').textContent = `×${count}`;
+      slot.setAttribute('aria-label', `${i + 1}: ${POWERUP_LABELS[sub]}, ${count} charges${i === p.selectedSlot ? ', selected' : ''}`);
+    });
+    const sub = POWERUP_SLOTS[p.selectedSlot];
+    hotbarHint.textContent = `1–3 select · ${p.inventory[sub] ? 'E use ' : 'Empty: '}${POWERUP_LABELS[sub]}`;
+  }
+
+  function updateExitDoor(dt) {
+    const exit = state.exit, p = state.player;
+    const unlocked = p.keys >= p.requiredKeys;
+    const nearby = dist2(exit, p) < 2.25 && lineClear(p.x, p.y, exit.x, exit.y);
+    if (!unlocked) exit.open = 0;
+    else exit.open = Math.max(0, Math.min(1, exit.open + (nearby ? dt : -dt) / 0.6));
+  }
+
+  function updateFloorTransition(dt) {
+    const transition = state.floorTransition;
+    if (transition.phase === 'black') {
+      state.floor++;
+      buildLevel(state.floor);
+      transition.phase = 'in';
+      transition.elapsed = 0;
+      return;
+    }
+    transition.elapsed = Math.min(FADE_SECONDS, transition.elapsed + dt);
+    const progress = transition.elapsed / FADE_SECONDS;
+    floorFade.style.opacity = String(transition.phase === 'out' ? progress : 1 - progress);
+    if (progress >= 1) {
+      if (transition.phase === 'out') transition.phase = 'black';
+      else state.floorTransition = null;
+    }
   }
 
   function update(dt) {
+    if (state.floorTransition) { updateFloorTransition(dt); return; }
     const p = state.player;
 
     for (const k in p.effects) {
@@ -595,21 +697,23 @@
         if (pk.type === 'key') p.keys++;
         else if (pk.type === 'health') p.health = Math.min(100, p.health + 30);
         else if (pk.type === 'powerup') {
-          applyPowerup(pk.sub);
+          p.inventory[pk.sub]++;
         }
       }
     }
 
-    if (p.keys >= p.requiredKeys && dist2(state.exit, p) < 0.4) {
-      state.floor++;
-      buildLevel(state.floor);
+    updateExitDoor(dt);
+    if (p.keys >= p.requiredKeys && state.exit.open >= 1 && dist2(state.exit, p) < 0.4) {
+      state.floorTransition = { phase: 'out', elapsed: 0 };
       return;
     }
 
     const now = performance.now();
     for (const e of state.enemies) {
       if (e.hitFlash > 0) e.hitFlash = Math.max(0, e.hitFlash - dt / 0.25);
-      if (!e.alive) continue;
+      e.animTime += dt;
+      e.attackTime = Math.max(0, e.attackTime - dt);
+      if (!e.alive) { e.deathTime += dt; continue; }
       if (now >= e.repathAt || !e.path) {
         e.path = AStar.find(state.tiles, Math.floor(e.x), Math.floor(e.y), Math.floor(p.x), Math.floor(p.y));
         e.pathIndex = 1; // skip the tile the enemy is already standing on
@@ -643,9 +747,11 @@
             life: 3,
           });
           e.shootCooldown = 1.6 + Math.random() * 0.6;
+          e.attackTime = 0.4;
         }
       } else if (dist2(e, p) < 0.55 && e.cooldown <= 0) {
         e.cooldown = 1.0;
+        e.attackTime = 0.4;
         if (p.effects.invincible <= 0) {
           p.health -= 8;
           flashDamage();
@@ -699,7 +805,7 @@
 
     const sprites = [];
     for (const e of state.enemies) {
-      if (e.alive) sprites.push({ x: e.x, y: e.y, color: e.ranged ? '#d9b3ff' : '#eaf3ff', scale: 1, ghost: true, flash: e.hitFlash });
+      if (e.alive || e.deathTime < 0.6) sprites.push(wraithSprite(e));
     }
     for (const proj of state.projectiles) {
       sprites.push({ x: proj.x, y: proj.y, color: '#ff5fd6', scale: 0.22, bolt: true });
@@ -717,7 +823,8 @@
         });
       }
     }
-    sprites.push({ x: state.exit.x, y: state.exit.y, color: '#39c8ff', scale: 1.3, door: true });
+    sprites.push({ x: state.exit.x, y: state.exit.y, color: '#39c8ff', scale: 1.3, door: true,
+      atlas: doorAtlas, frame: Math.min(3, Math.floor(state.exit.open * 4)) });
 
     Raycaster.render(ctx, W, H, state.tiles, state.tw, state.th, state.player, sprites, activeSky, state.theme, wallTextures);
     if (settings.minimap) drawMinimap();
@@ -790,15 +897,14 @@
         mctx.lineTo(px, py + 2.6);
         mctx.stroke();
       } else if (pk.type === 'health') {
-        // Tiny health-pack icon: a small green square with a white cross.
-        mctx.fillStyle = '#3fbf5f';
-        mctx.fillRect(px - 2.5, py - 2.5, 5, 5);
-        mctx.strokeStyle = '#1d3a24';
-        mctx.lineWidth = 0.6;
-        mctx.strokeRect(px - 2.5, py - 2.5, 5, 5);
-        mctx.fillStyle = '#f4f4f0';
-        mctx.fillRect(px - 0.5, py - 1.8, 1, 3.6);
-        mctx.fillRect(px - 1.8, py - 0.5, 3.6, 1);
+        // Pixel-aligned green plus with a dark border for map contrast.
+        const hx = Math.round(px), hy = Math.round(py);
+        mctx.fillStyle = '#102b19';
+        mctx.fillRect(hx - 2, hy - 4, 5, 9);
+        mctx.fillRect(hx - 4, hy - 2, 9, 5);
+        mctx.fillStyle = '#63f58a';
+        mctx.fillRect(hx - 1, hy - 3, 3, 7);
+        mctx.fillRect(hx - 3, hy - 1, 7, 3);
       } else if (pk.type === 'powerup') {
         // Tiny power-up icon: a small colored diamond.
         mctx.fillStyle = POWERUP_COLORS[pk.sub] || '#ffffff';
@@ -811,16 +917,22 @@
         mctx.fill();
       }
     }
-    // Exit door icon: a small bordered rectangle with a knob dot.
+    // Simple brown arch stays readable at minimap scale.
     const ex = state.exit.x * scale, ey = state.exit.y * scale;
     if (isRevealed(state.exit.x, state.exit.y)) {
-      mctx.fillStyle = '#39c8ff';
-      mctx.fillRect(ex - 3, ey - 4, 6, 8);
-      mctx.strokeStyle = '#12262e';
-      mctx.lineWidth = 1;
-      mctx.strokeRect(ex - 3, ey - 4, 6, 8);
-      mctx.fillStyle = '#ffe27a';
-      mctx.fillRect(ex + 0.8, ey - 0.5, 1, 1);
+      const iconX = Math.round(ex) - 4;
+      const iconY = Math.round(ey) - 5;
+      mctx.save();
+      mctx.fillStyle = '#382315';
+      mctx.fillRect(iconX + 2, iconY, 4, 1);
+      mctx.fillRect(iconX + 1, iconY + 1, 6, 1);
+      mctx.fillRect(iconX, iconY + 2, 8, 8);
+      mctx.fillStyle = '#ad713e';
+      mctx.fillRect(iconX + 2, iconY + 1, 4, 1);
+      mctx.fillRect(iconX + 1, iconY + 2, 6, 7);
+      mctx.fillStyle = '#f0c76a';
+      mctx.fillRect(iconX + 5, iconY + 5, 1, 1);
+      mctx.restore();
     }
 
     const p = state.player;
@@ -836,6 +948,16 @@
   }
 
   function drawHUD() {
+    updateHotbar();
+    const p = state.player;
+    const missingKeys = p.requiredKeys - p.keys;
+    const showDoorHint = state.started && !state.paused && !state.gameOver && !state.floorTransition &&
+      missingKeys > 0 && dist2(state.exit, p) < 1 && lineClear(p.x, p.y, state.exit.x, state.exit.y);
+    const hint = showDoorHint ? `Door locked — go back and collect all keys. ${missingKeys} key${missingKeys === 1 ? '' : 's'} remaining (${p.keys}/${p.requiredKeys}).` : '';
+    if (doorHint.textContent !== hint) {
+      doorHint.textContent = hint;
+      doorHint.classList.toggle('visible', !!hint);
+    }
     hudFloor.textContent = state.floor;
     hudHp.textContent = Math.max(0, Math.round(state.player.health));
     hudKills.textContent = state.kills;

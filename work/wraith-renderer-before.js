@@ -5,27 +5,6 @@
 
 const Raycaster = (() => {
   const FOV = (60 * Math.PI) / 180;
-  const ghostPalettes = new WeakMap();
-
-  // Pay for color filters once per atlas, never once per screen column.
-  function prepareGhostAtlas(atlas) {
-    if (ghostPalettes.has(atlas) || !atlas.complete || !atlas.naturalWidth) return;
-    const variants = [atlas];
-    for (const filter of [
-      'hue-rotate(75deg)',
-      'sepia(1) saturate(6) hue-rotate(315deg)',
-      'sepia(1) saturate(9) hue-rotate(305deg) brightness(0.72)',
-    ]) {
-      const surface = document.createElement('canvas');
-      surface.width = atlas.naturalWidth;
-      surface.height = atlas.naturalHeight;
-      const context = surface.getContext('2d');
-      context.filter = filter;
-      context.drawImage(atlas, 0, 0);
-      variants.push(surface);
-    }
-    ghostPalettes.set(atlas, variants);
-  }
 
   // Default palette used when no per-floor theme is supplied.
   const DEFAULT_THEME = {
@@ -368,25 +347,6 @@ const Raycaster = (() => {
       }
 
       if (s.door) {
-        if (s.atlas && s.atlas.complete && s.atlas.naturalWidth) {
-          ctx.beginPath();
-          let visible = false;
-          for (let x = x0; x < x1;) {
-            if (transformY >= zbuffer[x]) { x++; continue; }
-            const start = x++;
-            while (x < x1 && transformY < zbuffer[x]) x++;
-            ctx.rect(start, 0, x - start, H);
-            visible = true;
-          }
-          if (!visible) continue;
-          ctx.save();
-          ctx.clip();
-          ctx.imageSmoothingEnabled = false;
-          ctx.globalAlpha = shade;
-          ctx.drawImage(s.atlas, s.frame * 64, 0, 64, 64, left, top, spriteSize, spriteSize);
-          ctx.restore();
-          continue;
-        }
         // Simple paneled door: dark frame border, a glowing panel with a
         // horizontal mid-rail, and a small knob near one edge.
         const glow = 0.82 + 0.18 * Math.sin(time * 1.6 + s.x + s.y);
@@ -435,28 +395,18 @@ const Raycaster = (() => {
 
       if (s.ghost) {
         if (s.atlas && s.atlas.complete && s.atlas.naturalWidth) {
-          prepareGhostAtlas(s.atlas);
-          // Death keeps a darker crimson tint throughout the dissolve, even
-          // after the ordinary damage flash expires (for both enemy types).
-          const atlas = ghostPalettes.get(s.atlas)[s.row === 3 ? 3 : s.flash > 0 ? 2 : s.ranged ? 1 : 0];
-          // Combine adjacent visible columns into clipping rectangles. A single
-          // image draw retains full-frame texture mapping across wall gaps.
-          ctx.beginPath();
-          let visible = false;
-          for (let x = x0; x < x1;) {
-            if (transformY >= zbuffer[x]) { x++; continue; }
-            const start = x++;
-            while (x < x1 && transformY < zbuffer[x]) x++;
-            ctx.rect(start, 0, x - start, H);
-            visible = true;
-          }
-          if (!visible) continue;
           ctx.save();
-          ctx.clip();
           ctx.imageSmoothingEnabled = false;
           ctx.globalAlpha = shade;
-          ctx.drawImage(atlas, s.frame * 32, s.row * 32, 32, 32,
-            left, top, spriteSize, spriteSize);
+          // Filter preserves the atlas alpha and dark face; ranged robes turn violet.
+          ctx.filter = s.flash > 0 && s.row !== 3 ? 'sepia(1) saturate(6) hue-rotate(315deg)' :
+            s.ranged ? 'hue-rotate(75deg)' : 'none';
+          for (let x = x0; x < x1; x++) {
+            if (transformY >= zbuffer[x]) continue;
+            const u = Math.min(31, Math.max(0, Math.floor((x - left) / spriteSize * 32)));
+            ctx.drawImage(s.atlas, s.frame * 32 + u, s.row * 32, 1, 32,
+              x, top, 1, spriteSize);
+          }
           ctx.restore();
           continue;
         }
@@ -521,5 +471,5 @@ const Raycaster = (() => {
     }
   }
 
-  return { render, FOV, prepareGhostAtlas };
+  return { render, FOV };
 })();

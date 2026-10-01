@@ -20,6 +20,14 @@
 
     <!-- Active power-up badges -->
     <div id="powerup-status"></div>
+    <div id="hotbar" role="group" aria-label="Stored powerups" hidden>
+      <div class="hotbar-slots">
+        <div class="hotbar-slot speed" data-slot="0"><kbd>1</kbd><span>Speed</span><b>×0</b></div>
+        <div class="hotbar-slot damage" data-slot="1"><kbd>2</kbd><span>Damage</span><b>×0</b></div>
+        <div class="hotbar-slot invincible" data-slot="2"><kbd>3</kbd><span>Shield</span><b>×0</b></div>
+      </div>
+      <div id="hotbar-hint" role="status">1–3 select · E use</div>
+    </div>
 
     <!-- Minimap -->
     <canvas id="minimap" width="180" height="180"></canvas>
@@ -28,6 +36,8 @@
     <div id="crosshair">+</div>
 
     <!-- Damage flash -->
+    <div id="floor-fade" aria-hidden="true"></div>
+    <div id="door-hint" role="status" aria-live="polite" aria-atomic="true"></div>
     <div id="damage-flash"></div>
 
     <!-- Start / message overlay -->
@@ -62,13 +72,14 @@
             </div>
             <div class="legend-row">
               <span class="legend-icon powerup"></span>
-              <span><b>Power-Up</b> — temporary Speed, Damage, or Invincibility boost</span>
+              <span><b>Power-Up</b> — stored in your hotbar; press E to activate the selected boost</span>
             </div>
           </div>
           <div class="controls">
             <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Move</div>
             <div><kbd>←</kbd><kbd>→</kbd> / Mouse — Turn</div>
             <div><kbd>Space</kbd> / Click — Shoot</div>
+            <div><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> Select power-up · <kbd>E</kbd> Use</div>
             <div><kbd>M</kbd> — Toggle minimap paths</div>
             <div><kbd>P</kbd> — Pause & settings</div>
           </div>
