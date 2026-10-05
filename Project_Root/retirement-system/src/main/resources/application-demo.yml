@@ -1,0 +1,5 @@
+spring:
+  datasource:
+    password: ${DB_PASSWORD:local-learning-only}
+  flyway:
+    locations: classpath:db/migration,classpath:db/demo

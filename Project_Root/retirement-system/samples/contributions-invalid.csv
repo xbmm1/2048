@@ -1,0 +1,4 @@
+member_number,payroll_month,pensionable_pay,employee_contribution,employer_contribution
+DEMO-1001,2026-01,5000.00,500.00,750.00
+UNKNOWN,2026-01,4000.00,400.00,600.00
+DEMO-1002,2026-01,-100.00,10.00,15.00

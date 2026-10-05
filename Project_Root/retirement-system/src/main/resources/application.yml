@@ -1,0 +1,34 @@
+spring:
+  application:
+    name: retirement-learning-lab
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/retirement}
+    username: ${DB_USER:retirement}
+    password: ${DB_PASSWORD}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  batch:
+    job:
+      enabled: false
+    jdbc:
+      initialize-schema: always
+      # A unique import fingerprint chooses one launcher; Batch's unique job key is the backstop.
+      # Avoid unrelated PostgreSQL SERIALIZABLE predicate conflicts on concurrent job creation.
+      isolation-level-for-create: READ_COMMITTED
+  servlet:
+    multipart:
+      max-file-size: 1MB
+      max-request-size: 1MB
+server:
+  error:
+    include-message: never
+  servlet:
+    session:
+      cookie:
+        http-only: true
+        same-site: lax
+logging:
+  level:
+    org.example.retirement: INFO

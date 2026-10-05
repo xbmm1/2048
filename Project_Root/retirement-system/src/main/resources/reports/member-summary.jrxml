@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jasperReport name="member_summary" language="java" pageWidth="595" pageHeight="842" columnWidth="499" leftMargin="48" rightMargin="48" topMargin="45" bottomMargin="45">
+  <parameter name="MEMBER" class="java.lang.String"/>
+  <parameter name="EMPLOYER" class="java.lang.String"/>
+  <parameter name="ESTIMATE" class="java.lang.String"/>
+  <parameter name="ELIGIBILITY" class="java.lang.String"/>
+  <parameter name="BENEFIT" class="java.lang.String"/>
+  <parameter name="INPUTS" class="java.lang.String"/>
+  <parameter name="TOTALS" class="java.lang.String"/>
+  <title height="600">
+    <element kind="staticText" x="0" y="0" width="499" height="22" forecolor="#157A6E" fontSize="11" bold="true"><text><![CDATA[RETIREMENT LEARNING LAB / MEMBER STATEMENT]]></text></element>
+    <element kind="staticText" x="0" y="35" width="499" height="40" forecolor="#153040" fontSize="25" bold="true"><text><![CDATA[Your pension summary]]></text></element>
+    <element kind="textField" x="0" y="95" width="499" height="44" fontSize="16" textAdjust="StretchHeight"><expression><![CDATA[$P{MEMBER}]]></expression></element>
+    <element kind="textField" x="0" y="145" width="499" height="40" fontSize="11"><expression><![CDATA[$P{EMPLOYER}]]></expression></element>
+    <element kind="textField" x="0" y="192" width="499" height="28" fontSize="10"><expression><![CDATA[$P{ESTIMATE}]]></expression></element>
+    <element kind="textField" x="0" y="235" width="499" height="28" fontSize="11"><expression><![CDATA[$P{ELIGIBILITY}]]></expression></element>
+    <element kind="textField" x="0" y="278" width="499" height="40" forecolor="#157A6E" fontSize="14" bold="true"><expression><![CDATA[$P{BENEFIT}]]></expression></element>
+    <element kind="textField" x="0" y="325" width="499" height="35" fontSize="10"><expression><![CDATA[$P{INPUTS}]]></expression></element>
+    <element kind="staticText" x="0" y="380" width="499" height="25" fontSize="13" bold="true"><text><![CDATA[Contribution totals at report generation]]></text></element>
+    <element kind="textField" x="0" y="417" width="499" height="90" fontSize="12"><expression><![CDATA[$P{TOTALS}]]></expression></element>
+    <element kind="staticText" x="0" y="542" width="499" height="55" forecolor="#536670" fontSize="10"><text><![CDATA[Fictional learning rules and synthetic data. This is not a PSPRS benefit statement or a payment authorization. The estimate is an immutable snapshot; contribution totals reflect the current ledger.]]></text></element>
+  </title>
+  <pageFooter height="25"><element kind="staticText" x="0" y="5" width="499" height="20" fontSize="9" forecolor="#536670"><text><![CDATA[Retirement Administration Learning Project | Learning use only]]></text></element></pageFooter>
+</jasperReport>

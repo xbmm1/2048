@@ -1,6 +1,10 @@
 [Link to programs](https://xbmm1.github.io/2048/Project_Root/HTML_Projects/index.html)
 # 2048 Game with AI Strategy Solver
 
+## Retirement Administration Learning Project
+
+[Retirement Learning Lab](Project_Root/retirement-system/README.md) is a standalone Java 17 / Spring Boot / PostgreSQL example with a staff portal, contribution batch imports, pension estimates, independent approvals, audit history, and Jasper PDF reporting. Its README includes local setup and a guided walkthrough.
+
 A fully-featured implementation of the classic 2048 puzzle game, complete with multiple AI strategies, a 1000-game simulator for benchmarking, and comprehensive strategy documentation.
 [2048-with-strategies](https://xbmm1.github.io/2048/Project_Root/HTML_Projects/2048.html)
 
