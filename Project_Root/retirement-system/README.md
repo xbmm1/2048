@@ -64,6 +64,7 @@ Jordan is too young and lacks service; Casey lacks 36 months of salary history. 
 - [Learning backlog](docs/backlog.md): Jira-style stories, acceptance criteria, debugging exercises.
 - [AWS deployment mapping](docs/aws.md): ECS, RDS, Secrets Manager, CloudWatch; no infrastructure is created.
 - [Verification record](docs/verification.md): what was actually tested in the implementation environment.
+- [Saved architecture reference](docs/references.md): your GitDiagram link and attached diagram preserved for later.
 
 ## Commands
 

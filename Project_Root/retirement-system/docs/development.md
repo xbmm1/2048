@@ -17,7 +17,7 @@ Open the JRXML as an existing report, select Java expressions, use an empty-reco
 ## Tests
 
 - `mvnw test`: eight deterministic calculation cases and a real Jasper/PDF rendering test.
-- `mvnw verify`: additionally starts PostgreSQL 17 through Testcontainers and tests migrations, function/reconciliation results, atomic imports, duplicate protection, immutable history, request transitions, concurrent approvals, security, and rendered portal pages.
+- `mvnw verify`: additionally runs 13 integration cases against PostgreSQL 17 through Testcontainers, covering migrations, function/reconciliation results, atomic imports, database-failure rollback, concurrent imports, duplicate protection, immutable history, request transitions, concurrent approvals, durable batch metadata, real demo login, security, and rendered portal pages.
 - CI fails when Docker is unavailable; integration tests are not silently skipped.
 - For an explicitly provisioned **disposable** PostgreSQL 17 test database, set `TEST_DATABASE_URL`, `TEST_DATABASE_USER`, and `TEST_DATABASE_PASSWORD` before `verify`. Tests insert synthetic fixtures into that database. Do not point these variables at a valuable database.
 
