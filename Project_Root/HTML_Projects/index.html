@@ -94,7 +94,7 @@
     opacity: 0.65;
     will-change: transform;
   }
-  #hill-chase { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; image-rendering: pixelated; }
+  .hill-chase-canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; image-rendering: pixelated; }
   @media (prefers-reduced-motion: reduce) {
     .landscape-layer, .landscape-sun { will-change: auto; }
   }
@@ -551,13 +551,17 @@
       <path id="chase-ridge" fill="none" stroke="none" d="M0 220 C180 90 260 245 440 175 S700 100 860 210 S1170 70 1440 170"/>
       <path fill="#df652f" d="M0 220 C180 90 260 245 440 175 S700 100 860 210 S1170 70 1440 170 V600 H0Z"/>
     </svg>
-    <canvas id="hill-chase" aria-hidden="true"></canvas>
-    <svg class="landscape-layer" data-parallax="0.65" viewBox="0 0 1440 600" preserveAspectRatio="none">
+    <canvas id="hill-chase" class="hill-chase-canvas" aria-hidden="true"></canvas>
+    <svg id="middle-hill" class="landscape-layer" data-parallax="0.65" viewBox="0 0 1440 600" preserveAspectRatio="none">
+      <path id="middle-hill-ridge" fill="none" stroke="none" d="M0 300 C180 210 340 360 530 270 S790 200 960 295 S1230 210 1440 290"/>
       <path fill="#82463e" d="M0 300 C180 210 340 360 530 270 S790 200 960 295 S1230 210 1440 290 V600 H0Z"/>
     </svg>
-    <svg class="landscape-layer" data-parallax="1" viewBox="0 0 1440 600" preserveAspectRatio="none">
+    <canvas id="middle-hill-chase" class="hill-chase-canvas" aria-hidden="true"></canvas>
+    <svg id="back-hill" class="landscape-layer" data-parallax="1" viewBox="0 0 1440 600" preserveAspectRatio="none">
+      <path id="back-hill-ridge" fill="none" stroke="none" d="M0 390 C200 290 380 460 590 355 S910 450 1100 345 S1310 345 1440 390"/>
       <path fill="#062438" d="M0 390 C200 290 380 460 590 355 S910 450 1100 345 S1310 345 1440 390 V600 H0Z"/>
     </svg>
+    <canvas id="back-hill-chase" class="hill-chase-canvas" aria-hidden="true"></canvas>
   </div>
   <canvas id="particles" aria-hidden="true"></canvas>
   <div id="unicorn-background" data-us-project="WDQAscd8gRV09lIpHv0h" data-us-lazyload="true" aria-hidden="true"></div>
@@ -1034,38 +1038,78 @@
   }
 
   function initHillChase() {
-    var canvas = document.getElementById('hill-chase'), ctx = canvas.getContext('2d');
-    var hill = document.getElementById('chase-hill'), ridge = document.getElementById('chase-ridge');
+    var tracks = [
+      { canvas: document.getElementById('hill-chase'), hill: document.getElementById('chase-hill'), ridge: document.getElementById('chase-ridge') },
+      { canvas: document.getElementById('middle-hill-chase'), hill: document.getElementById('middle-hill'), ridge: document.getElementById('middle-hill-ridge') },
+      { canvas: document.getElementById('back-hill-chase'), hill: document.getElementById('back-hill'), ridge: document.getElementById('back-hill-ridge') }
+    ];
     var preference = window.matchMedia('(prefers-reduced-motion: reduce)');
-    var points = [], length = ridge.getTotalLength();
-    for (var i = 0; i <= 1024; i++) points.push(ridge.getPointAtLength(length * i / 1024));
+    tracks.forEach(function (track) {
+      track.ctx = track.canvas.getContext('2d');
+      var length = track.ridge.getTotalLength();
+      track.points = [];
+      for (var pointIndex = 0; pointIndex <= 1024; pointIndex++) {
+        track.points.push(track.ridge.getPointAtLength(length * pointIndex / 1024));
+      }
+    });
     var images = [], ready = false, active = false, elapsed = 0, last = null;
     var timer = null, frameRequest = null, remaining = 6000, waitStarted = 0;
-    function clear() { ctx.clearRect(0, 0, canvas.width, canvas.height); }
-    function ground(x) {
+    var trackIndex = -1, direction = 1;
+    function clear() {
+      tracks.forEach(function (track) {
+        track.ctx.setTransform(1, 0, 0, 1, 0, 0);
+        track.ctx.clearRect(0, 0, track.canvas.width, track.canvas.height);
+      });
+    }
+    function ground(track, svgX) {
+      var points = track.points;
       var lo = 0, hi = points.length - 1;
-      while (hi - lo > 1) { var mid = (lo + hi) >> 1; if (points[mid].x < x) lo = mid; else hi = mid; }
-      var a = points[lo], b = points[hi];
-      var t = Math.max(0, Math.min(1, (x - a.x) / (b.x - a.x || 1)));
-      return a.y + (b.y - a.y) * t;
+      while (hi - lo > 1) {
+        var middle = (lo + hi) >> 1;
+        if (points[middle].x < svgX) lo = middle;
+        else hi = middle;
+      }
+      var startPoint = points[lo], endPoint = points[hi];
+      var fraction = Math.max(0, Math.min(1, (svgX - startPoint.x) / (endPoint.x - startPoint.x || 1)));
+      return startPoint.y + (endPoint.y - startPoint.y) * fraction;
     }
     function paint() {
-      var width = window.innerWidth, height = window.innerHeight;
+      var viewportWidth = window.innerWidth, viewportHeight = window.innerHeight;
       var dpr = Math.min(window.devicePixelRatio || 1, 2);
-      if (canvas.width !== Math.round(width * dpr) || canvas.height !== Math.round(height * dpr)) {
-        canvas.width = Math.round(width * dpr); canvas.height = Math.round(height * dpr);
-      }
+      var track = tracks[trackIndex];
+      tracks.forEach(function (candidateTrack) {
+        var currentCanvas = candidateTrack.canvas;
+        if (currentCanvas.width !== Math.round(viewportWidth * dpr) || currentCanvas.height !== Math.round(viewportHeight * dpr)) {
+          currentCanvas.width = Math.round(viewportWidth * dpr);
+          currentCanvas.height = Math.round(viewportHeight * dpr);
+        }
+      });
+      var ctx = track.ctx;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      ctx.clearRect(0, 0, width, height); ctx.imageSmoothingEnabled = false;
-      var rect = hill.getBoundingClientRect(), small = width < 640 ? 0.75 : 1;
-      var horseSize = 64 * small, buffaloSize = 48 * small, gap = horseSize * 1.8;
-      var horseX = -gap - horseSize + elapsed / 12000 * (width + gap + horseSize * 2);
+      ctx.clearRect(0, 0, viewportWidth, viewportHeight); ctx.imageSmoothingEnabled = false;
+      var rect = track.hill.getBoundingClientRect();
+      var scale = viewportWidth < 640 ? 0.75 : 1;
+      var horseSize = 64 * scale, buffaloSize = 48 * scale, gap = horseSize * 1.8;
+      var travel = elapsed / 12000 * (viewportWidth + gap + horseSize * 2);
+      var baseX = direction > 0 ? -gap - horseSize + travel : viewportWidth + horseSize - travel;
+      var positions = direction > 0 ? [baseX + gap, baseX] : [baseX, baseX + gap];
       var frame = Math.floor(elapsed / 100) % 6;
-      [horseX + gap, horseX].forEach(function (x, index) {
-        var size = index === 0 ? buffaloSize : horseSize;
-        var y = rect.top + ground((x - rect.left) / rect.width * 1440) / 600 * rect.height;
-        ctx.drawImage(images[index], frame % 3 * 64, Math.floor(frame / 3) * 64, 64, 64,
-          Math.round(x - size / 2), Math.round(y - size * 56 / 64), size, size);
+      positions.forEach(function (centerX, spriteIndex) {
+        var size = spriteIndex === 0 ? buffaloSize : horseSize;
+        var svgX = Math.max(0, Math.min(1440, (centerX - rect.left) / rect.width * 1440));
+        var contactY = rect.top + ground(track, svgX) / 600 * rect.height;
+        var slopeStart = Math.max(0, svgX - 12);
+        var slopeEnd = Math.min(1440, svgX + 12);
+        var slopeY = (ground(track, slopeEnd) - ground(track, slopeStart)) * rect.height / 600;
+        var slopeX = (slopeEnd - slopeStart) * rect.width / 1440;
+        var angle = Math.atan2(slopeY, slopeX);
+        ctx.save();
+        ctx.translate(Math.round(centerX), Math.round(contactY));
+        ctx.rotate(angle);
+        if (direction < 0) ctx.scale(-1, 1);
+        ctx.drawImage(images[spriteIndex], frame % 3 * 64, Math.floor(frame / 3) * 64, 64, 64,
+          Math.round(-size / 2), Math.round(-size * 56 / 64), size, size);
+        ctx.restore();
       });
     }
     function tick(now) {
@@ -1083,7 +1127,14 @@
       if (active) { last = null; frameRequest = requestAnimationFrame(tick); return; }
       waitStarted = performance.now();
       timer = setTimeout(function () {
-        timer = null; active = true; elapsed = 0; last = null;
+        timer = null;
+        var nextTrack = Math.floor(Math.random() * tracks.length);
+        if (trackIndex >= 0 && tracks.length > 1 && nextTrack === trackIndex) {
+          nextTrack = (nextTrack + 1 + Math.floor(Math.random() * (tracks.length - 1))) % tracks.length;
+        }
+        trackIndex = nextTrack;
+        direction = Math.random() < 0.5 ? -1 : 1;
+        active = true; elapsed = 0; last = null;
         frameRequest = requestAnimationFrame(tick);
       }, remaining);
     }
