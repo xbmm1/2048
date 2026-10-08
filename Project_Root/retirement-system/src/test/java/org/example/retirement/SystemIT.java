@@ -39,6 +39,8 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 @AutoConfigureMockMvc
 @ActiveProfiles("demo")
 class SystemIT {
+  static final String STAFF_PW = "t-" + UUID.randomUUID();
+  static final String APPROVER_PW = "t-" + UUID.randomUUID();
   // External URL is ONLY for an explicitly provisioned disposable test database.
   static final String external = System.getenv("TEST_DATABASE_URL");
   static final PostgreSQLContainer postgres =
@@ -47,6 +49,8 @@ class SystemIT {
   @DynamicPropertySource
   static void database(DynamicPropertyRegistry registry) {
     if (postgres != null) postgres.start();
+    registry.add("app.demo.staff-password", () -> STAFF_PW);
+    registry.add("app.demo.approver-password", () -> APPROVER_PW);
     registry.add(
         "spring.datasource.url", () -> external != null ? external : postgres.getJdbcUrl());
     registry.add(
@@ -309,11 +313,12 @@ class SystemIT {
 
   @Test
   void demoPasswordsReallyAuthenticate() throws Exception {
-    mvc.perform(formLogin().user("staff").password("Staff-demo-17!"))
+    mvc.perform(formLogin().user("staff").password(STAFF_PW))
         .andExpect(authenticated().withUsername("staff"));
-    mvc.perform(formLogin().user("approver").password("Approve-demo-17!"))
+    mvc.perform(formLogin().user("approver").password(APPROVER_PW))
         .andExpect(authenticated().withUsername("approver"));
     mvc.perform(formLogin().user("staff").password("wrong")).andExpect(unauthenticated());
+    mvc.perform(formLogin().user("staff").password(APPROVER_PW)).andExpect(unauthenticated());
   }
 
   @Test
