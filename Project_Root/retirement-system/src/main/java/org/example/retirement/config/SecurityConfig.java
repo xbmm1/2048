@@ -1,5 +1,10 @@
 package org.example.retirement.config;
 
+import java.security.SecureRandom;
+import java.util.Base64;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.*;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -13,6 +18,8 @@ import org.springframework.security.web.authentication.LoginUrlAuthenticationEnt
 @Configuration
 @EnableMethodSecurity
 public class SecurityConfig {
+  private static final Logger LOG = LoggerFactory.getLogger(SecurityConfig.class);
+
   @Bean
   BCryptPasswordEncoder passwordEncoder() {
     return new BCryptPasswordEncoder();
@@ -61,16 +68,32 @@ public class SecurityConfig {
 
   @Bean
   @Profile("demo")
-  UserDetailsService demoUsers(BCryptPasswordEncoder encoder) {
+  UserDetailsService demoUsers(
+      BCryptPasswordEncoder encoder,
+      @Value("${app.demo.staff-password:}") String staffPassword,
+      @Value("${app.demo.approver-password:}") String approverPassword) {
     return new InMemoryUserDetailsManager(
         User.withUsername("staff")
-            .password(encoder.encode("Staff-demo-17!"))
+            .password(encoder.encode(passwordOrGenerate("staff", staffPassword)))
             .roles("STAFF")
             .build(),
         User.withUsername("approver")
-            .password(encoder.encode("Approve-demo-17!"))
+            .password(encoder.encode(passwordOrGenerate("approver", approverPassword)))
             .roles("APPROVER")
             .build());
+  }
+
+  // Unset demo passwords are randomly generated and logged once at WARN level.
+  private static String passwordOrGenerate(String username, String configured) {
+    if (configured != null && !configured.isBlank()) return configured;
+    byte[] bytes = new byte[18];
+    new SecureRandom().nextBytes(bytes);
+    String generated = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+    LOG.warn(
+        "No demo password configured for '{}'; generated one for this run: {}",
+        username,
+        generated);
+    return generated;
   }
 
   // Fail closed outside the demo profile until an identity provider is integrated.

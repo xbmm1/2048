@@ -7,15 +7,21 @@ A runnable example of the Java/Spring, PostgreSQL, batch integration, and Jasper
 From this directory, with Docker Desktop running Linux containers:
 
 ```powershell
+$env:DB_PASSWORD = '<choose a database password>'
+# Optional; if unset, random passwords are generated and logged at startup:
+$env:DEMO_STAFF_PASSWORD = '<choose a staff password>'
+$env:DEMO_APPROVER_PASSWORD = '<choose an approver password>'
 docker compose up --build
 ```
 
 Open [the staff portal](http://localhost:8080). The first build downloads dependencies; wait for `Started RetirementApplication` in the logs.
 
-| Role | Username | Demo password |
-| --- | --- | --- |
-| Staff | `staff` | `Staff-demo-17!` |
-| Independent approver | `approver` | `Approve-demo-17!` |
+| Role | Username |
+| --- | --- |
+| Staff | `staff` |
+| Independent approver | `approver` |
+
+Passwords are never stored in the repository. Set `DEMO_STAFF_PASSWORD` and `DEMO_APPROVER_PASSWORD` (bound to `app.demo.staff-password` / `app.demo.approver-password`). If either is unset, a random password is generated at startup and logged once at WARN level; retrieve it with `docker compose logs app | Select-String "generated one"`.
 
 The Compose file binds to localhost and explicitly enables the `demo` profile. Credentials and seed migrations exist only in that profile. Without it, authentication fails closed until you integrate an identity provider. Do not deploy the demo profile publicly.
 
@@ -30,7 +36,7 @@ javac -version
 $env:JAVA_HOME = 'C:\Program Files\Java\jdk-17'
 docker compose up -d db
 $env:SPRING_PROFILES_ACTIVE = 'demo'
-$env:DB_PASSWORD = 'local-learning-only'
+$env:DB_PASSWORD = '<your-local-password>'
 .\mvnw.cmd spring-boot:run
 ```
 

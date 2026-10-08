@@ -4,7 +4,7 @@ services:
     environment:
       POSTGRES_DB: retirement
       POSTGRES_USER: retirement
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-local-learning-only}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD}
     ports:
       - "127.0.0.1:5432:5432"
     volumes:
@@ -20,7 +20,9 @@ services:
       SPRING_PROFILES_ACTIVE: demo
       DB_URL: jdbc:postgresql://db:5432/retirement
       DB_USER: retirement
-      DB_PASSWORD: ${DB_PASSWORD:-local-learning-only}
+      DEMO_STAFF_PASSWORD: ${DEMO_STAFF_PASSWORD:-}
+      DEMO_APPROVER_PASSWORD: ${DEMO_APPROVER_PASSWORD:-}
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD}
     ports:
       - "127.0.0.1:8080:8080"
     depends_on:
