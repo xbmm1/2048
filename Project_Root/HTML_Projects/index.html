@@ -474,6 +474,8 @@
   .tag.popular { color: var(--coral); border-color: rgba(255, 94, 43, 0.35); }
   .tag.fast { color: var(--orange); border-color: rgba(255, 125, 55, 0.35); }
 
+  .card-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .card-actions > .card-cta:first-child { flex: 1; }
   .card-cta {
     display: inline-flex;
     align-items: center;
@@ -491,6 +493,13 @@
   }
   .card-cta:hover { transform: translateY(-2px); box-shadow: 0 10px 26px rgba(255, 194, 104, 0.35); filter: brightness(1.05); }
   .card-cta svg { width: 14px; height: 14px; }
+  .card-readme {
+    padding: 10px 12px;
+    font-size: 0.78rem;
+    color: var(--text-primary);
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+  }
 
   /* ---------- No-results state ---------- */
   #no-results {
@@ -649,11 +658,11 @@
       description: 'Playable projects and interactive demos with game-like mechanics, controls, and real-time logic.',
       projects: [
         { title: 'Side-Scrolling Platformer', href: 'Simple_Side_Scrolling_Platformer.html', desc: 'A classic 2D platformer with gravity, jumping, and scrolling level design.', tags: ['Canvas', 'Game Physics'] },
-        { title: '2048', href: '2048.html', desc: 'The original sliding-tile puzzle game, built from scratch in JavaScript.', tags: ['Game Logic', 'Grid'], featured: true, popular: true },
+        { title: '2048', href: '2048.html', readme: 'https://github.com/xbmm1/2048/blob/HEAD/README.md', desc: 'The original sliding-tile puzzle game, built from scratch in JavaScript.', tags: ['Game Logic', 'Grid'], featured: true, popular: true },
         { title: '2048 (With Scores)', href: '2048-with-scores.html', desc: 'An enhanced 2048 build with live scoring and high-score tracking.', tags: ['Game Logic', 'LocalStorage'] },
         { title: '2048 (Explained)', href: '2048-explained.html', desc: 'A heavily annotated version of 2048 that walks through the core game logic.', tags: ['Education', 'Game Logic'] },
         { title: 'Sudoku Game', href: 'Simple-Sudoku-Game.html', desc: 'A playable Sudoku board with validation and puzzle generation.', tags: ['Puzzle', 'Validation'] },
-        { title: 'Doom Crawler (3D Raycaster)', href: 'https://xbmm1.github.io/2048/Project_Root/doom-crawler/doom2/index.html', desc: 'A DOOM-style first-person raycasting dungeon crawler with A* enemy AI and procedural mazes.', tags: ['Raycasting', 'AI', 'Canvas'], featured: true, popular: true }
+        { title: 'Doom Crawler (3D Raycaster)', href: 'https://xbmm1.github.io/2048/Project_Root/doom-crawler/doom2/index.html', readme: 'https://github.com/xbmm1/2048/blob/HEAD/Project_Root/doom-crawler/README.md', desc: 'A DOOM-style first-person raycasting dungeon crawler with A* enemy AI and procedural mazes.', tags: ['Raycasting', 'AI', 'Canvas'], featured: true, popular: true }
       ]
     },
     {
@@ -777,9 +786,13 @@
       '<h3>' + escapeHtml(project.title) + '</h3>' +
       '<p class="desc">' + escapeHtml(project.desc) + '</p>' +
       '<div class="tags">' + buildTagsHtml(project.tags, project) + '</div>' +
-      '<a class="card-cta" href="' + project.href.replace(/"/g, '&quot;') + '" target="_blank" rel="noopener">' +
-        'Open Project ' + externalIcon +
-      '</a>';
+      '<div class="card-actions">' +
+        '<a class="card-cta" href="' + escapeHtml(project.href) + '" target="_blank" rel="noopener">' +
+          'Open Project ' + externalIcon +
+        '</a>' +
+        (project.featured && project.readme ?
+          '<a class="card-cta card-readme" href="' + escapeHtml(project.readme) + '" target="_blank" rel="noopener" aria-label="Read ' + escapeHtml(project.title) + ' README (opens in a new tab)">README</a>' : '') +
+      '</div>';
     return card;
   }
 
