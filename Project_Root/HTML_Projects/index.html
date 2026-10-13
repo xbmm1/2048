@@ -48,22 +48,27 @@
     overflow-x: hidden;
   }
 
-  /* ---------- Animated gradient backdrop ---------- */
+  body:not(.unicorn-background-active) {
+    --glass-bg: rgba(40, 19, 22, 0.88);
+    --glass-bg-hover: rgba(62, 27, 27, 0.95);
+    --text-secondary: #f3dfcf;
+    --text-muted: #e2c5b3;
+  }
+  body:not(.unicorn-background-active) .site-nav { background: rgba(35, 18, 23, 0.96); }
+  body:not(.unicorn-background-active) .hero .subtitle,
+  body:not(.unicorn-background-active) .hero .lede {
+    color: #fff3e9;
+    text-shadow: 0 1px 4px #351820;
+  }
+
+  /* ---------- Desert sunset backdrop ---------- */
   .bg-gradient {
     position: fixed;
     inset: 0;
     z-index: -2;
     background:
-      radial-gradient(38% 45% at 15% 12%, rgba(255, 125, 55, 0.16), transparent 60%),
-      radial-gradient(45% 50% at 85% 8%, rgba(255, 94, 43, 0.16), transparent 60%),
-      radial-gradient(50% 55% at 50% 100%, rgba(255, 194, 104, 0.14), transparent 60%),
-      linear-gradient(180deg, var(--bg-0), var(--bg-1) 45%, var(--bg-0));
-    background-size: 200% 200%, 200% 200%, 200% 200%, 100% 100%;
-    animation: gradientDrift 22s ease-in-out infinite alternate;
-  }
-  @keyframes gradientDrift {
-    0% { background-position: 0% 0%, 100% 0%, 50% 100%, 0 0; }
-    100% { background-position: 20% 30%, 80% 20%, 40% 80%, 0 0; }
+      radial-gradient(ellipse at 45% 25%, rgba(42, 19, 29, 0.8), transparent 70%),
+      linear-gradient(180deg, #6e292d 0%, #c2472d 32%, #f47732 57%, #ffbc60 76%, #9c4330 100%);
   }
 
   .sunset-landscape {
@@ -72,26 +77,25 @@
     z-index: -1;
     overflow: hidden;
     pointer-events: none;
-    opacity: 0.78;
   }
   .landscape-layer {
     position: absolute;
     left: -10%;
     bottom: -80px;
     width: 120%;
-    height: 65vh;
+    height: 70vh;
     will-change: transform;
   }
   .landscape-sun {
     position: absolute;
-    left: 70%;
-    top: 30%;
-    width: clamp(90px, 14vw, 190px);
+    left: 74%;
+    top: 32%;
+    width: clamp(130px, 19vw, 270px);
     aspect-ratio: 1;
     border-radius: 50%;
-    background: #ffd17c;
-    box-shadow: 0 0 100px 30px rgba(255, 116, 45, 0.22);
-    opacity: 0.65;
+    background: #ffcf70;
+    -webkit-mask-image: linear-gradient(to bottom, #000 0% 68%, transparent 68% 70%, #000 70% 77%, transparent 77% 80%, #000 80% 87%, transparent 87% 91%, #000 91%);
+    mask-image: linear-gradient(to bottom, #000 0% 68%, transparent 68% 70%, #000 70% 77%, transparent 77% 80%, #000 80% 87%, transparent 87% 91%, #000 91%);
     will-change: transform;
   }
   .hill-chase-canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; image-rendering: pixelated; }
@@ -122,8 +126,7 @@
   body.unicorn-background-active .bg-gradient,
   body.unicorn-background-active .sunset-landscape,
   body.unicorn-background-active #particles {
-    opacity: 0;
-    visibility: hidden;
+    display: none;
   }
   body.unicorn-background-active #unicorn-background {
     opacity: 1;
@@ -524,6 +527,7 @@
   }
 
   @media (max-width: 639px) {
+    .landscape-sun { left: 78%; top: 43%; width: 120px; }
     .nav-inner { gap: 8px; }
     .brand { min-width: 0; font-size: 0.85rem; white-space: normal; }
     .brand-mark { flex-shrink: 0; }
@@ -547,19 +551,29 @@
   <div class="bg-gradient" aria-hidden="true"></div>
   <div class="sunset-landscape" aria-hidden="true">
     <div class="landscape-sun" data-parallax="0.15"></div>
+    <svg class="landscape-layer" data-parallax="0.18" viewBox="0 0 1440 600" preserveAspectRatio="none">
+      <defs>
+        <path id="desert-cactus" d="M-5 2 V-39 H-16 Q-25-39-25-48 V-66 Q-25-72-20-72 Q-15-72-15-66 V-50 H-5 V-85 Q-5-92 1-92 Q7-92 7-85 V-59 H18 V-76 Q18-82 23-82 Q28-82 28-76 V-57 Q28-48 19-48 H7 V2Z"/>
+      </defs>
+      <path fill="#c27649" d="M0 190 L70 172 105 162 128 120 140 118 144 72 163 72 168 62 215 64 220 86 238 88 247 144 300 176 380 183 415 168 437 150 473 177 560 197 650 170 710 182 765 164 806 186 900 179 950 139 976 135 982 87 1002 85 1008 76 1058 78 1065 97 1083 98 1093 151 1130 167 1190 177 1235 140 1250 146 1290 185 1370 166 1440 180 V600 H0Z"/>
+      <path fill="#a95738" opacity="0.6" d="M144 76 L151 78 149 125 129 157 115 164 137 124Z M220 88 L235 92 244 150 264 160 230 154Z M984 94 L994 91 989 146 965 163 978 139Z M1065 103 L1079 106 1088 154 1110 171 1074 158Z"/>
+    </svg>
     <svg id="chase-hill" class="landscape-layer" data-parallax="0.3" viewBox="0 0 1440 600" preserveAspectRatio="none">
-      <path id="chase-ridge" fill="none" stroke="none" d="M0 220 C180 90 260 245 440 175 S700 100 860 210 S1170 70 1440 170"/>
-      <path fill="#df652f" d="M0 220 C180 90 260 245 440 175 S700 100 860 210 S1170 70 1440 170 V600 H0Z"/>
+      <path id="chase-ridge" fill="none" stroke="none" d="M0 224 Q90 202 180 227 T340 234 Q430 227 510 205 Q580 194 645 226 Q740 268 830 239 Q920 202 1000 221 Q1110 260 1200 225 Q1320 190 1440 221"/>
+      <path fill="#a94e32" d="M0 224 Q90 202 180 227 T340 234 Q430 227 510 205 Q580 194 645 226 Q740 268 830 239 Q920 202 1000 221 Q1110 260 1200 225 Q1320 190 1440 221 V600 H0Z"/>
+      <g fill="#78382b"><use href="#desert-cactus" data-ridge-x="235" data-size="0.38"/><use href="#desert-cactus" data-ridge-x="905" data-size="0.3"/><use href="#desert-cactus" data-ridge-x="1280" data-size="0.48"/></g>
     </svg>
     <canvas id="hill-chase" class="hill-chase-canvas" aria-hidden="true"></canvas>
     <svg id="middle-hill" class="landscape-layer" data-parallax="0.65" viewBox="0 0 1440 600" preserveAspectRatio="none">
-      <path id="middle-hill-ridge" fill="none" stroke="none" d="M0 300 C180 210 340 360 530 270 S790 200 960 295 S1230 210 1440 290"/>
-      <path fill="#82463e" d="M0 300 C180 210 340 360 530 270 S790 200 960 295 S1230 210 1440 290 V600 H0Z"/>
+      <path id="middle-hill-ridge" fill="none" stroke="none" d="M0 292 Q120 256 230 286 Q320 322 425 302 Q530 267 625 289 Q725 321 820 302 Q930 260 1040 276 Q1170 321 1290 287 Q1370 268 1440 279"/>
+      <path fill="#733329" d="M0 292 Q120 256 230 286 Q320 322 425 302 Q530 267 625 289 Q725 321 820 302 Q930 260 1040 276 Q1170 321 1290 287 Q1370 268 1440 279 V600 H0Z"/>
+      <g fill="#492322"><use href="#desert-cactus" data-ridge-x="155" data-size="0.85"/><use href="#desert-cactus" data-ridge-x="515" data-size="0.42"/><use href="#desert-cactus" data-ridge-x="1145" data-size="0.7"/></g>
     </svg>
     <canvas id="middle-hill-chase" class="hill-chase-canvas" aria-hidden="true"></canvas>
     <svg id="back-hill" class="landscape-layer" data-parallax="1" viewBox="0 0 1440 600" preserveAspectRatio="none">
-      <path id="back-hill-ridge" fill="none" stroke="none" d="M0 390 C200 290 380 460 590 355 S910 450 1100 345 S1310 345 1440 390"/>
-      <path fill="#062438" d="M0 390 C200 290 380 460 590 355 S910 450 1100 345 S1310 345 1440 390 V600 H0Z"/>
+      <path id="back-hill-ridge" fill="none" stroke="none" d="M0 356 Q125 322 240 355 Q380 397 515 369 Q650 327 760 352 Q875 391 990 365 Q1110 326 1215 347 Q1330 385 1440 357"/>
+      <path fill="#321e23" d="M0 356 Q125 322 240 355 Q380 397 515 369 Q650 327 760 352 Q875 391 990 365 Q1110 326 1215 347 Q1330 385 1440 357 V600 H0Z"/>
+      <g fill="#23191e"><use href="#desert-cactus" data-ridge-x="300" data-size="0.7"/><use href="#desert-cactus" data-ridge-x="1005" data-size="0.6"/><use href="#desert-cactus" data-ridge-x="1320" data-size="1.15"/></g>
     </svg>
     <canvas id="back-hill-chase" class="hill-chase-canvas" aria-hidden="true"></canvas>
   </div>
@@ -918,6 +932,7 @@
     function enableBackground(enabled) {
       document.body.classList.toggle('unicorn-background-active', enabled);
       button.setAttribute('aria-pressed', enabled ? 'true' : 'false');
+      document.dispatchEvent(new Event('backgroundchange'));
       if (!enabled || sceneInitialized) return;
 
       if (!sdkPromise) {
@@ -939,10 +954,11 @@
 
       sdkPromise.then(function (sdk) {
         if (!document.body.classList.contains('unicorn-background-active') || sceneInitialized) return;
-        sdk.init();
         sceneInitialized = true;
+        return sdk.init();
       }).catch(function (error) {
         console.warn(error.message);
+        sceneInitialized = false;
         sdkPromise = null;
         enableBackground(false);
       });
@@ -958,7 +974,9 @@
   // ---------------------------------------------------------------------
   function initParticles() {
     var canvas = document.getElementById('particles');
-    if (!canvas || reducedMotion) return;
+    if (!canvas) return;
+    var preference = window.matchMedia('(prefers-reduced-motion: reduce)');
+    var frameRequest = null;
     var ctx = canvas.getContext('2d');
     var particles = [];
     var count = 46;
@@ -992,7 +1010,8 @@
 
     var lastFrame = 0;
     function tick(ts) {
-      if (ts - lastFrame < 33) { requestAnimationFrame(tick); return; } // ~30fps cap for efficiency
+      frameRequest = requestAnimationFrame(tick);
+      if (ts - lastFrame < 33) return; // ~30fps cap for efficiency
       lastFrame = ts;
       ctx.clearRect(0, 0, w, h);
       particles.forEach(function (p) {
@@ -1006,11 +1025,22 @@
         ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
         ctx.fill();
       });
-      requestAnimationFrame(tick);
     }
 
+    function syncAnimation() {
+      cancelAnimationFrame(frameRequest);
+      frameRequest = null;
+      if (preference.matches) ctx.clearRect(0, 0, w, h);
+      if (!document.hidden && !preference.matches && !document.body.classList.contains('unicorn-background-active')) {
+        lastFrame = 0;
+        frameRequest = requestAnimationFrame(tick);
+      }
+    }
     window.addEventListener('resize', resize);
-    requestAnimationFrame(tick);
+    document.addEventListener('visibilitychange', syncAnimation);
+    document.addEventListener('backgroundchange', syncAnimation);
+    preference.addEventListener('change', syncAnimation);
+    syncAnimation();
   }
 
   function initLandscape() {
@@ -1023,8 +1053,10 @@
       var progress = Math.max(0, Math.min(1, window.scrollY / maxScroll));
       layers.forEach(function (layer) {
         var depth = Number(layer.dataset.parallax);
+        var offsetY = layer.classList.contains('landscape-sun') ?
+          progress * window.innerHeight * 0.28 : -progress * depth * 70;
         layer.style.transform = preference.matches ? 'none' :
-          'translate3d(' + (-progress * depth * 45) + 'px,' + (-progress * depth * 70) + 'px,0)';
+          'translate3d(' + (-progress * depth * 45) + 'px,' + offsetY + 'px,0)';
       });
     }
     function schedule() {
@@ -1051,6 +1083,10 @@
       for (var pointIndex = 0; pointIndex <= 1024; pointIndex++) {
         track.points.push(track.ridge.getPointAtLength(length * pointIndex / 1024));
       }
+      track.hill.querySelectorAll('[data-ridge-x]').forEach(function (cactus) {
+        var x = Number(cactus.dataset.ridgeX);
+        cactus.setAttribute('transform', 'translate(' + x + ',' + ground(track, x) + ') scale(' + cactus.dataset.size + ')');
+      });
     });
     var images = [], ready = false, active = false, elapsed = 0, last = null;
     var timer = null, frameRequest = null, remaining = 6000, waitStarted = 0;
@@ -1123,7 +1159,7 @@
       paint(); frameRequest = requestAnimationFrame(tick);
     }
     function schedule() {
-      if (!ready || document.hidden || preference.matches) return;
+      if (!ready || document.hidden || preference.matches || document.body.classList.contains('unicorn-background-active')) return;
       if (active) { last = null; frameRequest = requestAnimationFrame(tick); return; }
       waitStarted = performance.now();
       timer = setTimeout(function () {
@@ -1144,6 +1180,7 @@
       last = null;
     }
     document.addEventListener('visibilitychange', function () { suspend(); if (!document.hidden) schedule(); });
+    document.addEventListener('backgroundchange', function () { suspend(); schedule(); });
     preference.addEventListener('change', function () {
       suspend(); active = false; elapsed = 0; remaining = 6000; clear(); schedule();
     });
@@ -1151,7 +1188,19 @@
       return new Promise(function (resolve, reject) {
         var img = new Image(); img.onload = function () { resolve(img); }; img.onerror = reject; img.src = src;
       });
-    })).then(function (loaded) { images = loaded; ready = true; schedule(); }).catch(function () { clear(); });
+    })).then(function (loaded) {
+      images = loaded.map(function (image) {
+        var tinted = document.createElement('canvas');
+        tinted.width = image.naturalWidth; tinted.height = image.naturalHeight;
+        var ctx = tinted.getContext('2d');
+        ctx.drawImage(image, 0, 0);
+        ctx.globalCompositeOperation = 'source-in';
+        ctx.fillStyle = '#321e23';
+        ctx.fillRect(0, 0, tinted.width, tinted.height);
+        return tinted;
+      });
+      ready = true; schedule();
+    }).catch(function () { clear(); });
   }
 
   document.addEventListener('DOMContentLoaded', function () {
