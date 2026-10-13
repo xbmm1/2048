@@ -8,6 +8,11 @@
   const ctx = canvas.getContext('2d');
   const minimapCanvas = document.getElementById('minimap');
   const mctx = minimapCanvas.getContext('2d');
+  const minimapTerrain = document.createElement('canvas');
+  const terrainCtx = minimapTerrain.getContext('2d');
+  let terrainDirty = true, terrainFog = null;
+  let sceneDirty = true;
+  let pathCursor = 0;
 
   let W = canvas.width;
   let H = canvas.height;
@@ -20,6 +25,7 @@
     H = Math.max(1, Math.round(height * scale));
     if (canvas.width !== W) canvas.width = W;
     if (canvas.height !== H) canvas.height = H;
+    sceneDirty = true;
   }
   new ResizeObserver(resizeScene).observe(canvas);
   resizeScene();
@@ -33,17 +39,18 @@
   const wraithAtlas = new Image();
   const doorAtlas = new Image();
   const keySprite = new Image();
+  keySprite.onload = doorAtlas.onload = () => { sceneDirty = true; };
   keySprite.src = 'assets/key-v1.png';
   doorAtlas.src = 'assets/door-v1.png';
-  wraithAtlas.onload = () => Raycaster.prepareGhostAtlas(wraithAtlas);
+  wraithAtlas.onload = () => { Raycaster.prepareGhostAtlas(wraithAtlas); sceneDirty = true; };
   wraithAtlas.src = 'assets/wraith-v1.png';
   function wraithSprite(e) {
     let row = 0, frame = Math.floor(e.animTime * 8) % 6;
     if (!e.alive) { row = 3; frame = Math.min(5, Math.floor(e.deathTime * 10)); }
     else if (e.hitFlash > 0) { row = 2; frame = Math.min(1, Math.floor((1 - e.hitFlash) * 2)); }
     else if (e.attackTime > 0) { row = 1; frame = Math.min(3, Math.floor((0.4 - e.attackTime) * 10)); }
-    return { x: e.x, y: e.y, color: e.ranged ? '#d9b3ff' : '#eaf3ff', scale: 1,
-      ghost: true, flash: e.hitFlash, atlas: wraithAtlas, frame, row, ranged: e.ranged };
+    return { x: e.x, y: e.y, color: e.patrol ? '#ffc65c' : e.ranged ? '#d9b3ff' : '#eaf3ff', scale: 1,
+      ghost: true, flash: e.hitFlash, atlas: wraithAtlas, frame, row, ranged: e.ranged, patrol: !!e.patrol };
   }
 
   // ---- Sky ----
@@ -142,6 +149,7 @@
   const customSky = new Image();
   customSky.onload = () => {
     if (customSky.naturalWidth > 0) activeSky = customSky;
+    sceneDirty = true;
   };
   customSky.src = 'assets/sky.jpg';
 
@@ -152,6 +160,7 @@
   const WALL_TEXTURE_FILES = ['tile065.png', 'tile066.png', 'tile067.png', 'tile068.png', 'tile069.png', 'tile070.png'];
   const wallTextures = WALL_TEXTURE_FILES.map((name) => {
     const img = new Image();
+    img.onload = () => { sceneDirty = true; };
     img.src = `assets/${name}`;
     return img;
   });
@@ -246,15 +255,31 @@
   let settings = { ...DEFAULT_SETTINGS };
 
   function loadSettings() {
+    settings = { ...DEFAULT_SETTINGS };
     try {
-      const raw = localStorage.getItem(SETTINGS_KEY);
-      if (raw) settings = { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
+      const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY));
+      if (!saved || typeof saved !== 'object' || Array.isArray(saved)) return;
+      const controls = { sensitivity: sensInput, turnSpeed: turnInput, enemySpeed: enemySpeedInput,
+        enemyCountMult: enemyCountInput, enemyHealthMult: enemyHealthInput };
+      for (const key of Object.keys(DEFAULT_SETTINGS)) {
+        const value = saved[key];
+        if (typeof DEFAULT_SETTINGS[key] === 'boolean') {
+          if (typeof value === 'boolean') settings[key] = value;
+        } else {
+          const control = controls[key];
+          const scale = key === 'sensitivity' ? BASE_SENSITIVITY : 1;
+          if (Number.isFinite(value) && value >= Number(control.min) * scale && value <= Number(control.max) * scale) {
+            settings[key] = value;
+          }
+        }
+      }
     } catch (e) {
       settings = { ...DEFAULT_SETTINGS };
     }
   }
 
   function saveSettings() {
+    sceneDirty = true;
     try {
       localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
     } catch (e) {
@@ -283,6 +308,7 @@
   }
 
   function applyVisualSettings() {
+    sceneDirty = true;
     minimapCanvas.style.display = settings.minimap ? 'block' : 'none';
     crosshairEl.classList.toggle('hidden', !settings.crosshair);
   }
@@ -394,23 +420,60 @@
     return { x, y };
   }
 
-  // Exit placement: sample candidate tiles, run A* from spawn to each, and
-  // keep the tile with the longest path -- the farthest reachable point.
+  // Breadth-first search visits tiles by distance; the last is farthest away.
   function farthestTile(tiles, tw, th, sx, sy) {
-    let best = null;
-    let bestLen = -1;
-    for (let i = 0; i < 40; i++) {
-      const c = randomFloorCell(tiles, tw, th);
-      const path = AStar.find(tiles, sx, sy, c.x, c.y);
-      if (path && path.length > bestLen) {
-        bestLen = path.length;
-        best = c;
+    const queue = [{ x: sx, y: sy }];
+    const seen = new Uint8Array(tw * th);
+    seen[sy * tw + sx] = 1;
+    const directions = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+    for (let head = 0; head < queue.length; head++) {
+      const cell = queue[head];
+      for (const [dx, dy] of directions) {
+        const x = cell.x + dx, y = cell.y + dy;
+        if (!tileFree(tiles, x, y) || seen[y * tw + x]) continue;
+        seen[y * tw + x] = 1;
+        queue.push({ x, y });
       }
     }
-    return best || { x: sx, y: sy };
+    return queue[queue.length - 1];
+  }
+
+  function buildPatrolRoute(tiles, sx, sy) {
+    const root = { x: sx, y: sy, depth: 0, parent: null };
+    const queue = [root], seen = new Map([[`${sx},${sy}`, root]]);
+    const ancestry = node => {
+      const path = [];
+      for (; node; node = node.parent) path.push(node);
+      return path;
+    };
+    for (let head = 0; head < queue.length; head++) {
+      const cell = queue[head];
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const x = cell.x + dx, y = cell.y + dy;
+        if (!tileFree(tiles, x, y)) continue;
+        const key = `${x},${y}`, other = seen.get(key);
+        if (other && other !== cell.parent && other.parent !== cell) {
+          const left = ancestry(cell), right = ancestry(other);
+          let common;
+          // Join both branches at their last common ancestor, then close the edge.
+          while (left.length && right.length && left[left.length - 1] === right[right.length - 1]) {
+            common = left.pop(); right.pop();
+          }
+          return left.concat(common, right.reverse()).map(({ x, y }) => ({ x, y }));
+        }
+        if (!other && cell.depth < 6) {
+          const next = { x, y, depth: cell.depth + 1, parent: cell };
+          seen.set(key, next); queue.push(next);
+        }
+      }
+    }
+    const path = ancestry(queue[queue.length - 1]).reverse().map(({ x, y }) => ({ x, y }));
+    return path.concat(path.slice(1, -1).reverse());
   }
 
   function buildLevel(floorNum) {
+    sceneDirty = terrainDirty = true;
+    pathCursor = 0;
     const cols = 5 + floorNum;
     const rows = 5 + floorNum;
     const maze = Maze.generate(cols, rows);
@@ -453,12 +516,17 @@
 
     state.enemies = [];
     const enemyCount = Math.max(1, Math.round((2 + floorNum) * settings.enemyCountMult));
+    const patrolCount = Math.max(1, Math.round(enemyCount * 0.25));
     for (let i = 0; i < enemyCount; i++) {
       const c = randomFloorCell(tiles, w, h);
-      const ranged = Math.random() < Math.min(0.55, 0.25 + floorNum * 0.03);
+      const patrol = i < patrolCount;
+      const route = patrol ? buildPatrolRoute(tiles, c.x, c.y) : null;
+      const spawnCell = patrol ? route[0] : c;
+      const ranged = !patrol && Math.random() < Math.min(0.55, 0.25 + floorNum * 0.03);
       state.enemies.push({
-        x: c.x + 0.5,
-        y: c.y + 0.5,
+        x: spawnCell.x + 0.5,
+        y: spawnCell.y + 0.5,
+        patrol: patrol ? { route, index: route.length > 1 ? 1 : 0, mode: 'patrol', lostSight: 0, waypoint: null } : null,
         health: 30 * settings.enemyHealthMult,
         baseSpeed: 1.25 + floorNum * 0.08,
         path: null,
@@ -477,10 +545,8 @@
   }
 
   // ---- Overlay (start screen / game-over screen share the same markup) ----
-  let overlayMode = 'start';
-
   function showStartOverlay() {
-    overlayMode = 'start';
+    sceneDirty = true;
     overlayTitle.textContent = 'DUNGEON CRAWLER';
     overlaySubtitle.textContent = 'A tiny DOOM-style raycaster';
     overlayFeatures.style.display = '';
@@ -490,7 +556,7 @@
   }
 
   function showGameOverOverlay() {
-    overlayMode = 'gameover';
+    sceneDirty = true;
     overlayTitle.textContent = 'YOU DIED';
     overlaySubtitle.textContent = `Reached floor ${state.floor} \u00b7 ${state.kills} kills`;
     overlayFeatures.style.display = 'none';
@@ -500,6 +566,7 @@
   }
 
   function beginRun() {
+    clearHeldKeys();
     state.melee = null;
     state.floorTransition = null;
     floorFade.style.opacity = '0';
@@ -524,8 +591,10 @@
 
   // ---- Pause menu ----
   function pauseGame() {
+    clearHeldKeys();
     if (!state.started || state.gameOver || state.paused) return;
     state.paused = true;
+    sceneDirty = true;
     pauseMenu.classList.remove('hidden');
     pauseMenu.setAttribute('aria-hidden', 'false');
     if (document.pointerLockElement === canvas) document.exitPointerLock();
@@ -533,6 +602,7 @@
 
   function resumeGame() {
     if (!state.paused) return;
+    clearHeldKeys();
     state.paused = false;
     pauseMenu.classList.add('hidden');
     pauseMenu.setAttribute('aria-hidden', 'true');
@@ -562,6 +632,10 @@
   });
 
   // ---- Input ----
+  function clearHeldKeys() {
+    state.keysHeld = {};
+  }
+  window.addEventListener('blur', clearHeldKeys);
   window.addEventListener('keydown', (e) => {
     const k = e.key.toLowerCase();
     if (k === 'f') {
@@ -580,7 +654,7 @@
       updateHotbar();
       return;
     }
-    state.keysHeld[k] = true;
+    if (state.started && !state.paused && !state.gameOver) state.keysHeld[k] = true;
     if (e.code === 'Space') {
       e.preventDefault();
       shoot();
@@ -819,17 +893,18 @@
 
     updateMelee(dt);
     const now = performance.now();
+    for (const enemy of state.enemies) {
+      if (enemy.alive && enemy.patrol) updatePatrolState(enemy, dt);
+    }
+    updateEnemyPaths(now);
     for (const e of state.enemies) {
       if (e.hitFlash > 0) e.hitFlash = Math.max(0, e.hitFlash - dt / 0.25);
       e.animTime += dt;
       e.attackTime = Math.max(0, e.attackTime - dt);
       if (!e.alive) { e.deathTime += dt; continue; }
-      if (now >= e.repathAt || !e.path) {
-        e.path = AStar.find(state.tiles, Math.floor(e.x), Math.floor(e.y), Math.floor(p.x), Math.floor(p.y));
-        e.pathIndex = 1; // skip the tile the enemy is already standing on
-        e.repathAt = now + 350 + Math.random() * 250;
-      }
-      if (e.path && e.pathIndex < e.path.length) {
+      if (e.patrol) {
+        movePatrolGhost(e, dt);
+      } else if (e.path && e.pathIndex < e.path.length) {
         const wp = e.path[e.pathIndex];
         const tx = wp.x + 0.5, ty = wp.y + 0.5;
         const ddx = tx - e.x, ddy = ty - e.y;
@@ -859,7 +934,8 @@
           e.shootCooldown = 1.6 + Math.random() * 0.6;
           e.attackTime = 0.4;
         }
-      } else if (dist2(e, p) < 0.55 && e.cooldown <= 0) {
+      } else if (dist2(e, p) < 0.55 && e.cooldown <= 0 &&
+          (!e.patrol || (e.patrol.mode === 'chase' && lineClear(e.x, e.y, p.x, p.y)))) {
         e.cooldown = 1.0;
         e.attackTime = 0.4;
         if (p.effects.invincible <= 0) {
@@ -897,6 +973,70 @@
     }
   }
 
+  function updatePatrolState(enemy, dt) {
+    const patrol = enemy.patrol, p = state.player;
+    const distance = dist2(enemy, p);
+    const visible = distance <= 16 && lineClear(enemy.x, enemy.y, p.x, p.y);
+    if (patrol.mode !== 'chase' && distance <= 6.25 && visible) {
+      patrol.mode = 'chase'; patrol.lostSight = 0;
+      enemy.path = null; enemy.repathAt = 0;
+    } else if (patrol.mode === 'chase') {
+      patrol.lostSight = visible ? 0 : patrol.lostSight + dt;
+      if (distance > 16 || patrol.lostSight >= 2) {
+        patrol.mode = 'return';
+        patrol.index = patrol.route.reduce((best, tile, index) =>
+          dist2(enemy, { x: tile.x + 0.5, y: tile.y + 0.5 }) <
+          dist2(enemy, { x: patrol.route[best].x + 0.5, y: patrol.route[best].y + 0.5 }) ? index : best, 0);
+        enemy.path = null; enemy.repathAt = 0;
+      }
+    }
+  }
+
+  function movePatrolGhost(enemy, dt) {
+    const patrol = enemy.patrol;
+    const target = patrol.mode === 'patrol' ? patrol.route[patrol.index] : enemy.path?.[enemy.pathIndex];
+    if (!target) return;
+    patrol.waypoint = target;
+    const dx = target.x + 0.5 - enemy.x, dy = target.y + 0.5 - enemy.y;
+    const distance = Math.hypot(dx, dy), step = enemy.baseSpeed * settings.enemySpeed * dt;
+    if (distance <= step) {
+      enemy.x = target.x + 0.5; enemy.y = target.y + 0.5;
+      patrol.waypoint = null;
+      if (patrol.mode === 'patrol') patrol.index = (patrol.index + 1) % patrol.route.length;
+      else {
+        enemy.pathIndex++;
+        if (patrol.mode === 'return' && enemy.pathIndex >= enemy.path.length) {
+          patrol.mode = 'patrol';
+          patrol.index = (patrol.index + 1) % patrol.route.length;
+          enemy.path = null;
+        }
+      }
+    } else {
+      enemy.x += dx / distance * step;
+      enemy.y += dy / distance * step;
+    }
+  }
+
+  // Round-robin scheduling bounds searches per frame, including after a pause.
+  function updateEnemyPaths(now) {
+    const enemies = state.enemies, p = state.player;
+    let searches = 0;
+    for (let checked = 0; checked < enemies.length && searches < 2; checked++) {
+      pathCursor %= enemies.length;
+      const enemy = enemies[pathCursor++];
+      if (!enemy.alive || now < enemy.repathAt) continue;
+      const patrol = enemy.patrol;
+      if (patrol && (patrol.mode === 'patrol' || (patrol.mode === 'return' && enemy.path))) continue;
+      const target = patrol?.mode === 'return' ? patrol.route[patrol.index] : { x: Math.floor(p.x), y: Math.floor(p.y) };
+      // Finish an in-progress tile step before turning onto a new path.
+      const start = patrol?.waypoint || { x: Math.floor(enemy.x), y: Math.floor(enemy.y) };
+      enemy.path = AStar.find(state.tiles, start.x, start.y, target.x, target.y);
+      enemy.pathIndex = patrol ? 0 : 1;
+      enemy.repathAt = now + 350 + Math.random() * 250;
+      searches++;
+    }
+  }
+
   // ---- Fog of war ----
   function revealAround(cx, cy, radius) {
     const visited = state.visited;
@@ -905,7 +1045,10 @@
     const x0 = Math.max(0, cx - radius), x1 = Math.min(state.tw - 1, cx + radius);
     for (let y = y0; y <= y1; y++) {
       for (let x = x0; x <= x1; x++) {
-        if ((x - cx) ** 2 + (y - cy) ** 2 <= radius * radius) visited[y][x] = true;
+        if (!visited[y][x] && (x - cx) ** 2 + (y - cy) ** 2 <= radius * radius) {
+          visited[y][x] = true;
+          if (settings.fogOfWar) terrainDirty = true;
+        }
       }
     }
   }
@@ -929,7 +1072,7 @@
             : POWERUP_COLORS[pk.sub] || '#ffffff',
           scale: pk.type === 'powerup' ? 0.6 : 0.5,
           key: pk.type === 'key',
-          image: pk.type === 'key' ? keySprite : null,
+          image: pk.type === 'key' ? keySprite : pk.type === 'powerup' ? PowerupIcons[pk.sub].world : null,
           health: pk.type === 'health',
         });
       }
@@ -947,20 +1090,21 @@
     const size = minimapCanvas.width;
     const scale = size / Math.max(tw, th);
     mctx.clearRect(0, 0, size, size);
-    mctx.fillStyle = 'rgba(10,10,15,0.7)';
-    mctx.fillRect(0, 0, size, size);
-
-    for (let y = 0; y < th; y++) {
-      for (let x = 0; x < tw; x++) {
-        if (settings.fogOfWar && !(state.visited && state.visited[y][x])) {
-          mctx.fillStyle = '#050507';
-          mctx.fillRect(x * scale, y * scale, scale, scale);
-          continue;
+    if (terrainDirty || terrainFog !== settings.fogOfWar || minimapTerrain.width !== size) {
+      minimapTerrain.width = minimapTerrain.height = size;
+      terrainCtx.fillStyle = 'rgba(10,10,15,0.7)';
+      terrainCtx.fillRect(0, 0, size, size);
+      for (let y = 0; y < th; y++) {
+        for (let x = 0; x < tw; x++) {
+          terrainCtx.fillStyle = settings.fogOfWar && !state.visited[y][x] ? '#050507' :
+            tiles[y][x] === 1 ? '#333844' : '#8a8f9c';
+          terrainCtx.fillRect(x * scale, y * scale, scale, scale);
         }
-        mctx.fillStyle = tiles[y][x] === 1 ? '#333844' : '#8a8f9c';
-        mctx.fillRect(x * scale, y * scale, scale, scale);
       }
+      terrainDirty = false;
+      terrainFog = settings.fogOfWar;
     }
+    mctx.drawImage(minimapTerrain, 0, 0);
 
     const isRevealed = (wx, wy) => !settings.fogOfWar || (state.visited && state.visited[Math.floor(wy)] && state.visited[Math.floor(wy)][Math.floor(wx)]);
 
@@ -968,19 +1112,25 @@
       mctx.strokeStyle = '#ff5050';
       mctx.lineWidth = 1;
       for (const e of state.enemies) {
-        if (!e.alive || !e.path || !isRevealed(e.x, e.y)) continue;
+        if (!e.alive || !isRevealed(e.x, e.y)) continue;
+        const patrolling = e.patrol?.mode === 'patrol';
+        const path = patrolling ? e.patrol.route : e.path;
+        if (!path) continue;
+        mctx.strokeStyle = e.patrol ? '#ff923f' : '#ff5050';
         mctx.beginPath();
-        mctx.moveTo(e.x * scale, e.y * scale);
-        for (let i = e.pathIndex; i < e.path.length; i++) {
-          mctx.lineTo((e.path[i].x + 0.5) * scale, (e.path[i].y + 0.5) * scale);
+        if (patrolling) mctx.moveTo((path[0].x + 0.5) * scale, (path[0].y + 0.5) * scale);
+        else mctx.moveTo(e.x * scale, e.y * scale);
+        for (let i = patrolling ? 1 : e.pathIndex; i < path.length; i++) {
+          mctx.lineTo((path[i].x + 0.5) * scale, (path[i].y + 0.5) * scale);
         }
+        if (patrolling) mctx.closePath();
         mctx.stroke();
       }
     }
 
     for (const e of state.enemies) {
       if (!e.alive || !isRevealed(e.x, e.y)) continue;
-      mctx.fillStyle = e.ranged ? '#c98bff' : '#e33333';
+      mctx.fillStyle = e.patrol ? '#ff923f' : e.ranged ? '#c98bff' : '#e33333';
       mctx.beginPath();
       mctx.arc(e.x * scale, e.y * scale, 2.5, 0, Math.PI * 2);
       mctx.fill();
@@ -1021,15 +1171,8 @@
         mctx.fillRect(hx - 1, hy - 3, 3, 7);
         mctx.fillRect(hx - 3, hy - 1, 7, 3);
       } else if (pk.type === 'powerup') {
-        // Tiny power-up icon: a small colored diamond.
-        mctx.fillStyle = POWERUP_COLORS[pk.sub] || '#ffffff';
-        mctx.beginPath();
-        mctx.moveTo(px, py - 3);
-        mctx.lineTo(px + 3, py);
-        mctx.lineTo(px, py + 3);
-        mctx.lineTo(px - 3, py);
-        mctx.closePath();
-        mctx.fill();
+        const icon = PowerupIcons[pk.sub].map;
+        mctx.drawImage(icon, Math.round(px) - 4, Math.round(py) - 5);
       }
     }
     // Simple brown arch stays readable at minimap scale.
@@ -1095,6 +1238,7 @@
   const fpsEl = document.getElementById('fps-counter');
   let fpsElapsed = 0, fpsFrames = 0, fpsLastTime = null;
   document.addEventListener('visibilitychange', () => {
+    if (document.hidden) clearHeldKeys();
     fpsElapsed = 0; fpsFrames = 0; fpsLastTime = null;
     fpsEl.textContent = 'FPS —';
   });
@@ -1113,8 +1257,12 @@
     }
     const dt = Math.min(0.05, (now - lastTime) / 1000);
     lastTime = now;
-    if (state.started && !state.paused && !state.gameOver) update(dt);
-    draw();
+    const running = state.started && !state.paused && !state.gameOver;
+    if (running) update(dt);
+    if (!document.hidden && (running || sceneDirty)) {
+      draw();
+      sceneDirty = false;
+    }
     requestAnimationFrame(loop);
   }
 

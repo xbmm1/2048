@@ -15,6 +15,7 @@ const Raycaster = (() => {
       'hue-rotate(75deg)',
       'sepia(1) saturate(6) hue-rotate(315deg)',
       'sepia(1) saturate(9) hue-rotate(305deg) brightness(0.72)',
+      'sepia(1) saturate(3)',
     ]) {
       const surface = document.createElement('canvas');
       surface.width = atlas.naturalWidth;
@@ -65,12 +66,13 @@ const Raycaster = (() => {
     ctx.fillRect(0, H / 2, W, H / 2);
 
     const wallStep = W >= 640 ? 2 : 1;
+    const dirX = Math.cos(player.angle), dirY = Math.sin(player.angle);
     for (let x = 0; x < W; x += wallStep) {
       const columnWidth = Math.min(wallStep, W - x);
       const cameraX = (2 * (x + (columnWidth - 1) / 2)) / W - 1;
-      const rayAngle = player.angle + Math.atan(cameraX * planeLen);
-      const rayDirX = Math.cos(rayAngle);
-      const rayDirY = Math.sin(rayAngle);
+      // Unnormalized camera-plane rays keep wall and sprite depths comparable.
+      const rayDirX = dirX - dirY * cameraX * planeLen;
+      const rayDirY = dirY + dirX * cameraX * planeLen;
 
       let mapX = Math.floor(player.x);
       let mapY = Math.floor(player.y);
@@ -225,26 +227,26 @@ const Raycaster = (() => {
       const clampedBottom = Math.min(H, bottom);
       if (clampedBottom <= clampedTop) continue;
 
-      if (s.key) {
-        if (s.image && s.image.complete && s.image.naturalWidth) {
-          ctx.beginPath();
-          let visible = false;
-          for (let x = x0; x < x1;) {
-            if (transformY >= zbuffer[x]) { x++; continue; }
-            const start = x++;
-            while (x < x1 && transformY < zbuffer[x]) x++;
-            ctx.rect(start, 0, x - start, H);
-            visible = true;
-          }
-          if (!visible) continue;
-          ctx.save();
-          ctx.clip();
-          ctx.imageSmoothingEnabled = false;
-          ctx.globalAlpha = shade;
-          ctx.drawImage(s.image, left, top, spriteSize, spriteSize);
-          ctx.restore();
-          continue;
+      if (s.image && s.image.complete !== false && (s.image.naturalWidth || s.image.width)) {
+        ctx.beginPath();
+        let visible = false;
+        for (let x = x0; x < x1;) {
+          if (transformY >= zbuffer[x]) { x++; continue; }
+          const start = x++;
+          while (x < x1 && transformY < zbuffer[x]) x++;
+          ctx.rect(start, 0, x - start, H);
+          visible = true;
         }
+        if (!visible) continue;
+        ctx.save();
+        ctx.clip();
+        ctx.imageSmoothingEnabled = false;
+        ctx.globalAlpha = shade;
+        ctx.drawImage(s.image, left, top, spriteSize, spriteSize);
+        ctx.restore();
+        continue;
+      }
+      if (s.key) {
         // Simple key silhouette: a hollow ring (bow), a vertical spine,
         // and two teeth prongs jutting out to one side near the bottom.
         const centerX = screenX;
@@ -461,7 +463,7 @@ const Raycaster = (() => {
           prepareGhostAtlas(s.atlas);
           // Death keeps a darker crimson tint throughout the dissolve, even
           // after the ordinary damage flash expires (for both enemy types).
-          const atlas = ghostPalettes.get(s.atlas)[s.row === 3 ? 3 : s.flash > 0 ? 2 : s.ranged ? 1 : 0];
+          const atlas = ghostPalettes.get(s.atlas)[s.row === 3 ? 3 : s.flash > 0 ? 2 : s.patrol ? 4 : s.ranged ? 1 : 0];
           // Combine adjacent visible columns into clipping rectangles. A single
           // image draw retains full-frame texture mapping across wall gaps.
           ctx.beginPath();

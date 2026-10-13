@@ -365,13 +365,14 @@ body { display: flex; flex-direction: column; height: 100dvh; padding: 6px; gap:
   background: #f4f4f0;
   transform: translateY(-50%);
 }
-.legend-icon.ghost-ranged {
+.legend-icon.ghost-ranged, .legend-icon.ghost-patrol {
   width: 14px;
   height: 16px;
   border-radius: 50% 50% 40% 40%;
   background: linear-gradient(90deg, #eaf3ff 50%, #d9b3ff 50%);
   box-shadow: 0 0 6px rgba(217, 179, 255, 0.6);
 }
+.legend-icon.ghost-patrol { background: #ffc65c; box-shadow: 0 0 6px rgba(255, 198, 92, 0.6); }
 .legend-icon.powerup {
   width: 14px;
   height: 14px;
