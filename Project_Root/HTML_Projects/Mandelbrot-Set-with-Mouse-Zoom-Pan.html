@@ -1,62 +1,135 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Mandelbrot Set with Mouse Zoom & Pan</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mandelbrot Explorer</title>
   <style>
-    body {
-      text-align: center;
-      font-family: Arial, sans-serif;
-      background: #111;
-      color: white;
+    :root {
+      color-scheme: dark;
+      font-family: system-ui, sans-serif;
+      background: #10141c;
+      color: #f0f4fb;
     }
-    canvas {
-      border: 1px solid #555;
-      cursor: grab;
-      display: block;
-      margin: 20px auto;
-      background: black;
-      max-width: 100%;
-      height: auto;
+    body { margin: 0; }
+    main { max-width: 1560px; margin: auto; padding: clamp(12px, 2vw, 28px); }
+    h1 { font-size: clamp(1.8rem, 4vw, 2.75rem); margin: 0 0 16px; text-align: center; }
+    h2 { font-size: 1.15rem; margin: 0; }
+    .hint, #renderStatus { color: #c0cce0; line-height: 1.5; }
+    .hint { margin: 0; font-size: 0.875rem; }
+    .panel {
+      border: 1px solid #566781;
+      border-radius: 14px;
+      background: #191f2b;
+      padding: clamp(10px, 2vw, 20px);
     }
-    .controls {
-      max-width: 900px;
-      margin: 0 auto 20px;
-      text-align: left;
-    }
-    .controls button {
+    .toolbar {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
       margin-top: 10px;
-      padding: 7px 14px;
-      background: #2b7cff;
-      color: white;
-      border: none;
-      border-radius: 6px;
+    }
+    .toolbar button { grid-column: span 2; }
+    .toolbar button[data-action^="Arrow"] { grid-column: span 1; padding-inline: 0; }
+    .sidebar { display: grid; gap: 12px; min-width: 0; }
+    button {
+      font: inherit;
+      font-weight: 600;
+      min-width: 44px;
+      min-height: 44px;
+      padding: 6px 12px;
+      border: 1px solid #7184a2;
+      border-radius: 8px;
+      background: #26344a;
+      color: #f0f4fb;
       cursor: pointer;
-      font-size: 14px;
     }
-    .controls button:hover {
-      background: #4b90ff;
+    button:hover { background: #364966; }
+    #randomJumpBtn { background: #a8d4ff; color: #11243b; }
+    #randomJumpBtn:hover { background: #c7e3ff; }
+    :focus-visible { outline: 3px solid #ffdc78; outline-offset: 3px; }
+    canvas {
+      display: block;
+      width: 100%;
+      height: auto;
+      border-radius: 8px;
+      background: black;
+      cursor: grab;
+      touch-action: pinch-zoom;
     }
-    #jumpLabel {
-      margin-top: 6px;
-      font-size: 13px;
-      color: #aaa;
+    canvas:active { cursor: grabbing; }
+    .readout { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 20px; margin-top: 8px; }
+    #viewStatus { font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+    .workspace {
+      display: grid;
+      grid-template-columns: 264px minmax(0, 1fr);
+      align-items: start;
+      gap: 16px;
     }
-    #renderStatus {
-      margin-top: 10px;
-      font-size: 13px;
-      color: #7fd67f;
-      min-height: 18px;
+    .controls { display: grid; gap: 8px; margin-top: 12px; }
+    @media (max-width: 760px) {
+      .workspace { grid-template-columns: minmax(0, 1fr); }
     }
-    .controls label.checkbox-label {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 13px;
-      color: #ccc;
+    @media (min-width: 600px) and (max-width: 760px) {
+      .sidebar { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
     }
+    .range-label { display: flex; justify-content: space-between; gap: 12px; }
+    .range-value {
+      padding: 2px 7px;
+      border-radius: 6px;
+      background: #26344a;
+      color: #a8d4ff;
+      font-variant-numeric: tabular-nums;
+    }
+    input { accent-color: #a8d4ff; }
+    input[type="range"] {
+      --slider-track: linear-gradient(to right, #a8d4ff var(--fill, 0%), #697a94 var(--fill, 0%));
+      appearance: none;
+      display: block;
+      width: 100%;
+      height: 44px;
+      margin: 0;
+      background: transparent;
+      cursor: pointer;
+    }
+    input[type="range"]::-webkit-slider-runnable-track {
+      height: 6px;
+      border-radius: 999px;
+      background: var(--slider-track);
+    }
+    input[type="range"]::-moz-range-track {
+      height: 6px;
+      border-radius: 999px;
+      background: var(--slider-track);
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      appearance: none;
+      box-sizing: border-box;
+      width: 22px;
+      height: 22px;
+      margin-top: -8px;
+      border: 2px solid #a8d4ff;
+      border-radius: 50%;
+      background: #191f2b;
+    }
+    input[type="range"]::-moz-range-thumb {
+      box-sizing: border-box;
+      width: 22px;
+      height: 22px;
+      border: 2px solid #a8d4ff;
+      border-radius: 50%;
+      background: #191f2b;
+    }
+    input[type="range"]:hover::-webkit-slider-thumb { background: #364966; }
+    input[type="range"]:hover::-moz-range-thumb { background: #364966; }
+    @media (forced-colors: active) {
+      input[type="range"] { appearance: auto; }
+      input[type="range"]::-webkit-slider-thumb { appearance: auto; }
+    }
+    .checkbox-label { display: flex; gap: 8px; align-items: center; min-height: 44px; cursor: pointer; }
+    .checkbox-label input { width: 20px; height: 20px; flex: none; }
     .explain-wrap {
-      max-width: 1100px;
-      margin: 24px auto;
+      margin: 12px 0 0;
       text-align: left;
       color: #ddd;
     }
@@ -68,6 +141,8 @@
     }
     .explain-wrap summary {
       cursor: pointer;
+      align-content: center;
+      min-height: 44px;
       font-size: 18px;
       font-weight: 700;
       color: #f0f0f0;
@@ -106,30 +181,66 @@
 </head>
 <body>
 
-<h1>Mandelbrot Set Visualization</h1>
+<main>
+<h1>Mandelbrot Explorer</h1>
+<div class="workspace">
+<div class="sidebar">
+<section class="panel" aria-labelledby="navigationHeading">
+  <h2 id="navigationHeading">Navigate</h2>
+  <div class="toolbar" id="viewControls" role="group" aria-label="View controls">
+    <button type="button" data-action="+" aria-label="Zoom in">Zoom in</button>
+    <button type="button" data-action="-" aria-label="Zoom out">Zoom out</button>
+    <button type="button" data-action="ArrowLeft" aria-label="Pan left">←</button>
+    <button type="button" data-action="ArrowUp" aria-label="Pan up">↑</button>
+    <button type="button" data-action="ArrowDown" aria-label="Pan down">↓</button>
+    <button type="button" data-action="ArrowRight" aria-label="Pan right">→</button>
+    <button type="button" data-action="Home">Reset view</button>
+    <button type="button" id="randomJumpBtn">Random jump</button>
+  </div>
+</section>
 
-<canvas id="mandelbrotCanvas" width="1280" height="720"></canvas>
+<section class="panel" aria-labelledby="settingsHeading">
+  <h2 id="settingsHeading">Display settings</h2>
+  <div class="controls">
+    <div>
+      <div class="range-label">
+        <label for="iterationRange">Max iterations</label>
+        <span class="range-value" id="iterationValue" aria-hidden="true">100</span>
+      </div>
+      <input type="range" id="iterationRange" min="10" max="1000" value="100" step="10">
+    </div>
+    <div>
+      <div class="range-label">
+        <label for="paletteShiftRange">Palette shift</label>
+        <span class="range-value" id="paletteShiftValue" aria-hidden="true">0.00</span>
+      </div>
+      <input type="range" id="paletteShiftRange" min="0" max="1" value="0" step="0.01">
+    </div>
+    <label class="checkbox-label">
+      <input type="checkbox" id="useWorkersCheckbox" checked>
+      Use parallel rendering
+    </label>
+  </div>
+</section>
 
-<div class="controls">
-  <label for="iterationRange">Max Iterations: <span id="iterationValue">100</span></label><br/>
-  <input type="range" id="iterationRange" min="10" max="1000" value="100" step="10" />
-  <br/><br/>
-  <label for="paletteShiftRange">Palette Shift: <span id="paletteShiftValue">0.00</span></label><br/>
-  <input type="range" id="paletteShiftRange" min="0" max="1" value="0" step="0.01" />
-  <br/>
-  <button id="randomJumpBtn">Random Jump</button>
-  <div id="jumpLabel"></div>
-  <br/>
-  <label class="checkbox-label">
-    <input type="checkbox" id="useWorkersCheckbox" checked />
-    Use tile-based Web Workers (parallel rendering)
-  </label>
-  <div id="renderStatus"></div>
+<p id="canvasHelp" class="hint">Drag to pan. Focus the plot to pan with arrow keys and zoom with +, −, or the scroll wheel.</p>
+</div>
+
+<section class="panel" aria-label="Fractal explorer">
+  <canvas id="mandelbrotCanvas" width="1280" height="720" tabindex="0"
+    aria-label="Interactive Mandelbrot plot" aria-describedby="canvasHelp">
+    This plot shows the Mandelbrot set in black, with colors indicating how quickly nearby points escape.
+  </canvas>
+  <div class="readout">
+    <span id="viewStatus" role="status"></span>
+    <span id="renderStatus"></span>
+  </div>
+</section>
 </div>
 
 <div class="explain-wrap">
   <details>
-    <summary>Detailed Explanation: What This Program Is Doing, The Math Behind It, and Why Fractals Are Infinite</summary>
+    <summary>How the Mandelbrot set works</summary>
 
     <h2>1) What This Renderer Does</h2>
     <p>
@@ -238,6 +349,8 @@ b = floor(8.5 * (1 - t)^3 * t * 255)</code></pre>
   </details>
 </div>
 
+</main>
+
 <script>
   const canvas = document.getElementById('mandelbrotCanvas');
   const ctx = canvas.getContext('2d');
@@ -259,10 +372,6 @@ b = floor(8.5 * (1 - t)^3 * t * 255)</code></pre>
   let maxIterations = 100;
   let paletteShift = 0;
 
-  let isDragging = false;
-  let dragStart = { x: 0, y: 0 };
-  let dragStartOffset = { x: 0, y: 0 };
-
   const iterationRange = document.getElementById('iterationRange');
   const iterationValue = document.getElementById('iterationValue');
   const paletteShiftRange = document.getElementById('paletteShiftRange');
@@ -270,15 +379,27 @@ b = floor(8.5 * (1 - t)^3 * t * 255)</code></pre>
   const useWorkersCheckbox = document.getElementById('useWorkersCheckbox');
   const renderStatus = document.getElementById('renderStatus');
 
+  function updateSliderFill(slider) {
+    const min = Number(slider.min);
+    const max = Number(slider.max);
+    const percent = (slider.valueAsNumber - min) / (max - min) * 100;
+    slider.style.setProperty('--fill', percent + '%');
+  }
+
+  updateSliderFill(iterationRange);
+  updateSliderFill(paletteShiftRange);
+
   iterationRange.addEventListener('input', () => {
     maxIterations = parseInt(iterationRange.value, 10);
     iterationValue.textContent = maxIterations;
+    updateSliderFill(iterationRange);
     requestRender();
   });
 
   paletteShiftRange.addEventListener('input', () => {
     paletteShift = parseFloat(paletteShiftRange.value);
     paletteShiftValue.textContent = paletteShift.toFixed(2);
+    updateSliderFill(paletteShiftRange);
     requestRender();
   });
 
@@ -536,61 +657,89 @@ b = floor(8.5 * (1 - t)^3 * t * 255)</code></pre>
     });
   }
 
-  canvas.addEventListener('wheel', (e) => {
-    e.preventDefault();
+  const viewStatus = document.getElementById('viewStatus');
+  let viewAnnouncement;
+  function updateViewStatus(prefix = '') {
+    const center = pixelToComplex(width / 2, height / 2);
+    viewStatus.textContent = `${prefix}${zoom.toLocaleString(undefined, { maximumFractionDigits: 2 })}× zoom · Center (${center.real.toFixed(12).replace(/0+$/, '').replace(/\.$/, '')}, ${center.imag.toFixed(12).replace(/0+$/, '').replace(/\.$/, '')})`;
+  }
 
+  function renderView(prefix = '') {
+    clearTimeout(viewAnnouncement);
+    viewAnnouncement = setTimeout(() => updateViewStatus(prefix), 180);
+    requestRender();
+  }
+
+  function zoomAt(factor, x, y) {
+    const before = pixelToComplex(x, y);
+    zoom = Math.min(Math.max(zoom * factor, 1), 1e10);
+    const after = pixelToComplex(x, y);
+    offsetX += before.real - after.real;
+    offsetY += before.imag - after.imag;
+    renderView();
+  }
+
+  function panBy(fractionX, fractionY) {
+    offsetX += fractionX * (originalBounds.xmax - originalBounds.xmin) / zoom;
+    offsetY += fractionY * (originalBounds.ymax - originalBounds.ymin) / zoom;
+    renderView();
+  }
+
+  const viewActions = new Map([
+    ['+', () => zoomAt(2, width / 2, height / 2)],
+    ['-', () => zoomAt(0.5, width / 2, height / 2)],
+    ['ArrowLeft', () => panBy(-0.15, 0)],
+    ['ArrowRight', () => panBy(0.15, 0)],
+    ['ArrowUp', () => panBy(0, -0.15)],
+    ['ArrowDown', () => panBy(0, 0.15)],
+    ['Home', () => {
+      zoom = 1;
+      offsetX = 0;
+      offsetY = 0;
+      renderView('View reset. ');
+    }]
+  ]);
+
+  document.getElementById('viewControls').addEventListener('click', (event) => {
+    viewActions.get(event.target.dataset.action)?.();
+  });
+
+  canvas.addEventListener('keydown', (event) => {
+    if (event.ctrlKey || event.metaKey || event.altKey) return;
+    const action = viewActions.get(event.key === '=' ? '+' : event.key);
+    if (!action) return;
+    event.preventDefault();
+    action();
+  });
+
+  canvas.addEventListener('wheel', (event) => {
+    if (document.activeElement !== canvas || event.ctrlKey || event.metaKey || !event.deltaY) return;
+    event.preventDefault();
     const rect = canvas.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
+    zoomAt(event.deltaY < 0 ? 1.1 : 0.9,
+      (event.clientX - rect.left) / rect.width * width,
+      (event.clientY - rect.top) / rect.height * height);
+  }, { passive: false });
 
-    const { real: mouseReBefore, imag: mouseImBefore } = pixelToComplex(mouseX, mouseY);
-
-    const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
-    zoom *= zoomFactor;
-    zoom = Math.min(Math.max(zoom, 1), 1e10);
-
-    const { real: mouseReAfter, imag: mouseImAfter } = pixelToComplex(mouseX, mouseY);
-
-    offsetX += mouseReBefore - mouseReAfter;
-    offsetY += mouseImBefore - mouseImAfter;
-
-    requestRender();
+  let drag;
+  canvas.addEventListener('pointerdown', (event) => {
+    if (drag || !event.isPrimary || event.button !== 0) return;
+    canvas.focus({ preventScroll: true });
+    canvas.setPointerCapture(event.pointerId);
+    drag = { id: event.pointerId, x: event.clientX, y: event.clientY };
   });
 
-  canvas.addEventListener('mousedown', (e) => {
-    e.preventDefault();
-    isDragging = true;
-    dragStart.x = e.clientX;
-    dragStart.y = e.clientY;
-    dragStartOffset.x = offsetX;
-    dragStartOffset.y = offsetY;
-    canvas.style.cursor = 'grabbing';
+  canvas.addEventListener('pointermove', (event) => {
+    if (drag?.id !== event.pointerId) return;
+    const rect = canvas.getBoundingClientRect();
+    panBy((drag.x - event.clientX) / rect.width, (drag.y - event.clientY) / rect.height);
+    drag.x = event.clientX;
+    drag.y = event.clientY;
   });
 
-  window.addEventListener('mouseup', () => {
-    if (isDragging) {
-      isDragging = false;
-      canvas.style.cursor = 'grab';
-    }
+  canvas.addEventListener('lostpointercapture', (event) => {
+    if (drag?.id === event.pointerId) drag = null;
   });
-
-  window.addEventListener('mousemove', (e) => {
-    if (!isDragging) return;
-
-    const dx = e.clientX - dragStart.x;
-    const dy = e.clientY - dragStart.y;
-
-    const viewWidth = (originalBounds.xmax - originalBounds.xmin) / zoom;
-    const viewHeight = (originalBounds.ymax - originalBounds.ymin) / zoom;
-
-    offsetX = dragStartOffset.x - dx / width * viewWidth;
-    offsetY = dragStartOffset.y - dy / height * viewHeight;
-
-    requestRender();
-  });
-
-  const randomJumpBtn = document.getElementById('randomJumpBtn');
-  const jumpLabel = document.getElementById('jumpLabel');
 
   const jumpSpots = [
     { name: 'Seahorse Valley',  cx: -0.7436438870371587, cy:  0.13182590420531197, zoom: 8000 },
@@ -611,12 +760,12 @@ b = floor(8.5 * (1 - t)^3 * t * 255)</code></pre>
     // Center the view on the spot by computing the needed offsets
     offsetX = spot.cx - originalBounds.xmin - (viewWidth  / zoom) / 2;
     offsetY = spot.cy - originalBounds.ymin - (viewHeight / zoom) / 2;
-    jumpLabel.textContent = 'Jumped to: ' + spot.name;
-    requestRender();
+    renderView('Jumped to ' + spot.name + '. ');
   }
 
-  randomJumpBtn.addEventListener('click', jumpToRandom);
+  document.getElementById('randomJumpBtn').addEventListener('click', jumpToRandom);
 
+  updateViewStatus();
   requestRender();
 </script>
 
