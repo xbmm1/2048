@@ -1,0 +1,867 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>Relay | Operations Console</title>
+<link rel="icon" href="data:,">
+<style>
+  :root {
+    --base: #080e18;
+    --panel: #0e1828;
+    --line: #23344b;
+    --text: #e6f0fc;
+    --muted: #9aacbf;
+    --cyan: #43e5f4;
+    --lime: #b8f55b;
+    --amber: #ffc464;
+    --pink: #ff64ab;
+    --violet: #b59cff;
+    --mono: 'Cascadia Mono', 'SFMono-Regular', Consolas, monospace;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    color: var(--text);
+    background: var(--base);
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-width: 0; }
+  button { font: inherit; }
+  button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
+  .shell { width: min(100%, 1700px); margin: auto; padding: 0 28px; }
+  .masthead { border-bottom: 1px solid var(--line); background: #0b1422; }
+  .masthead-inner { min-height: 80px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+  .brand, .header-controls, .feed-state, .pause, .key, .panel-header, .status { display: flex; align-items: center; }
+  .brand { gap: 13px; }
+  .brand-mark {
+    width: 40px; height: 40px; flex: 0 0 40px; display: grid; place-items: center;
+    border: 1px solid #2d7183; background: #102b3a; border-radius: 6px;
+  }
+  .brand-mark::before {
+    content: ''; width: 24px; height: 24px; background: var(--cyan);
+    clip-path: polygon(2% 51%, 25% 51%, 39% 20%, 54% 69%, 67% 39%, 98% 39%, 98% 50%, 74% 50%, 53% 91%, 38% 49%, 32% 62%, 2% 62%);
+  }
+  .brand h1 { font-size: 26px; line-height: 1; letter-spacing: .16em; margin: 0 0 6px; }
+  .brand p, .feed-state, .clock, .panel-meta, .kpi h3, .caption, .status, .footer { font-family: var(--mono); }
+  .brand p { margin: 0; font-size: .75rem; color: var(--muted); letter-spacing: .12em; text-transform: uppercase; }
+  .header-controls { gap: 20px; }
+  .feed-state { gap: 8px; color: var(--lime); font-size: .75rem; white-space: nowrap; }
+  .feed-state.paused { color: var(--amber); }
+  .dot { width: 7px; height: 7px; flex: 0 0 7px; border-radius: 50%; background: currentColor; }
+  .feed-state .dot { box-shadow: 0 0 10px currentColor; }
+  .clock { color: var(--muted); font-size: .8rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .pause {
+    min-height: 40px; justify-content: center; gap: 9px; padding: 0 13px; min-width: 98px;
+    color: var(--text); background: #152337; border: 1px solid #344b66; border-radius: 5px; cursor: pointer;
+    font-size: .83rem; font-weight: 600;
+  }
+  .pause:hover, .segments button:hover { background: #20344a; }
+  .pause-icon { width: 9px; height: 11px; border-inline: 2px solid var(--cyan); }
+  .paused .pause-icon { border: 0; background: var(--cyan); clip-path: polygon(0 0, 100% 50%, 0 100%); }
+  main.shell { padding-top: 21px; }
+  .section-title { font-size: .78rem; text-transform: uppercase; letter-spacing: .17em; color: var(--muted); margin: 0 0 10px; }
+  .kpis, .dashboard { display: grid; gap: 12px; }
+  .kpis { grid-template-columns: repeat(6, minmax(0, 1fr)); margin-bottom: 12px; }
+  .kpi, .panel {
+    min-width: 0; position: relative; border: 1px solid var(--line); border-radius: 6px;
+    background: linear-gradient(150deg, #111d2e, #0c1523 80%);
+  }
+  .kpi { padding: 12px 13px 10px; overflow: hidden; }
+  .kpi::before { content: ''; position: absolute; top: 0; left: 13px; width: 29px; height: 2px; background: var(--accent); }
+  .kpi h3 { position: relative; z-index: 1; margin: 0; color: var(--muted); font-size: .75rem; font-weight: 500; }
+  .kpi-reading { position: relative; z-index: 1; margin: 4px 0 2px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .kpi-value { font-size: clamp(1.42rem, 2.4vw, 2rem); font-weight: 680; letter-spacing: -.055em; }
+  .kpi-unit { margin-left: 4px; font-size: .72rem; color: var(--muted); }
+  .kpi-trend { position: relative; z-index: 1; color: var(--accent); font: .72rem var(--mono); white-space: nowrap; }
+  .kpi canvas { position: absolute; width: 39%; height: 44px; right: 9px; bottom: 12px; opacity: .85; }
+  .dashboard { grid-template-columns: repeat(12, minmax(0, 1fr)); }
+  .panel { padding: 13px 15px; display: flex; flex-direction: column; }
+  .panel::before {
+    content: ''; position: absolute; inset: -1px auto auto -1px; width: 10px; height: 10px;
+    border-top: 1px solid var(--cyan); border-left: 1px solid var(--cyan); border-top-left-radius: 6px;
+    pointer-events: none;
+  }
+  .process { grid-column: 1 / span 3; grid-row: 1; }
+  .throughput { grid-column: 4 / span 6; grid-row: 1; }
+  .utilities { grid-column: 10 / span 3; grid-row: 1; }
+  .network { grid-column: span 5; }
+  .equipment { grid-column: span 4; }
+  .incidents { grid-column: span 3; }
+  .panel-header { min-height: 30px; justify-content: space-between; gap: 5px 10px; flex-wrap: wrap; }
+  .panel-header h2 { margin: 0; font-size: .82rem; text-transform: uppercase; letter-spacing: .12em; }
+  .panel-meta, .caption { color: var(--muted); font-size: .72rem; }
+  .accent-cyan { color: var(--cyan); }
+  .accent-lime { color: var(--lime); }
+  .accent-amber { color: var(--amber); }
+  .accent-pink { color: var(--pink); }
+  .segments { display: inline-flex; max-width: 100%; padding: 2px; gap: 2px; border: 1px solid var(--line); border-radius: 5px; background: #0a1220; }
+  .segments button {
+    min-height: 30px; padding: 3px 8px; border: 1px solid transparent; border-radius: 3px;
+    cursor: pointer; color: var(--muted); background: transparent; font: .73rem var(--mono); white-space: nowrap;
+  }
+  .segments button[aria-pressed='true'] { border-color: #2d6373; background: #123040; color: var(--cyan); }
+  .panel-canvas { display: block; width: 100%; }
+  #process-canvas { height: 181px; margin: 5px 0; }
+  .process-readings { margin: auto 0 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+  .process-readings div { min-width: 0; padding: 7px 5px; text-align: center; background: #0a1422; border: 1px solid #1c2d43; border-radius: 4px; }
+  .process-readings dt { font-size: .7rem; color: var(--muted); }
+  .process-readings dd { font: .79rem var(--mono); margin: 4px 0 0; white-space: nowrap; }
+  .plot { position: relative; margin: 9px 0 5px; border-radius: 4px; touch-action: pan-y; cursor: crosshair; }
+  #throughput-canvas { height: 196px; }
+  .tooltip {
+    pointer-events: none; position: absolute; top: 12px; width: max-content; z-index: 1;
+    padding: 6px 8px; background: #0b1c2d; color: var(--text); border: 1px solid #3a748b;
+    border-radius: 4px; font: .74rem var(--mono); box-shadow: 0 4px 12px #050b14;
+  }
+  .chart-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 5px 12px; margin-top: auto; }
+  .chart-keys { display: flex; gap: 14px; }
+  .key { gap: 6px; white-space: nowrap; color: var(--muted); font-size: .74rem; }
+  .key::before { content: ''; width: 14px; border-top: 2px solid var(--cyan); }
+  .key.target::before { border-top: 2px dashed var(--amber); }
+  .gauges { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin: 11px 0 12px; }
+  .gauge { min-width: 0; text-align: center; }
+  .dial { aspect-ratio: 1; position: relative; display: grid; place-items: center; margin: 0 auto; width: min(100%, 84px); }
+  .dial::before {
+    content: ''; position: absolute; inset: 0; border-radius: 50%;
+    background: conic-gradient(from 225deg, var(--accent) 0 var(--angle, 0deg), #25374c var(--angle, 0deg) 270deg, transparent 270deg);
+    mask: radial-gradient(farthest-side, transparent calc(100% - 6px), #000 calc(100% - 5px));
+  }
+  .dial strong { font: 700 clamp(.79rem, 1.3vw, 1.12rem) var(--mono); }
+  .gauge-label { display: block; color: var(--muted); font-size: .73rem; white-space: nowrap; }
+  .utility-lines { display: grid; gap: 10px; border-top: 1px solid var(--line); margin: auto 0 0; padding: 11px 0 1px; }
+  .utility-line { display: grid; align-items: center; grid-template-columns: 68px 1fr 30px; gap: 7px; }
+  .utility-line dt { font-size: .73rem; color: var(--muted); }
+  .utility-line dd { margin: 0; }
+  .bar-track { display: block; height: 4px; border-radius: 3px; background: #25374c; overflow: hidden; }
+  .bar-fill { display: block; width: 0; height: 100%; border-radius: inherit; background: currentColor; transition: width 250ms ease; }
+  .util-number { text-align: right; font: .72rem var(--mono); }
+  #network-canvas { height: 168px; margin: 4px 0 6px; }
+  .map-footer { min-height: 29px; margin-top: auto; border-top: 1px solid var(--line); padding-top: 8px; display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: baseline; justify-content: space-between; }
+  #route-info { font: .73rem var(--mono); }
+  table { width: 100%; border-collapse: collapse; table-layout: fixed; margin-top: 6px; font-size: .79rem; }
+  th, td { padding: 7px 4px; border-bottom: 1px solid #203046; text-align: left; }
+  thead th { color: var(--muted); font-weight: 500; font-size: .72rem; }
+  tbody th { font: .76rem var(--mono); }
+  tbody tr:last-child > * { border-bottom: 0; }
+  .machine-col { width: 25%; }
+  .status-col { width: 30%; }
+  .temp-col { width: 19%; }
+  .status { gap: 6px; white-space: nowrap; font-size: .72rem; }
+  .machine-load { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 5px; }
+  .machine-load > span:last-child { font: .69rem var(--mono); color: var(--muted); }
+  th:last-child, td:last-child { text-align: right; }
+  .machine-temp { color: var(--muted); font: .74rem var(--mono); white-space: nowrap; }
+  .incidents .segments { margin: 6px 0 8px; align-self: start; }
+  .event-list { overflow-y: auto; max-height: 11.5rem; margin: 0; padding: 0 5px 0 0; list-style: none; scrollbar-color: #3b536c transparent; }
+  .incident {
+    display: grid; align-items: center; grid-template-columns: 6px minmax(0, 1fr) auto; gap: 7px; width: 100%;
+    min-height: 2.875rem; text-align: left; padding: 5px 6px; border: 1px solid transparent; border-bottom-color: #203046;
+    border-radius: 3px; background: transparent; color: var(--text); cursor: pointer;
+  }
+  .incident:hover { background: #17263b; }
+  .incident:focus-visible { outline-offset: -2px; }
+  .incident[aria-pressed='true'] { border-color: #34516e; background: #15283d; }
+  .incident .dot { width: 6px; height: 6px; }
+  .incident-name { display: block; font-size: .78rem; line-height: 1.25; }
+  .incident-severity, .incident time { font: .68rem/1.25 var(--mono); }
+  .incident-severity { display: block; margin-top: 3px; }
+  .incident time { color: var(--muted); }
+  .empty-events { margin: 8px 0; font-size: .82rem; color: var(--muted); }
+  .footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px 12px; padding: 12px 0 15px; color: var(--muted); font-size: .73rem; }
+  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+  [hidden] { display: none !important; }
+  @media (max-width: 1200px) {
+    .shell { padding-inline: 18px; }
+    .dashboard { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .dashboard .panel { grid-column: auto; grid-row: auto; }
+    .dashboard .throughput, .dashboard .incidents { grid-column: 1 / -1; }
+    #throughput-canvas { height: 234px; }
+    .kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  }
+  @media (max-width: 650px) {
+    .shell { padding-inline: 12px; }
+    .masthead-inner { align-items: start; flex-direction: column; padding-block: 13px; gap: 11px; }
+    .header-controls { width: 100%; justify-content: space-between; gap: 6px; }
+    .pause { min-width: 82px; padding-inline: 8px; }
+    main.shell { padding-top: 15px; }
+    .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+    .kpi { padding-inline: 10px; }
+    .kpi canvas { width: 31%; height: 35px; right: 5px; bottom: 8px; }
+    .dashboard { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+    .panel { padding-inline: 12px; }
+    #throughput-canvas { height: 204px; }
+    .segments button { min-height: 36px; }
+  }
+  @media (prefers-reduced-motion: reduce) { .bar-fill { transition: none; } }
+</style>
+</head>
+<body>
+  <header class="masthead">
+    <div class="shell masthead-inner">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <div><h1>RELAY</h1><p>Operations console</p></div>
+      </div>
+      <div class="header-controls">
+        <span class="feed-state" id="feed-state" role="status"><span class="dot" aria-hidden="true"></span><span id="feed-label">Simulation live</span></span>
+        <time class="clock" id="clock" aria-label="Simulation time"></time>
+        <button type="button" class="pause" id="pause"><span class="pause-icon" aria-hidden="true"></span><span id="pause-label">Pause</span></button>
+      </div>
+    </div>
+  </header>
+
+  <main class="shell">
+    <h2 class="section-title" id="overview-title">System overview</h2>
+    <section class="kpis" id="kpis" aria-labelledby="overview-title"></section>
+
+    <div class="dashboard">
+      <section class="panel throughput" aria-labelledby="throughput-title">
+        <header class="panel-header">
+          <h2 id="throughput-title">Production throughput</h2>
+          <div class="segments" id="windows" role="group" aria-label="Chart time range">
+            <button type="button" data-range="15" aria-pressed="false">15m</button>
+            <button type="button" data-range="30" aria-pressed="false">30m</button>
+            <button type="button" data-range="60" aria-pressed="true">60m</button>
+          </div>
+        </header>
+        <div class="plot" id="plot" role="slider" tabindex="0" aria-label="Throughput sample" aria-describedby="plot-help" aria-valuemin="0" aria-valuemax="60" aria-valuenow="60">
+          <canvas class="panel-canvas" id="throughput-canvas" aria-hidden="true"></canvas>
+          <div class="tooltip" id="plot-tooltip" aria-hidden="true" hidden></div>
+        </div>
+        <span class="sr-only" id="plot-help">Use arrow keys to inspect samples, Home for the first sample, and End for the latest.</span>
+        <div class="chart-footer">
+          <div class="chart-keys"><span class="key">Throughput</span><span class="key target">Target</span></div>
+          <span class="caption">Units per hour · UTC</span>
+        </div>
+      </section>
+
+      <section class="panel process" aria-labelledby="process-title">
+        <header class="panel-header"><h2 id="process-title">Process schematic</h2><span class="panel-meta">LINE A</span></header>
+        <canvas class="panel-canvas" id="process-canvas" role="img" aria-label="Process flow from intake to reactor to outlet"></canvas>
+        <dl class="process-readings">
+          <div><dt>Intake</dt><dd class="accent-cyan" id="tank-in"></dd></div>
+          <div><dt>Reactor</dt><dd class="accent-amber" id="tank-core"></dd></div>
+          <div><dt>Outlet</dt><dd class="accent-pink" id="tank-out"></dd></div>
+        </dl>
+      </section>
+
+      <section class="panel utilities" aria-labelledby="utility-title">
+        <header class="panel-header"><h2 id="utility-title">Utilities</h2><span class="panel-meta">SYSTEM LOAD</span></header>
+        <div class="gauges" id="gauges"></div>
+        <dl class="utility-lines" id="utility-lines"></dl>
+      </section>
+
+      <section class="panel network" aria-labelledby="network-title">
+        <header class="panel-header"><h2 id="network-title">Relay network</h2><span class="panel-meta">5 SIMULATED SITES</span></header>
+        <canvas class="panel-canvas" id="network-canvas" role="img" aria-label="Network routes from Phoenix to Santiago, Frankfurt, Singapore, and Sydney"></canvas>
+        <div class="map-footer"><span class="caption">Selected route</span><span id="route-info" role="status"></span></div>
+      </section>
+
+      <section class="panel equipment" aria-labelledby="equipment-title">
+        <header class="panel-header"><h2 id="equipment-title">Equipment status</h2><span class="panel-meta" id="online-count"></span></header>
+        <table aria-labelledby="equipment-title">
+          <thead><tr><th class="machine-col" scope="col">Asset</th><th class="status-col" scope="col">Status</th><th scope="col">Load</th><th class="temp-col" scope="col">Temp</th></tr></thead>
+          <tbody id="machine-rows"></tbody>
+        </table>
+      </section>
+
+      <section class="panel incidents" aria-labelledby="incident-title">
+        <header class="panel-header"><h2 id="incident-title">Incident feed</h2><span class="panel-meta" id="incident-count"></span></header>
+        <div class="segments" id="filters" role="group" aria-label="Incident severity">
+          <button type="button" data-filter="All" aria-pressed="true">All</button>
+          <button type="button" data-filter="Warning" aria-pressed="false">Warning</button>
+          <button type="button" data-filter="Critical" aria-pressed="false">Critical</button>
+        </div>
+        <ul class="event-list" id="event-list" aria-label="Incidents"></ul>
+        <p class="empty-events" id="empty-events" hidden>No incidents at this severity.</p>
+      </section>
+    </div>
+    <footer class="footer"><span>Simulated telemetry</span><span>1 simulated minute per update</span></footer>
+  </main>
+
+  <script>
+  'use strict';
+
+  const $ = (id) => document.getElementById(id);
+  const colors = {
+    cyan: '#43e5f4', lime: '#b8f55b', amber: '#ffc464', pink: '#ff64ab',
+    violet: '#b59cff', muted: '#9aacbf', grid: '#24384f',
+  };
+  const mono = getComputedStyle(document.documentElement).getPropertyValue('--mono').trim();
+  const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+  const comma = new Intl.NumberFormat('en-US');
+  const minute = 60000;
+  const epoch = Date.UTC(2026, 0, 1, 14, 32);
+  const timeAt = (step) => new Date(epoch + step * minute).toISOString();
+  const clockAt = (step) => timeAt(step).slice(11, 16);
+
+  const machines = [
+    ['MX-101', 64, 47], ['MX-102', 72, 55], ['MX-103', 90, 68],
+    ['MX-104', 69, 51], ['MX-105', 95, 82], ['MX-106', 58, 42],
+  ];
+  const utilityMetrics = [
+    ['Grid power', 'lime'], ['Cooling', 'cyan'], ['Inert gas', 'violet'],
+    ['Line Alpha', 'cyan'], ['Line Beta', 'lime'], ['Line Gamma', 'amber'],
+  ];
+  const metrics = [
+    { label: 'Throughput', unit: 'u/h', key: 'flow', tone: 'cyan', format: (n) => comma.format(n), delta: ' u/h' },
+    { label: 'Active assets', unit: '/ 06', key: 'active', tone: 'lime', format: (n) => String(n).padStart(2, '0'), delta: '' },
+    { label: 'Energy load', unit: 'MW', key: 'energy', tone: 'amber', format: (n) => n.toFixed(1), delta: ' MW' },
+    { label: 'Thermal efficiency', unit: '%', key: 'thermal', tone: 'cyan', format: (n) => n.toFixed(1), delta: ' pp' },
+    { label: 'Critical alarms', unit: '', key: 'critical', tone: 'pink', format: (n) => String(n).padStart(2, '0'), delta: '' },
+    { label: 'Network latency', unit: 'ms', key: 'latency', tone: 'violet', format: (n) => String(n), delta: ' ms' },
+  ];
+
+  function sample(step) {
+    const wave = (pace, offset = 0) => Math.sin(step * pace + offset);
+    const jitter = wave(1.69) * 102 + wave(.91, 1) * 105;
+    const assets = machines.map(([, baseLoad, baseTemp], index) => {
+      const load = Math.round(clamp(baseLoad + wave(.32, index * 1.4) * 7 + wave(.83, index) * 3, 40, 100));
+      const temp = Math.round(baseTemp + (load - baseLoad) * .7 + wave(.46, index) * 1.5);
+      const status = temp >= 76 ? 'Critical' : temp >= 64 ? 'Warning' : 'Online';
+      return { load, temp, status };
+    });
+
+    return {
+      step, assets,
+      flow: Math.round(7830 + wave(.17, .4) * 810 + wave(.36, 2.1) * 285 + wave(.071, .12) * 460 + jitter),
+      target: Math.round(8090 + wave(.12, .8) * 380 + wave(.27, 1.1) * 115),
+      active: assets.filter((asset) => asset.status !== 'Critical').length,
+      critical: assets.filter((asset) => asset.status === 'Critical').length,
+      energy: +(12.4 + wave(.29, .3) * .58 + wave(.71) * .19).toFixed(1),
+      thermal: +(92.8 + wave(.21, .8) * 1.2 + wave(.95) * .26).toFixed(1),
+      latency: Math.round(27 + wave(.24, .3) * 6 + wave(1.07, 2) * 3),
+      tanks: [Math.round(68 + wave(.22, .2) * 8), Math.round(82 + wave(.18, .9) * 6), Math.round(46 + wave(.31, .3) * 10)],
+      utilities: [85, 74, 91, 93, 77, 52].map((base, index) => Math.round(base + wave(.22 + index * .03, index * .72) * 5)),
+    };
+  }
+
+  const samples = Array.from({ length: 61 }, (_, index) => sample(index - 60));
+  let range = 60;
+  let inspectStep = null;
+  let inspectionMode = '';
+  let timer;
+
+  const kpis = metrics.map(({ label, unit, tone }) => {
+    const card = document.createElement('article');
+    card.className = 'kpi';
+    card.style.setProperty('--accent', colors[tone]);
+    card.innerHTML = `<h3>${label}</h3><p class="kpi-reading"><span class="kpi-value"></span><span class="kpi-unit">${unit}</span></p><span class="kpi-trend"></span><canvas aria-hidden="true"></canvas>`;
+    $('kpis').append(card);
+    return {
+      value: card.querySelector('.kpi-value'), trend: card.querySelector('.kpi-trend'),
+      canvas: card.querySelector('canvas'),
+    };
+  });
+
+  const utilities = utilityMetrics.map(([label, tone], index) => {
+    const item = document.createElement('div');
+    if (index < 3) {
+      item.className = 'gauge';
+      item.style.setProperty('--accent', colors[tone]);
+      item.innerHTML = `<span class="dial"><strong></strong></span><span class="gauge-label">${label}</span>`;
+      $('gauges').append(item);
+      return { dial: item.firstElementChild, number: item.querySelector('strong') };
+    }
+    item.className = `utility-line accent-${tone}`;
+    item.innerHTML = `<dt>${label}</dt><dd><span class="bar-track" aria-hidden="true"><span class="bar-fill"></span></span></dd><dd class="util-number"></dd>`;
+    $('utility-lines').append(item);
+    return { bar: item.querySelector('.bar-fill'), number: item.lastElementChild };
+  });
+
+  const machineRows = machines.map(([id]) => {
+    const row = document.createElement('tr');
+    row.innerHTML = `<th scope="row">${id}</th><td><span class="status"><span class="dot" aria-hidden="true"></span><span></span></span></td><td><span class="machine-load"><span class="bar-track" aria-hidden="true"><span class="bar-fill"></span></span><span></span></span></td><td class="machine-temp"></td>`;
+    $('machine-rows').append(row);
+    return { status: row.querySelector('.status'), load: row.querySelector('.machine-load'), temp: row.lastElementChild };
+  });
+
+  function updateReadings(current) {
+    const datetime = timeAt(current.step);
+    $('clock').dateTime = datetime;
+    $('clock').textContent = `${clockAt(current.step)} UTC`;
+    metrics.forEach(({ key, format, delta }, index) => {
+      const difference = +(current[key] - samples.at(-6)[key]).toFixed(1);
+      kpis[index].value.textContent = format(current[key]);
+      kpis[index].trend.textContent = difference === 0 ? 'Steady · 5m' : `${difference > 0 ? '+' : '−'}${comma.format(Math.abs(difference))}${delta} · 5m`;
+    });
+    ['tank-in', 'tank-core', 'tank-out'].forEach((id, index) => {
+      $(id).textContent = `${current.tanks[index]}%`;
+    });
+    utilities.forEach(({ dial, bar, number }, index) => {
+      const value = current.utilities[index];
+      number.textContent = `${value}%`;
+      if (dial) dial.style.setProperty('--angle', `${value * 2.7}deg`);
+      else bar.style.width = `${value}%`;
+    });
+    machineRows.forEach(({ status, load, temp }, index) => {
+      const asset = current.assets[index];
+      const tone = { Online: 'lime', Warning: 'amber', Critical: 'pink' }[asset.status];
+      status.className = `status accent-${tone}`;
+      status.lastElementChild.textContent = asset.status;
+      load.className = `machine-load accent-${tone}`;
+      load.querySelector('.bar-fill').style.width = `${asset.load}%`;
+      load.lastElementChild.textContent = `${asset.load}%`;
+      temp.textContent = `${asset.temp}°C`;
+    });
+    $('online-count').textContent = `${current.active} / ${machines.length} ACTIVE`;
+  }
+
+  function prepare(canvas) {
+    const { width, height } = canvas.getBoundingClientRect();
+    if (!width || !height) return null;
+    const scale = Math.min(window.devicePixelRatio || 1, 2);
+    const pixelWidth = Math.round(width * scale);
+    const pixelHeight = Math.round(height * scale);
+    if (canvas.width !== pixelWidth) canvas.width = pixelWidth;
+    if (canvas.height !== pixelHeight) canvas.height = pixelHeight;
+    const context = canvas.getContext('2d');
+    context.setTransform(pixelWidth / width, 0, 0, pixelHeight / height, 0, 0);
+    context.clearRect(0, 0, width, height);
+    return { context, width, height };
+  }
+
+  function linePath(context, points) {
+    context.beginPath();
+    points.forEach(([x, y], index) => {
+      if (index === 0) context.moveTo(x, y);
+      else context.lineTo(x, y);
+    });
+  }
+
+  function area(context, points, bottom, color, opacity) {
+    linePath(context, points);
+    context.lineTo(points.at(-1)[0], bottom);
+    context.lineTo(points[0][0], bottom);
+    context.closePath();
+    const shade = context.createLinearGradient(0, Math.min(...points.map(([, y]) => y)), 0, bottom);
+    shade.addColorStop(0, color + opacity);
+    shade.addColorStop(1, color + '00');
+    context.fillStyle = shade;
+    context.fill();
+  }
+
+  function stroke(context, points, color, width = 1) {
+    linePath(context, points);
+    context.strokeStyle = color;
+    context.lineWidth = width;
+    context.stroke();
+  }
+
+  function drawSparks() {
+    metrics.forEach(({ key, tone }, index) => {
+      const surface = prepare(kpis[index].canvas);
+      if (!surface) return;
+      const { context, width, height } = surface;
+      const values = samples.slice(-16).map((entry) => entry[key]);
+      const low = Math.min(...values);
+      const spread = Math.max(...values) - low || 1;
+      const points = values.map((value, sampleIndex) => [
+        1 + (width - 3) * sampleIndex / (values.length - 1),
+        height - 7 - (height - 14) * (value - low) / spread,
+      ]);
+      area(context, points, height, colors[tone], '45');
+      stroke(context, points, colors[tone], 1.5);
+      const [x, y] = points.at(-1);
+      context.fillStyle = colors[tone];
+      context.beginPath();
+      context.arc(x - 1, y, 2, 0, Math.PI * 2);
+      context.fill();
+    });
+  }
+
+  const plot = $('plot');
+  const tooltip = $('plot-tooltip');
+  function plotBounds(width, height) {
+    return { left: 41, right: width - 18, top: 12, bottom: height - 24 };
+  }
+
+  function drawThroughput() {
+    const entries = samples.slice(-range - 1);
+    const selected = inspectStep === null ? range : clamp(inspectStep - entries[0].step, 0, range);
+    const entry = entries[selected];
+    plot.setAttribute('aria-valuemax', range);
+    plot.setAttribute('aria-valuenow', selected);
+    plot.setAttribute('aria-valuetext', `${clockAt(entry.step)} UTC, ${comma.format(entry.flow)} units per hour, target ${comma.format(entry.target)}`);
+    tooltip.hidden = inspectStep === null;
+
+    const surface = prepare($('throughput-canvas'));
+    if (!surface) return;
+    const { context, width, height } = surface;
+    const { left, right, top, bottom } = plotBounds(width, height);
+    const xAt = (index) => left + (right - left) * index / range;
+    const yAt = (value) => bottom - (bottom - top) * (value - 6000) / 4000;
+
+    context.font = `11px ${mono}`;
+    context.textBaseline = 'middle';
+    context.textAlign = 'right';
+    for (let value = 6000; value <= 10000; value += 1000) {
+      const y = yAt(value);
+      context.setLineDash(value === 6000 ? [] : [2, 4]);
+      stroke(context, [[left, y], [right, y]], colors.grid);
+      context.fillStyle = colors.muted;
+      context.fillText(`${value / 1000}k`, left - 8, y);
+    }
+    const divisions = width < 440 ? 3 : 5;
+    context.textAlign = 'center';
+    for (let index = 0; index <= divisions; index++) {
+      const offset = Math.round(range * index / divisions);
+      const x = xAt(offset);
+      context.setLineDash([2, 4]);
+      stroke(context, [[x, top], [x, bottom]], colors.grid);
+      context.fillStyle = colors.muted;
+      context.fillText(clockAt(entries[offset].step), x, bottom + 14);
+    }
+
+    context.setLineDash([]);
+    const points = entries.map(({ flow }, index) => [xAt(index), yAt(flow)]);
+    area(context, points, bottom, colors.cyan, '48');
+    context.setLineDash([5, 5]);
+    stroke(context, entries.map(({ target }, index) => [xAt(index), yAt(target)]), colors.amber, 1.35);
+    context.setLineDash([]);
+    context.lineJoin = 'round';
+    stroke(context, points, colors.cyan, 2);
+    const [x, y] = points[selected];
+    if (inspectStep !== null) {
+      context.setLineDash([3, 3]);
+      stroke(context, [[x, top], [x, bottom]], '#56a5ba');
+      context.setLineDash([]);
+      tooltip.textContent = `${clockAt(entry.step)} · ${comma.format(entry.flow)} u/h`;
+      tooltip.style.left = `${clamp(x + 8, 3, width - tooltip.offsetWidth - 3)}px`;
+    }
+    context.beginPath();
+    context.arc(x, y, 3.5, 0, Math.PI * 2);
+    context.fillStyle = '#0c1726';
+    context.fill();
+    context.strokeStyle = colors.cyan;
+    context.lineWidth = 2;
+    context.stroke();
+  }
+
+  function drawProcess(current) {
+    const surface = prepare($('process-canvas'));
+    if (!surface) return;
+    const { context, width, height } = surface;
+    context.fillStyle = '#22364c';
+    for (let x = 6; x < width; x += 11) {
+      for (let y = 8; y < height; y += 11) context.fillRect(x, y, 1, 1);
+    }
+
+    const centers = [width * .19, width * .5, width * .81];
+    const half = Math.min(23, width * .09);
+    const top = 29;
+    const bottom = 112;
+    const pipe = 71;
+    const returnLine = 153;
+    const tones = [colors.cyan, colors.amber, colors.pink];
+    const labels = ['TANK A', 'CORE', 'TANK B'];
+
+    centers.slice(1).forEach((center, index) => {
+      const start = centers[index] + half;
+      const end = center - half;
+      const middle = (start + end) / 2;
+      stroke(context, [[start, pipe], [end, pipe]], '#346d84', 2);
+      stroke(context, [[middle - 3, pipe - 3], [middle + 2, pipe], [middle - 3, pipe + 3]], colors.cyan, 1.5);
+    });
+    stroke(context, [[1, pipe], [centers[0] - half, pipe]], '#346d84', 2);
+    stroke(context, [[centers[2] + half, pipe], [width - 1, pipe]], '#346d84', 2);
+    context.setLineDash([4, 4]);
+    stroke(context, [[centers[0], bottom], [centers[0], returnLine], [centers[2], returnLine], [centers[2], bottom]], '#46879a', 1.3);
+    context.setLineDash([]);
+    stroke(context, [[centers[1], bottom], [centers[1], returnLine]], '#8e6b39', 1.3);
+
+    centers.forEach((center, index) => {
+      const value = current.tanks[index];
+      const tone = tones[index];
+      const level = bottom - 3 - (bottom - top - 6) * value / 100;
+      const x = center - half;
+      context.fillStyle = '#0a1422';
+      context.fillRect(x, top, half * 2, bottom - top);
+      const fill = context.createLinearGradient(0, level, 0, bottom);
+      fill.addColorStop(0, tone + '66');
+      fill.addColorStop(1, tone + '18');
+      context.fillStyle = fill;
+      context.fillRect(x + 2, level, half * 2 - 4, bottom - level - 2);
+      context.strokeStyle = tone + '99';
+      context.lineWidth = 1;
+      context.strokeRect(x, top, half * 2, bottom - top);
+      context.setLineDash([2, 2]);
+      stroke(context, [[x + 2, level], [x + half * 2 - 2, level]], tone);
+      context.setLineDash([]);
+      context.textAlign = 'center';
+      context.font = `10px ${mono}`;
+      context.fillStyle = colors.muted;
+      context.fillText(labels[index], center, 19);
+      context.fillStyle = tone;
+      context.font = `bold 12px ${mono}`;
+      context.fillText(`${value}%`, center, 91);
+
+      context.beginPath();
+      context.moveTo(center, returnLine - 5);
+      context.lineTo(center + 5, returnLine);
+      context.lineTo(center, returnLine + 5);
+      context.lineTo(center - 5, returnLine);
+      context.closePath();
+      context.fillStyle = '#0c1726';
+      context.fill();
+      context.strokeStyle = tone;
+      context.stroke();
+    });
+    context.textAlign = 'center';
+    context.font = `10px ${mono}`;
+    context.fillStyle = colors.muted;
+    context.fillText('RETURN LOOP', width / 2, 174);
+  }
+
+  const regions = [
+    [[-169, 66], [-149, 61], [-139, 58], [-125, 51], [-125, 42], [-117, 32], [-104, 22], [-96, 18], [-88, 21], [-84, 13], [-78, 8], [-82, 10], [-91, 15], [-103, 22], [-105, 27], [-97, 26], [-90, 29], [-83, 24], [-80, 27], [-81, 33], [-74, 41], [-64, 45], [-59, 53], [-75, 57], [-84, 54], [-85, 63], [-72, 68], [-80, 75], [-109, 74], [-128, 70], [-154, 72]],
+    [[-81, 8], [-75, 11], [-65, 10], [-53, 5], [-48, -2], [-35, -7], [-40, -21], [-49, -29], [-57, -36], [-65, -49], [-68, -55], [-73, -47], [-73, -35], [-70, -22], [-77, -10], [-81, -4]],
+    [[-59, 59], [-49, 60], [-39, 66], [-23, 73], [-21, 80], [-46, 83], [-61, 78], [-68, 73]],
+    [[-17, 15], [-15, 23], [-9, 31], [2, 36], [13, 37], [24, 32], [33, 30], [37, 19], [45, 10], [51, 11], [44, 1], [40, -9], [35, -19], [32, -28], [22, -35], [16, -31], [12, -18], [7, -6], [8, 4], [-1, 5], [-11, 6]],
+    [[-10, 37], [-10, 44], [0, 50], [9, 55], [13, 58], [12, 65], [23, 71], [31, 70], [32, 63], [41, 66], [57, 69], [65, 74], [89, 77], [112, 73], [126, 73], [145, 69], [166, 70], [178, 66], [168, 60], [158, 58], [154, 51], [143, 52], [136, 48], [130, 42], [121, 39], [121, 31], [114, 23], [107, 20], [107, 10], [100, 6], [97, 18], [90, 22], [82, 18], [77, 8], [72, 19], [68, 25], [57, 26], [54, 17], [48, 14], [42, 20], [36, 29], [34, 36], [25, 35], [23, 39], [15, 38], [11, 43], [6, 43], [0, 37]],
+    [[-11, 51], [-7, 59], [-3, 60], [2, 53], [0, 50]],
+    [[128, 31], [131, 34], [136, 36], [141, 42], [146, 45], [144, 41], [141, 35], [135, 31]],
+    [[96, 5], [107, 4], [118, 6], [129, 2], [141, -3], [149, -7], [140, -10], [126, -8], [114, -9], [103, -6]],
+    [[112, -22], [115, -33], [126, -33], [135, -31], [145, -39], [151, -33], [154, -25], [147, -18], [142, -11], [136, -14], [130, -13], [123, -17]],
+    [[166, -47], [171, -43], [173, -38], [178, -36], [177, -43], [172, -47]],
+  ];
+  const sites = [
+    { name: 'Phoenix', lon: -112, lat: 33, xOffset: -7, yOffset: -10, tone: colors.cyan },
+    { name: 'Santiago', lon: -71, lat: -33, xOffset: -7, yOffset: 13, tone: colors.amber },
+    { name: 'Frankfurt', lon: 9, lat: 50, xOffset: 7, yOffset: -9, tone: colors.pink },
+    { name: 'Singapore', lon: 104, lat: 1, xOffset: -7, yOffset: 13, tone: colors.cyan },
+    { name: 'Sydney', lon: 151, lat: -34, xOffset: -7, yOffset: 13, tone: colors.violet },
+  ];
+  const eventTypes = [
+    { name: 'Thermal limit exceeded', severity: 'Critical', site: 2 },
+    { name: 'Packet loss spike', severity: 'Warning', site: 3 },
+    { name: 'Relay back online', severity: 'Info', site: 1 },
+    { name: 'Backup link saturated', severity: 'Warning', site: 4 },
+    { name: 'Primary link dropped', severity: 'Critical', site: 1 },
+    { name: 'Cooling loop recovered', severity: 'Info', site: 2 },
+  ];
+  const severityTone = { Critical: 'pink', Warning: 'amber', Info: 'cyan' };
+  const incidents = [];
+  const eventList = $('event-list');
+  let filter = 'All';
+  let selectedIncident = null;
+
+  function addIncident(step, type) {
+    const incident = { step, ...type };
+    const item = document.createElement('li');
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'incident';
+    const tone = severityTone[incident.severity];
+    button.innerHTML = `<span class="dot accent-${tone}" aria-hidden="true"></span><span><span class="incident-name">${incident.name}</span><span class="incident-severity accent-${tone}">${incident.severity}</span></span><time datetime="${timeAt(step)}">${clockAt(step)}</time>`;
+    item.append(button);
+    incident.button = button;
+    incident.item = item;
+    incidents.unshift(incident);
+    eventList.prepend(item);
+    if (incidents.length > 20) incidents.pop().item.remove();
+  }
+
+  function refreshIncidentSelection() {
+    let visible = 0;
+    for (const incident of incidents) {
+      incident.item.hidden = filter !== 'All' && filter !== incident.severity;
+      if (!incident.item.hidden) visible++;
+    }
+    if (selectedIncident && (selectedIncident.item.hidden || !selectedIncident.item.isConnected)) selectedIncident = null;
+    for (const incident of incidents) incident.button.setAttribute('aria-pressed', incident === selectedIncident);
+
+    $('incident-count').textContent = `${visible} ${visible === 1 ? 'EVENT' : 'EVENTS'}`;
+    $('empty-events').hidden = visible !== 0;
+    const route = $('route-info');
+    const label = selectedIncident ? `Phoenix → ${sites[selectedIncident.site].name}` : 'Select an incident';
+    route.className = selectedIncident ? `accent-${severityTone[selectedIncident.severity]}` : 'caption';
+    if (route.textContent !== label) route.textContent = label;
+    drawNetwork();
+  }
+
+  const land = new Path2D();
+  for (const region of regions) {
+    land.moveTo(...region[0]);
+    for (const [lon, lat] of region.slice(1)) land.lineTo(lon, lat);
+    land.closePath();
+  }
+  const mapDots = [];
+  const geometry = document.createElement('canvas').getContext('2d');
+  for (let lat = -55; lat <= 84; lat += 4.6) {
+    for (let lon = -171; lon <= 180; lon += 4.6) {
+      if (geometry.isPointInPath(land, lon, lat)) mapDots.push([lon, lat]);
+    }
+  }
+
+  function drawNetwork() {
+    const surface = prepare($('network-canvas'));
+    if (!surface) return;
+    const { context, width, height } = surface;
+    const mapWidth = Math.min(width - 14, (height - 12) * 2.6);
+    const mapHeight = Math.min(height - 15, mapWidth / 2.6);
+    const xAt = (lon) => (width - mapWidth) / 2 + (lon + 180) * mapWidth / 360;
+    const yAt = (lat) => (height - mapHeight) / 2 + (84 - lat) * mapHeight / 144;
+    const points = sites.map(({ lon, lat }) => [xAt(lon), yAt(lat)]);
+    const active = selectedIncident?.site;
+
+    context.fillStyle = '#355272';
+    for (const [lon, lat] of mapDots) context.fillRect(xAt(lon), yAt(lat), 1.6, 1.6);
+
+    const [startX, startY] = points[0];
+    const routeIndices = [1, 2, 3, 4].filter((index) => index !== active);
+    if (active) routeIndices.push(active);
+    for (const index of routeIndices) {
+      const [x, y] = points[index];
+      const isActive = index === active;
+      const tone = isActive ? colors[severityTone[selectedIncident.severity]] : sites[index].tone;
+      context.beginPath();
+      context.moveTo(startX, startY);
+      const arch = Math.min(80, 14 + Math.abs(x - startX) * .34);
+      context.quadraticCurveTo((x + startX) / 2, Math.max(2, Math.min(startY, y) - arch), x, y);
+      context.strokeStyle = isActive ? tone : tone + '88';
+      context.lineWidth = isActive ? 2 : 1.15;
+      context.setLineDash(isActive ? [] : [3, 4]);
+      context.stroke();
+    }
+    context.setLineDash([]);
+    sites.forEach(({ name, tone, xOffset, yOffset }, index) => {
+      const [x, y] = points[index];
+      const isActive = index === active;
+      const color = isActive ? colors[severityTone[selectedIncident.severity]] : tone;
+      context.beginPath();
+      context.arc(x, y, isActive ? 8 : 5.5, 0, Math.PI * 2);
+      context.fillStyle = color + '22';
+      context.fill();
+      context.strokeStyle = color + 'aa';
+      context.lineWidth = 1;
+      context.stroke();
+      context.beginPath();
+      context.arc(x, y, isActive ? 3.5 : 2.4, 0, Math.PI * 2);
+      context.fillStyle = color;
+      context.fill();
+      context.textAlign = xOffset > 0 ? 'left' : 'right';
+      context.textBaseline = 'middle';
+      context.font = `10px ${mono}`;
+      context.fillStyle = isActive ? color : '#bed0e3';
+      context.fillText(name, x + xOffset, y + yOffset);
+    });
+  }
+
+  $('windows').addEventListener('click', (event) => {
+    const button = event.target.closest('button');
+    if (!button) return;
+    range = Number(button.dataset.range);
+    inspectStep = null;
+    for (const item of $('windows').querySelectorAll('button')) item.setAttribute('aria-pressed', item === button);
+    drawThroughput();
+  });
+
+  function inspectPointer(event) {
+    const { left: origin, width, height } = plot.getBoundingClientRect();
+    const { left, right } = plotBounds(width, height);
+    const index = Math.round(clamp((event.clientX - origin - left) / (right - left), 0, 1) * range);
+    const step = samples.at(-1).step - range + index;
+    if (step === inspectStep && inspectionMode === event.pointerType) return;
+    inspectStep = step;
+    inspectionMode = event.pointerType;
+    drawThroughput();
+  }
+
+  function clearInspection() {
+    inspectStep = null;
+    inspectionMode = '';
+    drawThroughput();
+  }
+
+  plot.addEventListener('pointermove', (event) => {
+    if (event.pointerType !== 'touch') inspectPointer(event);
+  });
+  plot.addEventListener('pointerdown', inspectPointer);
+  plot.addEventListener('pointerleave', () => {
+    if (inspectionMode === 'mouse' || inspectionMode === 'pen') clearInspection();
+  });
+  plot.addEventListener('pointercancel', clearInspection);
+  plot.addEventListener('blur', clearInspection);
+  plot.addEventListener('focus', () => {
+    if (inspectStep === null && plot.matches(':focus-visible')) {
+      inspectStep = samples.at(-1).step;
+      inspectionMode = 'keyboard';
+      drawThroughput();
+    }
+  });
+  plot.addEventListener('keydown', (event) => {
+    const latest = samples.at(-1).step;
+    const first = latest - range;
+    const current = clamp(inspectStep ?? latest, first, latest);
+    const steps = { ArrowLeft: current - 1, ArrowDown: current - 1, ArrowRight: current + 1, ArrowUp: current + 1, Home: first, End: latest };
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      clearInspection();
+    } else if (Object.hasOwn(steps, event.key)) {
+      event.preventDefault();
+      inspectStep = clamp(steps[event.key], first, latest);
+      inspectionMode = 'keyboard';
+      drawThroughput();
+    }
+  });
+
+  $('filters').addEventListener('click', (event) => {
+    const button = event.target.closest('button');
+    if (!button) return;
+    filter = button.dataset.filter;
+    for (const item of $('filters').querySelectorAll('button')) item.setAttribute('aria-pressed', item === button);
+    refreshIncidentSelection();
+  });
+
+  eventList.addEventListener('click', (event) => {
+    const button = event.target.closest('button');
+    if (!button) return;
+    const incident = incidents.find((item) => item.button === button);
+    selectedIncident = selectedIncident === incident ? null : incident;
+    refreshIncidentSelection();
+  });
+
+  function drawTelemetry() {
+    drawSparks();
+    drawThroughput();
+    drawProcess(samples.at(-1));
+  }
+
+  function tick() {
+    const current = sample(samples.at(-1).step + 1);
+    samples.push(current);
+    samples.shift();
+    if (current.step % 4 === 0) {
+      addIncident(current.step, eventTypes[(current.step / 4 - 1) % eventTypes.length]);
+      refreshIncidentSelection();
+    }
+    updateReadings(current);
+    drawTelemetry();
+  }
+
+  $('pause').addEventListener('click', () => {
+    const paused = timer !== undefined;
+    if (paused) {
+      clearInterval(timer);
+      timer = undefined;
+    } else timer = setInterval(tick, 2000);
+    $('pause').classList.toggle('paused', paused);
+    $('feed-state').classList.toggle('paused', paused);
+    $('pause-label').textContent = paused ? 'Resume' : 'Pause';
+    $('feed-label').textContent = paused ? 'Simulation paused' : 'Simulation live';
+  });
+
+  [3, 2, 1, 0].forEach((index) => addIncident(-index * 3, eventTypes[index]));
+  selectedIncident = incidents[0];
+  refreshIncidentSelection();
+  updateReadings(samples.at(-1));
+  drawTelemetry();
+  const resize = new ResizeObserver(() => {
+    drawTelemetry();
+    drawNetwork();
+  });
+  resize.observe(document.querySelector('main'));
+  timer = setInterval(tick, 2000);
+  </script>
+</body>
+</html>
